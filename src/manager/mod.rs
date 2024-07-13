@@ -1,24 +1,46 @@
 use crate::bot::Bot;
+use crate::connect::get_oauth_links;
 use crate::types::e_login_method::ELoginMethod;
+use spdlog::prelude::*;
 
 pub struct Manager {
     bots: Vec<Bot>,
+    oauth_links: Vec<String>,
 }
 
 impl Manager {
-    pub fn new() -> Manager {
-        Manager { bots: Vec::new() }
+    pub fn new() -> Result<Manager, String> {
+        info!("Getting OAuth links...");
+        let links = match get_oauth_links() {
+            Ok(links) => links,
+            Err(err) => return Err(err.to_string()),
+        };
+        if links.len() < 3 {
+            return Err("Something's wrong".to_string());
+        }
+
+        info!("Successfully got OAuth links for: apple, google and legacy");
+        info!("Initialized Manager");
+
+        Ok(Manager {
+            bots: Vec::new(),
+            oauth_links: links,
+        })
     }
 }
 
-pub trait BotManagement {
-    fn add_bot(&mut self, username: &str, password: &str, method: ELoginMethod);
-    fn remove_bot(&mut self, username: &str);
-    fn get_bot(&self, username: &str);
-}
-
-impl BotManagement for Manager {
-    fn add_bot(&mut self, username: &str, password: &str, method: ELoginMethod) {}
-    fn remove_bot(&mut self, username: &str) {}
-    fn get_bot(&self, username: &str) {}
+impl Manager {
+    pub fn add_bot(&mut self, username: &str, password: &str, method: ELoginMethod) {
+        info!("Adding bot: {}", username);
+        let mut bot = Bot::new(
+            username.to_string(),
+            password.to_string(),
+            method,
+            self.oauth_links.clone(),
+        );
+        bot.start();
+        self.bots.push(bot);
+    }
+    pub fn remove_bot(&mut self, username: &str) {}
+    pub fn get_bot(&self, username: &str) {}
 }

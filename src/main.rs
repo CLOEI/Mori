@@ -3,11 +3,17 @@ mod connect;
 mod manager;
 mod types;
 
-use manager::{BotManagement, Manager};
+use manager::Manager;
+use spdlog::prelude::*;
 use types::e_login_method::ELoginMethod;
 
 fn main() {
-    let mut manager = Manager::new();
+    let mut manager = match Manager::new() {
+        Ok(manager) => manager,
+        Err(err) => {
+            error!("Error: {}", err);
+            std::process::exit(1);
+        }
+    };
     manager.add_bot("Peroperod", "", ELoginMethod::LEGACY);
-    connect::get_oauth_links();
 }
