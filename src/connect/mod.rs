@@ -1,26 +1,73 @@
+use headless_chrome::Browser;
 use std::{collections::HashMap, error::Error};
 
-use byteorder::{ByteOrder, LittleEndian};
-use enet::*;
-use headless_chrome::Browser;
-use spdlog::{info, warn};
+use spdlog::info;
+
+use crate::bot::Bot;
+use crate::types::e_login_method::ELoginMethod;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
 
 pub struct Connect {
-    parsed_server_data: HashMap<String, String>,
+    username: String,
+    password: String,
+    method: ELoginMethod,
+    oauth_links: Vec<String>,
+    bot: Bot,
 }
 
 impl Connect {
-    pub fn new() -> Connect {
+    pub fn new(
+        username: String,
+        password: String,
+        method: ELoginMethod,
+        oauth_links: Vec<String>,
+    ) -> Connect {
         Connect {
-            parsed_server_data: HashMap::new(),
+            username,
+            password,
+            method,
+            oauth_links,
+            bot: Bot::new(),
         }
     }
 }
 
 impl Connect {
+    pub fn start(&mut self) {
+        info!("Getting token for {}", self.username);
+        match self.method {
+            ELoginMethod::APPLE => {
+                self.get_apple_token(
+                    self.oauth_links[0].as_str(),
+                    self.username.as_str(),
+                    self.password.as_str(),
+                );
+            }
+            ELoginMethod::GOOGLE => {
+                self.get_google_token(
+                    self.oauth_links[1].as_str(),
+                    self.username.as_str(),
+                    self.password.as_str(),
+                );
+            }
+            ELoginMethod::LEGACY => {
+                let res = self
+                    .get_legacy_token(
+                        self.oauth_links[2].as_str(),
+                        self.username.as_str(),
+                        self.password.as_str(),
+                    )
+                    .unwrap();
+                self.bot.token = res;
+            }
+        }
+        info!("Received the token: {}", self.bot.token);
+        self.to_http();
+        self.bot.login();
+    }
+
     pub fn to_http(&mut self) {
         let req = ureq::post("https://www.growtopia1.com/growtopia/server_data.php").set(
             "User-Agent",
@@ -32,49 +79,9 @@ impl Connect {
         let body = res.into_string().unwrap();
         self.parse_server_data(body);
     }
-    pub fn to_enet(&self) {
-        let enet = Enet::new().expect("Failed to initialize ENet");
 
-        let mut enet_host = Enet::create_host::<()>(
-            &enet,
-            None,
-            1,
-            ChannelLimit::Limited(1),
-            BandwidthLimit::Unlimited,
-            BandwidthLimit::Unlimited,
-            true,
-        )
-        .expect("Failed to create ENet host");
-
-        info!(
-            "Connecting to {}:{}",
-            self.parsed_server_data["server"], self.parsed_server_data["port"]
-        );
-        let server = self.parsed_server_data["server"]
-            .parse()
-            .expect("Failed to parse server address");
-        let port = self.parsed_server_data["port"]
-            .parse()
-            .expect("Failed to parse server port");
-        let mut enet_peer = enet_host
-            .connect(&Address::new(server, port), 2, 0)
-            .expect("Failed to connect to the server");
-
-        loop {
-            match enet_host.service(1000).expect("Service failed") {
-                Some(Event::Connect(_)) => info!("Connected to the server"),
-                Some(Event::Disconnect(..)) => info!("Disconnected from the server"),
-                Some(Event::Receive { ref packet, .. }) => {
-                    let data = packet.data();
-                    let packet_id = LittleEndian::read_u32(&data[0..4]);
-                    info!("Received packet with ID: {}", packet_id);
-                }
-                _ => (),
-            }
-        }
-    }
     pub fn parse_server_data(&mut self, data: String) {
-        self.parsed_server_data = data
+        self.bot.parsed_server_data = data
             .lines()
             .filter_map(|line| {
                 let mut parts = line.splitn(2, '|');
@@ -85,6 +92,7 @@ impl Connect {
             })
             .collect::<HashMap<String, String>>();
     }
+
     pub fn get_apple_token(&self, url: &str, username: &str, password: &str) {
         println!("Getting apple token");
     }

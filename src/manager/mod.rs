@@ -1,10 +1,9 @@
-use crate::bot::Bot;
-use crate::connect::get_oauth_links;
+use crate::connect::{get_oauth_links, Connect};
 use crate::types::e_login_method::ELoginMethod;
 use spdlog::prelude::*;
 
 pub struct Manager {
-    bots: Vec<Box<Bot>>,
+    bots: Vec<Box<Connect>>,
     oauth_links: Vec<String>,
 }
 
@@ -32,7 +31,7 @@ impl Manager {
 impl Manager {
     pub fn add_bot(&mut self, username: &str, password: &str, method: ELoginMethod) {
         info!("Adding bot: {}", username);
-        let mut bot = Bot::new(
+        let mut bot = Connect::new(
             username.to_string(),
             password.to_string(),
             method,
