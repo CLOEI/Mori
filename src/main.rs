@@ -2,6 +2,7 @@ mod bot;
 mod connect;
 mod manager;
 mod types;
+mod utils;
 
 use manager::Manager;
 use spdlog::prelude::*;
@@ -12,7 +13,7 @@ fn main() {
         Ok(manager) => manager,
         Err(err) => {
             error!("Error: {}", err);
-            std::process::exit(1);
+            return;
         }
     };
     manager.add_bot("Peroperod", "", ELoginMethod::LEGACY);

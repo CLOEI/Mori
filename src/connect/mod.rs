@@ -1,4 +1,6 @@
-use fantoccini::{ClientBuilder, Locator};
+use std::error::Error;
+
+use headless_chrome::{Browser, LaunchOptionsBuilder};
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -22,35 +24,29 @@ impl Connect {
     pub fn get_google_token(&self, url: &str, username: &str, password: &str) {
         println!("Getting google token");
     }
-    #[tokio::main]
-    pub async fn get_legacy_token(
+    #[warn(unused_must_use)]
+    pub fn get_legacy_token(
         &self,
         url: &str,
         username: &str,
         password: &str,
-    ) -> Result<String, fantoccini::error::CmdError> {
-        let c = ClientBuilder::native()
-            .connect("http://localhost:4444")
-            .await
-            .expect("failed to connect to WebDriver");
-        c.set_ua(USER_AGENT).await?;
-        println!("{}", url);
-        c.goto(url).await?;
-        c.find(Locator::Css("input#login-name"))
-            .await?
-            .send_keys(username)
-            .await?;
-        c.find(Locator::Css("input#password"))
-            .await?
-            .send_keys(password)
-            .await?;
-        c.find(Locator::Css("input.btn")).await?.click().await?;
+    ) -> Result<String, Box<dyn Error>> {
+        let browser = Browser::default()?;
+        let tab = browser.new_tab()?;
 
-        let html = c.source().await?;
+        tab.navigate_to(url)?;
+        tab.wait_until_navigated()?;
+        tab.wait_for_element("input#login-name")?
+            .type_into(username)?;
+        tab.wait_for_element("input#password")?
+            .type_into(password)?;
+        tab.wait_for_element("input.btn")?.click()?;
+        tab.wait_until_navigated()?;
 
-        println!("{}", html);
-        c.close().await?;
-        Ok(html)
+        let body = tab.wait_for_element("body")?.get_inner_text()?;
+        let parsed = json::parse(&body)?;
+
+        Ok(parsed["token"].to_string())
     }
 }
 
