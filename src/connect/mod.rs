@@ -34,7 +34,7 @@ impl Connect {
             .await
             .expect("failed to connect to WebDriver");
         c.set_ua(USER_AGENT).await?;
-
+        println!("{}", url);
         c.goto(url).await?;
         c.find(Locator::Css("input#login-name"))
             .await?
@@ -49,6 +49,7 @@ impl Connect {
         let html = c.source().await?;
 
         println!("{}", html);
+        c.close().await?;
         Ok(html)
     }
 }
@@ -56,7 +57,7 @@ impl Connect {
 pub fn get_oauth_links() -> Result<Vec<String>, ureq::Error> {
     let body = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
         .set("User-Agent", USER_AGENT)
-        .send_string("requestedName|\n")?
+        .send_string("requestedName%7C%0Af%7C1%0Aprotocol%7C208%0Agame_version%7C4.61%0A")?
         .into_string()?;
 
     let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
