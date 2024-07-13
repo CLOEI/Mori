@@ -4,7 +4,7 @@ use crate::types::e_login_method::ELoginMethod;
 use spdlog::prelude::*;
 
 pub struct Manager {
-    bots: Vec<Bot>,
+    bots: Vec<Box<Bot>>,
     oauth_links: Vec<String>,
 }
 
@@ -39,7 +39,7 @@ impl Manager {
             self.oauth_links.clone(),
         );
         bot.start();
-        self.bots.push(bot);
+        self.bots.push(Box::new(bot));
     }
     pub fn remove_bot(&mut self, username: &str) {}
     pub fn get_bot(&self, username: &str) {}

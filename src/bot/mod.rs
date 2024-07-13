@@ -63,6 +63,8 @@ impl Bot {
             }
         }
         info!("Received the token: {}", self.token);
+        self.connect.to_http();
+        self.connect.to_enet();
     }
 
     fn stop(&mut self) {

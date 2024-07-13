@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+headless_chrome = {git = "https://github.com/rust-headless-chrome/rust-headless-chrome", features = ["fetch"]}
+enet = { git = "https://github.com/cloei/enet-rs" }
 regex = "1.10.5"
 spdlog-rs = "0.3.13"
 ureq = "2.10.0"
-headless_chrome = {git = "https://github.com/rust-headless-chrome/rust-headless-chrome", features = ["fetch"]}
 json = "0.12.4"
+byteorder = "1.5.0"
