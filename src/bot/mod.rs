@@ -1,6 +1,8 @@
+mod packet_handler;
+
 use crate::types::e_packet_type::EPacketType;
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use byteorder::{ByteOrder, LittleEndian};
 use enet::*;
@@ -58,57 +60,22 @@ impl Bot {
                 Some(Event::Receive {
                     ref packet,
                     ref mut sender,
-                    channel_id,
+                    ..
                 }) => {
                     let data = packet.data();
                     let packet_id = LittleEndian::read_u32(&data[0..4]);
                     let packet_type = EPacketType::from(packet_id);
-
-                    match packet_type {
-                        EPacketType::NetMessageServerHello => {
-                            info!("Received NetMessageServerHello");
-                            let mut packet_data = Vec::new();
-                            packet_data.extend_from_slice(
-                                &(EPacketType::NetMessageGenericText as u32).to_le_bytes(),
-                            );
-                            let message = format!(
-                                "protocol|{}\nltoken|{}\nplatformID|{}\n",
-                                208, self.token, "0,1,1"
-                            );
-                            packet_data.extend_from_slice(&message.as_bytes());
-                            let pkt =
-                                Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
-                            sender.send_packet(pkt, channel_id).unwrap();
-                        }
-                        EPacketType::NetMessageGenericText => {
-                            info!("Received NetMessageGenericText");
-                        }
-                        EPacketType::NetMessageGameMessage => {
-                            info!("Received NetMessageGameMessage");
-                        }
-                        EPacketType::NetMessageGamePacket => {
-                            info!("Received NetMessageGamePacket");
-                        }
-                        EPacketType::NetMessageError => {
-                            info!("Received NetMessageError");
-                        }
-                        EPacketType::NetMessageTrack => {
-                            info!("Received NetMessageTrack");
-                        }
-                        EPacketType::NetMessageClientLogRequest => {
-                            info!("Received NetMessageClientLogRequest");
-                        }
-                        EPacketType::NetMessageClientLogResponse => {
-                            info!("Received NetMessageClientLogResponse");
-                        }
-                        EPacketType::NetMessageMax => {
-                            info!("Received NetMessageMax");
-                        }
-                        _ => (),
-                    }
+                    packet_handler::handler(self, sender, packet_type, &data[4..]);
                 }
                 _ => (),
             }
         }
+    }
+    pub fn send_packet(&self, peer: &mut Peer<()>, packet_type: EPacketType, message: String) {
+        let mut packet_data = Vec::new();
+        packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
+        packet_data.extend_from_slice(&message.as_bytes());
+        let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
+        peer.send_packet(pkt, 0).unwrap();
     }
 }

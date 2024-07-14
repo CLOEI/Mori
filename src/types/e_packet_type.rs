@@ -1,3 +1,4 @@
+#[repr(u32)]
 pub enum EPacketType {
     NetMessageUnknown = 0,
     NetMessageServerHello,
