@@ -45,6 +45,7 @@ impl Bot {
 impl Bot {
     pub fn login(&mut self) {
         self.is_running = true;
+        self.login_info.meta = self.parsed_server_data["meta"].clone();
         let enet = Enet::new().expect("Failed to initialize ENet");
 
         while self.is_running {

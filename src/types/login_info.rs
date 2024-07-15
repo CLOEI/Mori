@@ -3,6 +3,7 @@ use crate::utils::{
     random::{random_hex, random_mac_address},
 };
 
+#[derive(Debug)]
 pub struct LoginInfo {
     pub uuid: String,
     pub protocol: String,
@@ -42,7 +43,7 @@ impl LoginInfo {
             mac: random_mac_address(),
             requested_name: "BraveDuck".to_string(),
             hash2: String::new(),
-            fz: String::new(),
+            fz: "47142936".to_string(),
             f: "1".to_string(),
             player_age: "20".to_string(),
             game_version: "4.61".to_string(),
@@ -59,7 +60,7 @@ impl LoginInfo {
             meta: String::new(),
             platform_id: "0,1,1".to_string(),
             device_version: "0".to_string(),
-            zf: String::new(),
+            zf: "-821693372".to_string(),
             country: "us".to_string(),
             user: String::new(),
             wk: random_hex(32, true),
