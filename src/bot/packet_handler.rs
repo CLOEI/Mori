@@ -10,7 +10,7 @@ use super::Bot;
 use enet::Peer;
 use spdlog::info;
 
-pub fn handle(bot: &Bot, peer: &mut Peer<()>, packet_type: EPacketType, data: &[u8]) {
+pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
             info!("Received NetMessageServerHello");
@@ -31,7 +31,7 @@ pub fn handle(bot: &Bot, peer: &mut Peer<()>, packet_type: EPacketType, data: &[
             info!("Received Tank packet type: {:?}", tank_packet.packet_type);
 
             if tank_packet.packet_type == ETankPacketType::NetGamePacketCallFunction {
-                variant_handler::handle(&bot, &peer, &tank_packet, &data[56..]);
+                variant_handler::handle(bot, peer, &tank_packet, &data[56..]);
             }
         }
         EPacketType::NetMessageError => {
