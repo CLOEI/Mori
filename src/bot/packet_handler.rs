@@ -2,13 +2,15 @@ use crate::types::{
     e_packet_type::EPacketType, e_tank_packet_type::ETankPacketType,
     tank_packet_type::TankPacketType,
 };
+use crate::utils::bytes;
 
+use super::variant_handler;
 use super::Bot;
 
-use enet::{Packet, PacketMode, Peer};
+use enet::Peer;
 use spdlog::info;
 
-pub fn handler(bot: &Bot, peer: &mut Peer<()>, packet_type: EPacketType, data: &[u8]) {
+pub fn handle(bot: &Bot, peer: &mut Peer<()>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
             info!("Received NetMessageServerHello");
@@ -25,7 +27,12 @@ pub fn handler(bot: &Bot, peer: &mut Peer<()>, packet_type: EPacketType, data: &
             info!("Received NetMessageGameMessage");
         }
         EPacketType::NetMessageGamePacket => {
-            info!("Received NetMessageGamePacket");
+            let tank_packet = map_slice_to_tank_packet_type(data);
+            info!("Received Tank packet type: {:?}", tank_packet.packet_type);
+
+            if tank_packet.packet_type == ETankPacketType::NetGamePacketCallFunction {
+                variant_handler::handle(&bot, &peer, &tank_packet, &data[56..]);
+            }
         }
         EPacketType::NetMessageError => {
             info!("Received NetMessageError");
@@ -47,24 +54,23 @@ pub fn handler(bot: &Bot, peer: &mut Peer<()>, packet_type: EPacketType, data: &
 }
 
 fn map_slice_to_tank_packet_type(data: &[u8]) -> TankPacketType {
-    let packet_type = TankPacketType {
+    TankPacketType {
         packet_type: ETankPacketType::from(data[0]),
         unk1: data[1],
         unk2: data[2],
         unk3: data[3],
-        net_id: u32::from_le_bytes([data[4], data[5], data[6], data[7]]),
-        unk4: u32::from_le_bytes([data[8], data[9], data[10], data[11]]),
-        unk5: u32::from_le_bytes([data[12], data[13], data[14], data[15]]),
-        unk6: u32::from_le_bytes([data[16], data[17], data[18], data[19]]),
-        unk7: u32::from_le_bytes([data[20], data[21], data[22], data[23]]),
-        unk8: f32::from_le_bytes([data[24], data[25], data[26], data[27]]),
-        unk9: f32::from_le_bytes([data[28], data[29], data[30], data[31]]),
-        unk10: f32::from_le_bytes([data[32], data[33], data[34], data[35]]),
-        unk11: f32::from_le_bytes([data[36], data[37], data[38], data[39]]),
-        unk12: f32::from_le_bytes([data[40], data[41], data[42], data[43]]),
-        unk13: u32::from_le_bytes([data[44], data[45], data[46], data[47]]),
-        unk14: u32::from_le_bytes([data[48], data[49], data[50], data[51]]),
-        extended_data_length: u32::from_le_bytes([data[52], data[53], data[54], data[55]]),
-    };
-    packet_type
+        net_id: bytes::bytes_to_u32(&data[4..8]),
+        unk4: bytes::bytes_to_u32(&data[8..12]),
+        unk5: bytes::bytes_to_u32(&data[12..16]),
+        unk6: bytes::bytes_to_u32(&data[16..20]),
+        unk7: bytes::bytes_to_u32(&data[20..24]),
+        unk8: bytes::bytes_to_f32(&data[24..28]),
+        unk9: bytes::bytes_to_f32(&data[28..32]),
+        unk10: bytes::bytes_to_f32(&data[32..36]),
+        unk11: bytes::bytes_to_f32(&data[36..40]),
+        unk12: bytes::bytes_to_f32(&data[40..44]),
+        unk13: bytes::bytes_to_u32(&data[44..48]),
+        unk14: bytes::bytes_to_u32(&data[48..52]),
+        extended_data_length: bytes::bytes_to_u32(&data[52..56]),
+    }
 }

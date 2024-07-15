@@ -1,3 +1,4 @@
+use headless_chrome::{Browser, LaunchOptionsBuilder};
 use regex::Regex;
 use std::{collections::HashMap, error::Error};
 
@@ -39,18 +40,10 @@ impl Connect {
         info!("Getting token for {}", self.username);
         match self.method {
             ELoginMethod::APPLE => {
-                self.get_apple_token(
-                    self.oauth_links[0].as_str(),
-                    self.username.as_str(),
-                    self.password.as_str(),
-                );
+                self.get_apple_token(self.oauth_links[0].as_str());
             }
             ELoginMethod::GOOGLE => {
-                self.get_google_token(
-                    self.oauth_links[1].as_str(),
-                    self.username.as_str(),
-                    self.password.as_str(),
-                );
+                self.get_google_token(self.oauth_links[1].as_str());
             }
             ELoginMethod::LEGACY => {
                 let res = self
@@ -93,11 +86,11 @@ impl Connect {
             .collect::<HashMap<String, String>>();
     }
 
-    pub fn get_apple_token(&self, url: &str, username: &str, password: &str) {
+    pub fn get_apple_token(&self, url: &str) {
         println!("Getting apple token");
     }
 
-    pub fn get_google_token(&self, url: &str, username: &str, password: &str) {
+    pub fn get_google_token(&self, url: &str) {
         println!("Getting google token");
     }
 

@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 #[repr(u8)]
 pub enum ETankPacketType {
     NetGamePacketState,

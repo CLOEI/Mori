@@ -1,4 +1,5 @@
 mod packet_handler;
+mod variant_handler;
 
 use crate::types::e_packet_type::EPacketType;
 
@@ -65,7 +66,7 @@ impl Bot {
                     let data = packet.data();
                     let packet_id = LittleEndian::read_u32(&data[0..4]);
                     let packet_type = EPacketType::from(packet_id);
-                    packet_handler::handler(self, sender, packet_type, &data[4..]);
+                    packet_handler::handle(self, sender, packet_type, &data[4..]);
                 }
                 _ => (),
             }
