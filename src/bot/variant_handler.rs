@@ -1,6 +1,7 @@
 use enet::Peer;
 use spdlog::info;
 
+use crate::types::e_packet_type::{self, EPacketType};
 use crate::types::tank_packet_type::TankPacketType;
 use crate::utils::{text_parse::parse_and_store, variant::VariantList};
 
@@ -29,6 +30,24 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
             bot.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
             bot.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
             bot.disconnect(peer);
+        }
+        "OnSuperMainStartAcceptLogonHrdxs47254722215a" => bot.send_packet(
+            peer,
+            EPacketType::NetMessageGenericText,
+            "action|enter_game\n".to_string(),
+        ),
+        "OnCountryState" => {
+            // I'm not sure why this is sent twice, but it is.
+            bot.send_packet(
+                peer,
+                EPacketType::NetMessageGenericText,
+                "action|getDRAnimations\n".to_string(),
+            );
+            bot.send_packet(
+                peer,
+                EPacketType::NetMessageGenericText,
+                "action|getDRAnimations\n".to_string(),
+            );
         }
         _ => {}
     }
