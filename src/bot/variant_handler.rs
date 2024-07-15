@@ -24,10 +24,10 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
             bot.username = username;
             bot.server.ip = parsed_server_data.get(0).unwrap().to_string();
             bot.server.port = port.to_string();
-            bot.server.token = token.to_string();
-            bot.server.user_id = user_id.to_string();
-            bot.server.door_id = parsed_server_data.get(1).unwrap().to_string();
-            bot.server.uuid = parsed_server_data.get(2).unwrap().to_string();
+            bot.login_info.token = token.to_string();
+            bot.login_info.user = user_id.to_string();
+            bot.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
+            bot.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
             bot.disconnect(peer);
         }
         _ => {}

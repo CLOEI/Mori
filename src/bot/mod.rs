@@ -2,6 +2,7 @@ mod packet_handler;
 mod variant_handler;
 
 use crate::types::e_packet_type::EPacketType;
+use crate::types::login_info::LoginInfo;
 
 use std::collections::HashMap;
 
@@ -12,10 +13,6 @@ use spdlog::info;
 pub struct Server {
     ip: String,
     port: String,
-    token: String,
-    user_id: String,
-    door_id: String,
-    uuid: String,
 }
 
 pub struct Bot {
@@ -25,6 +22,7 @@ pub struct Bot {
     pub is_redirect: bool,
     pub is_running: bool,
     pub server: Server,
+    pub login_info: LoginInfo,
 }
 
 impl Bot {
@@ -38,11 +36,8 @@ impl Bot {
             server: Server {
                 ip: String::new(),
                 port: String::new(),
-                token: String::new(),
-                user_id: String::new(),
-                door_id: String::new(),
-                uuid: String::new(),
             },
+            login_info: LoginInfo::new(),
         }
     }
 }

@@ -2,7 +2,9 @@ use crate::types::{
     e_packet_type::EPacketType, e_tank_packet_type::ETankPacketType,
     tank_packet_type::TankPacketType,
 };
-use crate::utils::bytes;
+use crate::utils::proton::{generate_klv, hash_string};
+use crate::utils::random::random_hex;
+use crate::utils::{bytes, proton};
 
 use super::variant_handler;
 use super::Bot;
@@ -14,11 +16,30 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
     match packet_type {
         EPacketType::NetMessageServerHello => {
             info!("Received NetMessageServerHello");
-            let message = format!(
-                "protocol|{}\nltoken|{}\nplatformID|{}\n",
-                208, bot.token, "0,1,1"
-            );
-            bot.send_packet(peer, EPacketType::NetMessageGenericText, message);
+            if bot.is_redirect {
+                println!("hello");
+                bot.login_info.klv = generate_klv(
+                    &bot.login_info.protocol,
+                    &bot.login_info.game_version,
+                    &bot.login_info.rid,
+                );
+                bot.login_info.hash =
+                    hash_string(format!("{}RT", bot.login_info.mac).as_str()).to_string();
+                bot.login_info.hash2 =
+                    hash_string(format!("{}RT", random_hex(16, true)).as_str()).to_string();
+                // TODO: meta prop
+                let message = format!(
+                    "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\requestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
+                    bot.login_info.uuid, bot.login_info.protocol, bot.login_info.fhash, bot.login_info.mac, bot.login_info.requested_name, bot.login_info.hash2, bot.login_info.fz, bot.login_info.f, bot.login_info.player_age, bot.login_info.game_version, bot.login_info.lmode, bot.login_info.cbits, bot.login_info.rid, bot.login_info.gdpr, bot.login_info.hash, bot.login_info.category, bot.login_info.token, bot.login_info.total_playtime, bot.login_info.door_id, bot.login_info.klv, bot.login_info.meta, bot.login_info.platform_id, bot.login_info.device_version, bot.login_info.zf, bot.login_info.country, bot.login_info.user, bot.login_info.wk
+                );
+                bot.send_packet(peer, EPacketType::NetMessageGenericText, message);
+            } else {
+                let message = format!(
+                    "protocol|{}\nltoken|{}\nplatformID|{}\n",
+                    208, bot.token, "0,1,1"
+                );
+                bot.send_packet(peer, EPacketType::NetMessageGenericText, message);
+            }
         }
         EPacketType::NetMessageGenericText => {
             info!("Received NetMessageGenericText");
@@ -42,6 +63,8 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
         }
         EPacketType::NetMessageClientLogRequest => {
             info!("Received NetMessageClientLogRequest");
+            let message = String::from_utf8_lossy(data);
+            info!("Message: {}", message);
         }
         EPacketType::NetMessageClientLogResponse => {
             info!("Received NetMessageClientLogResponse");
