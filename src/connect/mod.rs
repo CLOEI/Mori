@@ -1,4 +1,4 @@
-use headless_chrome::Browser;
+use regex::Regex;
 use std::{collections::HashMap, error::Error};
 
 use spdlog::info;
@@ -96,33 +96,60 @@ impl Connect {
     pub fn get_apple_token(&self, url: &str, username: &str, password: &str) {
         println!("Getting apple token");
     }
+
     pub fn get_google_token(&self, url: &str, username: &str, password: &str) {
         println!("Getting google token");
     }
-    #[warn(unused_must_use)]
+
     pub fn get_legacy_token(
         &self,
         url: &str,
         username: &str,
         password: &str,
-    ) -> Result<String, Box<dyn Error>> {
-        let browser = Browser::default()?;
-        let tab = browser.new_tab()?;
+    ) -> Result<String, ureq::Error> {
+        let agent = ureq::AgentBuilder::new().build();
+        let body = agent.get(url)
+            .set("User-Agent", USER_AGENT)
+            .set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+            .set("Accept-Language", "en-US,en;q=0.5")
+            .set("Accept-Encoding", "gzip, deflate, br, zstd")
+            .set("DNT", "1")
+            .set("Sec-GPC", "1")
+            .set("Connection", "keep-alive")
+            .set("Upgrade-Insecure-Requests", "1")
+            .set("Sec-Fetch-Dest", "document")
+            .set("Sec-Fetch-Mode", "navigate")
+            .set("Sec-Fetch-Site", "none")
+            .set("Sec-Fetch-User", "?1")
+            .set("Sec-CH-UA-Platform", "Windows")
+            .set("Sec-CH-UA", "\"Edge\";v=\"120\", \"Chromium\";v=\"120\", \"Not=A?Brand\";v=\"24\"")
+            .set("Sec-CH-UA-Mobile", "?0")
+            .set("Priority", "u=1")
+            .set("TE", "trailers").call()?.into_string()?;
 
-        tab.navigate_to(url)?;
-        tab.wait_until_navigated()?;
-        tab.wait_for_element("input#login-name")?
-            .type_into(username)?;
-        tab.wait_for_element("input#password")?
-            .type_into(password)?;
-        tab.wait_for_element("input.btn")?.click()?;
-        tab.wait_until_navigated()?;
+        let token = match extract_token_from_html(&body) {
+            Some(token) => token,
+            None => panic!("Failed to extract token"),
+        };
+        let req = agent
+            .post("https://login.growtopiagame.com/player/growid/login/validate")
+            .send_form(&[
+                ("_token", &token),
+                ("growId", &username),
+                ("password", &password),
+            ])?;
 
-        let body = tab.wait_for_element("body")?.get_inner_text()?;
-        let parsed = json::parse(&body)?;
-
-        Ok(parsed["token"].to_string())
+        let body = req.into_string().unwrap();
+        let json = json::parse(&body).unwrap();
+        Ok(json["token"].to_string())
     }
+}
+
+pub fn extract_token_from_html(body: &str) -> Option<String> {
+    let regex = Regex::new(r#"name="_token"\s+type="hidden"\s+value="([^"]*)""#).unwrap();
+    regex
+        .captures(body)
+        .and_then(|cap| cap.get(1).map(|match_| match_.as_str().to_string()))
 }
 
 pub fn get_oauth_links() -> Result<Vec<String>, ureq::Error> {

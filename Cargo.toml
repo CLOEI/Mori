@@ -8,6 +8,6 @@ headless_chrome = {git = "https://github.com/rust-headless-chrome/rust-headless-
 enet = { git = "https://github.com/cloei/enet-rs" }
 regex = "1.10.5"
 spdlog-rs = "0.3.13"
-ureq = "2.10.0"
+ureq = {version = "2.10.0", features = ["cookies"]}
 json = "0.12.4"
 byteorder = "1.5.0"
