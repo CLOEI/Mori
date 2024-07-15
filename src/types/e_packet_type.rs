@@ -1,3 +1,4 @@
+#[derive(PartialEq)]
 #[repr(u32)]
 pub enum EPacketType {
     NetMessageUnknown = 0,

@@ -1,9 +1,10 @@
 use enet::Peer;
 use spdlog::info;
 
-use crate::types::e_packet_type::{self, EPacketType};
+use crate::types::e_packet_type::EPacketType;
 use crate::types::tank_packet_type::TankPacketType;
-use crate::utils::{text_parse::parse_and_store, variant::VariantList};
+use crate::utils::text_parse;
+use crate::utils::variant::VariantList;
 
 use super::Bot;
 
@@ -18,11 +19,11 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
             let token = variant.get(2).unwrap().as_int32();
             let user_id = variant.get(3).unwrap().as_int32();
             let server_data = variant.get(4).unwrap().as_string();
-            let username = variant.get(6).unwrap().as_string();
-            let parsed_server_data = parse_and_store(&server_data);
+            // let username = variant.get(6).unwrap().as_string(); // TODO: Sometime username unwrap will panic.
+            let parsed_server_data = text_parse::parse_and_store_as_vec(&server_data);
 
             bot.is_redirect = true;
-            bot.username = username;
+            // bot.username = username;
             bot.server.ip = parsed_server_data.get(0).unwrap().to_string();
             bot.server.port = port.to_string();
             bot.login_info.token = token.to_string();
@@ -48,6 +49,35 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
                 EPacketType::NetMessageGenericText,
                 "action|getDRAnimations\n".to_string(),
             );
+        }
+        "OnDialogRequest" => {
+            let message = variant.get(1).unwrap().as_string();
+            if message.contains("Gazette") {
+                bot.send_packet(
+                    peer,
+                    EPacketType::NetMessageGenericText,
+                    "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string(),
+                );
+            }
+        }
+        "OnSetBux" => {
+            let bux = variant.get(1).unwrap().as_int32();
+            bot.gems = bux;
+        }
+        "OnConsoleMessage" => {
+            let message = variant.get(1).unwrap().as_string();
+            info!("Received console message: {}", message);
+        }
+        "OnSetPos" => {
+            let pos = variant.get(1).unwrap().as_vec2();
+            info!("Received position: {:?}", pos);
+            bot.pos_x = pos.0;
+            bot.pos_y = pos.1;
+        }
+        "OnSpawn" => {
+            let message = variant.get(1).unwrap().as_string();
+            let data = text_parse::parse_and_store_as_map(&message);
+            bot.net_id = data.get("netID").unwrap().parse().unwrap();
         }
         _ => {}
     }

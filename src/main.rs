@@ -16,5 +16,5 @@ fn main() {
             return;
         }
     };
-    manager.add_bot("Peroperod", "", ELoginMethod::LEGACY);
+    manager.add_bot("", "", ELoginMethod::LEGACY);
 }

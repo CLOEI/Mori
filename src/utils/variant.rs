@@ -59,10 +59,10 @@ impl Variant {
         }
     }
 
-    pub fn as_float(&self) -> f32 {
+    pub fn as_vec2(&self) -> (f32, f32) {
         match self {
-            Variant::Float(value) => *value,
-            _ => 0.0,
+            Variant::Vec2(value) => *value,
+            _ => (0.0, 0.0),
         }
     }
 }
