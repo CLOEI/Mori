@@ -1,5 +1,3 @@
-use std::thread::panicking;
-
 use crate::types::{
     e_packet_type::EPacketType, e_tank_packet_type::ETankPacketType,
     tank_packet_type::TankPacketType,
@@ -39,6 +37,7 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
             info!("Message: {}", message);
 
             if message.contains("logon_fail") {
+                bot.is_redirect = false;
                 bot.disconnect(peer);
             }
             if message.contains("currently banned") {
@@ -59,10 +58,10 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
                 pkt.packet_type = ETankPacketType::NetGamePacketPingReply;
                 pkt.net_id = 0; // I'm not sure why it must be 0 instead of bot.net_id
                 pkt.unk2 = 0;
-                pkt.unk8 = 64.0;
-                pkt.unk9 = 64.0;
-                pkt.unk10 = 1000.0;
-                pkt.unk11 = 250.0;
+                pkt.vector_x = 64.0;
+                pkt.vector_y = 64.0;
+                pkt.vector_x2 = 1000.0;
+                pkt.vector_y2 = 250.0;
 
                 let mut packet_data = Vec::new();
                 packet_data
@@ -73,16 +72,16 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
                 packet_data.extend_from_slice(&pkt.unk3.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.net_id.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.unk4.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk5.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.flags.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.unk6.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.unk7.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk8.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk9.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk10.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk11.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.vector_x.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.vector_y.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.vector_x2.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.vector_y2.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.unk12.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk13.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk14.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.int_x.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.int_y.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.extended_data_length.to_le_bytes());
                 packet_data.extend_from_slice(&data[56..]);
 
@@ -119,16 +118,16 @@ fn map_slice_to_tank_packet_type(data: &[u8]) -> TankPacketType {
         unk3: data[3],
         net_id: bytes::bytes_to_u32(&data[4..8]),
         unk4: bytes::bytes_to_u32(&data[8..12]),
-        unk5: bytes::bytes_to_u32(&data[12..16]),
+        flags: bytes::bytes_to_u32(&data[12..16]),
         unk6: bytes::bytes_to_u32(&data[16..20]),
         unk7: bytes::bytes_to_u32(&data[20..24]),
-        unk8: bytes::bytes_to_f32(&data[24..28]),
-        unk9: bytes::bytes_to_f32(&data[28..32]),
-        unk10: bytes::bytes_to_f32(&data[32..36]),
-        unk11: bytes::bytes_to_f32(&data[36..40]),
+        vector_x: bytes::bytes_to_f32(&data[24..28]),
+        vector_y: bytes::bytes_to_f32(&data[28..32]),
+        vector_x2: bytes::bytes_to_f32(&data[32..36]),
+        vector_y2: bytes::bytes_to_f32(&data[36..40]),
         unk12: bytes::bytes_to_f32(&data[40..44]),
-        unk13: bytes::bytes_to_u32(&data[44..48]),
-        unk14: bytes::bytes_to_u32(&data[48..52]),
+        int_x: bytes::bytes_to_u32(&data[44..48]),
+        int_y: bytes::bytes_to_u32(&data[48..52]),
         extended_data_length: bytes::bytes_to_u32(&data[52..56]),
     }
 }

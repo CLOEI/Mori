@@ -1,5 +1,4 @@
 mod bot;
-mod connect;
 mod manager;
 mod types;
 mod utils;
@@ -16,5 +15,5 @@ fn main() {
             return;
         }
     };
-    manager.add_bot("", "", ELoginMethod::LEGACY);
+    manager.add_bot("", "", ELoginMethod::GOOGLE);
 }

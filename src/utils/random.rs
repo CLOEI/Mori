@@ -18,7 +18,7 @@ pub fn random_hex(length: u32, upper: bool) -> String {
 pub fn random_mac_address() -> String {
     let mut mac = random_hex(2, false);
     for _ in 0..5 {
-        mac += &format!(":{}", random_hex(2, false));
+        mac.push_str(&format!(":{}", random_hex(2, false)));
     }
     mac
 }

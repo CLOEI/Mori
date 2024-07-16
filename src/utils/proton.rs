@@ -1,3 +1,4 @@
+use md5;
 use sha2::{Digest, Sha256};
 
 pub fn generate_klv(protocol: &str, version: &str, rid: &str) -> String {
@@ -14,15 +15,18 @@ pub fn generate_klv(protocol: &str, version: &str, rid: &str) -> String {
         hash_sha256(&(hash_sha256(protocol) + salts[3])),
     ];
 
-    hash_sha256(
-        &(constant_values[0].clone()
-            + salts[0]
-            + &constant_values[1]
-            + salts[1]
-            + &hash_sha256(&hash_md5(&hash_sha256(rid)))
-            + salts[2]
-            + &constant_values[2]),
-    )
+    let result = hash_sha256(&format!(
+        "{}{}{}{}{}{}{}",
+        constant_values[0],
+        salts[0],
+        constant_values[1],
+        salts[1],
+        hash_sha256(&hash_md5(&hash_sha256(rid))),
+        salts[2],
+        constant_values[2]
+    ));
+
+    result
 }
 
 pub fn hash_sha256(input: &str) -> String {

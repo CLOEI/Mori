@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-headless_chrome = {git = "https://github.com/rust-headless-chrome/rust-headless-chrome", features = ["fetch"]}
+tokio = { version = "1.38.0", features = ["full"] }
 enet = { git = "https://github.com/cloei/enet-rs" }
 regex = "1.10.5"
 spdlog-rs = "0.3.13"
@@ -15,3 +15,5 @@ rand = "0.8.5"
 sha2 = "0.10.8"
 md5 = "0.7.0"
 hex = "0.4.3"
+tao = "0.28.1"
+wry = "0.41.0"

@@ -32,11 +32,14 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
             bot.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
             bot.disconnect(peer);
         }
-        "OnSuperMainStartAcceptLogonHrdxs47254722215a" => bot.send_packet(
-            peer,
-            EPacketType::NetMessageGenericText,
-            "action|enter_game\n".to_string(),
-        ),
+        "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
+            bot.send_packet(
+                peer,
+                EPacketType::NetMessageGenericText,
+                "action|enter_game\n".to_string(),
+            );
+            bot.is_redirect = false;
+        }
         "OnCountryState" => {
             // I'm not sure why this is sent twice, but it is.
             bot.send_packet(
@@ -77,7 +80,12 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
             let data = text_parse::parse_and_store_as_map(&message);
+            bot.is_ingame = true;
             bot.net_id = data.get("netID").unwrap().parse().unwrap();
+        }
+        "OnTalkBubble" => {
+            let message = variant.get(1).unwrap().as_string();
+            print!("Received talk bubble: {}", message);
         }
         _ => {}
     }
