@@ -74,7 +74,7 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
                 packet_data.extend_from_slice(&pkt.unk4.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.flags.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.unk6.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk7.to_le_bytes());
+                packet_data.extend_from_slice(&pkt.value.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.vector_x.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.vector_y.to_le_bytes());
                 packet_data.extend_from_slice(&pkt.vector_x2.to_le_bytes());
@@ -120,14 +120,14 @@ fn map_slice_to_tank_packet_type(data: &[u8]) -> TankPacketType {
         unk4: bytes::bytes_to_u32(&data[8..12]),
         flags: bytes::bytes_to_u32(&data[12..16]),
         unk6: bytes::bytes_to_u32(&data[16..20]),
-        unk7: bytes::bytes_to_u32(&data[20..24]),
+        value: bytes::bytes_to_u32(&data[20..24]),
         vector_x: bytes::bytes_to_f32(&data[24..28]),
         vector_y: bytes::bytes_to_f32(&data[28..32]),
         vector_x2: bytes::bytes_to_f32(&data[32..36]),
         vector_y2: bytes::bytes_to_f32(&data[36..40]),
         unk12: bytes::bytes_to_f32(&data[40..44]),
-        int_x: bytes::bytes_to_u32(&data[44..48]),
-        int_y: bytes::bytes_to_u32(&data[48..52]),
+        int_x: bytes::bytes_to_i32(&data[44..48]),
+        int_y: bytes::bytes_to_i32(&data[48..52]),
         extended_data_length: bytes::bytes_to_u32(&data[52..56]),
     }
 }

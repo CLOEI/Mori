@@ -27,6 +27,7 @@ pub struct Server {
 }
 
 pub struct Bot {
+    pub display_name: String,
     pub username: String,
     pub password: String,
     method: ELoginMethod,
@@ -54,6 +55,7 @@ impl Bot {
         oauth_links: Vec<String>,
     ) -> Bot {
         Bot {
+            display_name: String::new(),
             username: username,
             password: password,
             method: method,
@@ -314,16 +316,17 @@ impl Bot {
         self.pos_y += y * 32.0;
 
         let mut pkt = TankPacketType::new();
-        let mut flags: Vec<u8> = Vec::with_capacity(4);
-        flags[1] = true as u8; // unknown
-        flags[5] = true as u8; // is on a solid block
+        let mut flags: u32 = 0;
+        flags |= 1 << 1; // unknown
+        flags |= 1 << 5; // is on a solid block
 
         pkt.packet_type = ETankPacketType::NetGamePacketState;
         pkt.vector_x = self.pos_x;
         pkt.vector_y = self.pos_y;
-        pkt.flags = LittleEndian::read_u32(&flags);
-        pkt.int_x = u32::MAX;
-        pkt.int_y = u32::MAX;
+        pkt.flags = flags;
+        print!("{}", pkt.flags);
+        pkt.int_x = -1;
+        pkt.int_y = -1;
 
         let mut packet_data = Vec::new();
         packet_data.extend_from_slice(&(EPacketType::NetMessageGamePacket as u32).to_le_bytes());
@@ -335,7 +338,7 @@ impl Bot {
         packet_data.extend_from_slice(&pkt.unk4.to_le_bytes());
         packet_data.extend_from_slice(&pkt.flags.to_le_bytes());
         packet_data.extend_from_slice(&pkt.unk6.to_le_bytes());
-        packet_data.extend_from_slice(&pkt.unk7.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.value.to_le_bytes());
         packet_data.extend_from_slice(&pkt.vector_x.to_le_bytes());
         packet_data.extend_from_slice(&pkt.vector_y.to_le_bytes());
         packet_data.extend_from_slice(&pkt.vector_x2.to_le_bytes());
@@ -347,6 +350,66 @@ impl Bot {
 
         let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
         peer.send_packet(pkt, 0).unwrap();
+    }
+
+    pub fn talk(&mut self, peer: &mut Peer<()>, message: &str) {
+        self.send_packet(
+            peer,
+            EPacketType::NetMessageGenericText,
+            format!("action|input\n|text|{}\n", message),
+        );
+    }
+
+    pub fn place(&mut self, peer: &mut Peer<()>, offset_x: i32, offset_y: i32, block_id: u32) {
+        let mut pkt = TankPacketType::new();
+
+        pkt.packet_type = ETankPacketType::NetGamePacketTileChangeRequest;
+        pkt.vector_x = self.pos_x;
+        pkt.vector_y = self.pos_y;
+        pkt.int_x = ((self.pos_x / 32.0).floor() as i32) + offset_x;
+        pkt.int_y = ((self.pos_y / 32.0).floor() as i32) + offset_y;
+        pkt.value = block_id;
+
+        let mut packet_data = Vec::new();
+        packet_data.extend_from_slice(&(EPacketType::NetMessageGamePacket as u32).to_le_bytes());
+        packet_data.extend_from_slice(&(pkt.packet_type as u8).to_le_bytes());
+        packet_data.extend_from_slice(&pkt.unk1.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.unk2.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.unk3.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.net_id.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.unk4.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.flags.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.unk6.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.value.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.vector_x.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.vector_y.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.vector_x2.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.vector_y2.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.unk12.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.int_x.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.int_y.to_le_bytes());
+        packet_data.extend_from_slice(&pkt.extended_data_length.to_le_bytes());
+
+        if pkt.int_x <= (self.pos_x / 32.0).floor() as i32 + 4
+            && pkt.int_x >= (self.pos_x / 32.0).floor() as i32 - 4
+            && pkt.int_y <= (self.pos_y / 32.0).floor() as i32 + 4
+            && pkt.int_y >= (self.pos_y / 32.0).floor() as i32 - 4
+        {
+            let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
+            peer.send_packet(pkt, 0).unwrap();
+        }
+    }
+
+    pub fn punch(&mut self, peer: &mut Peer<()>, offset_x: i32, offset_y: i32) {
+        self.place(peer, offset_x, offset_y, 18)
+    }
+
+    pub fn warp(&mut self, peer: &mut Peer<()>, world: &str) {
+        self.send_packet(
+            peer,
+            EPacketType::NetMessageGameMessage,
+            format!("action|join_request\nname|{}\ninvitedWorld|0\n", world),
+        );
     }
 
     pub fn send_packet(&self, peer: &mut Peer<()>, packet_type: EPacketType, message: String) {
