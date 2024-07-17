@@ -1,5 +1,6 @@
 mod packet_handler;
 mod variant_handler;
+mod world;
 
 use crate::types::e_login_method::ELoginMethod;
 use crate::types::e_tank_packet_type::ETankPacketType;
@@ -17,6 +18,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use enet::*;
 use regex::Regex;
 use spdlog::info;
+use world::World;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -45,6 +47,7 @@ pub struct Bot {
     pub is_ingame: bool,
     pub server: Server,
     pub login_info: LoginInfo,
+    pub world: World,
 }
 
 impl Bot {
@@ -76,6 +79,7 @@ impl Bot {
                 port: String::new(),
             },
             login_info: LoginInfo::new(),
+            world: World::new(),
         }
     }
 }
