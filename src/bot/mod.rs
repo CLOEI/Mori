@@ -13,9 +13,11 @@ use crate::{types::e_packet_type::EPacketType, utils::proton::generate_klv};
 use std::collections::HashMap;
 use std::io;
 use std::process::Command;
+use std::sync::Arc;
 
 use byteorder::{ByteOrder, LittleEndian};
 use enet::*;
+use gtitem_r::structs::ItemDatabase;
 use regex::Regex;
 use spdlog::info;
 use world::World;
@@ -56,6 +58,7 @@ impl Bot {
         password: String,
         method: ELoginMethod,
         oauth_links: Vec<String>,
+        item_database: Arc<ItemDatabase>,
     ) -> Bot {
         Bot {
             display_name: String::new(),
@@ -63,7 +66,7 @@ impl Bot {
             password: password,
             method: method,
             oauth_links: oauth_links,
-            current_world: String::new(),
+            current_world: "EXIT".to_string(),
             net_id: 0,
             pos_x: 0.0,
             pos_y: 0.0,
@@ -79,7 +82,7 @@ impl Bot {
                 port: String::new(),
             },
             login_info: LoginInfo::new(),
-            world: World::new(),
+            world: World::new(item_database),
         }
     }
 }

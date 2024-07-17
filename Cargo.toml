@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
 enet = { git = "https://github.com/cloei/enet-rs" }
+gtitem-r = { git = "https://github.com/CLOEI/gtitem-r" }
 regex = "1.10.5"
 spdlog-rs = "0.3.13"
 ureq = {version = "2.10.0", features = ["cookies"]}
