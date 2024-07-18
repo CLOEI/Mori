@@ -61,7 +61,6 @@ impl Bot {
         username: String,
         password: String,
         method: ELoginMethod,
-        oauth_links: Vec<String>,
         item_database: Arc<ItemDatabase>,
     ) -> Bot {
         Bot {
@@ -69,7 +68,7 @@ impl Bot {
             username: username,
             password: password,
             method: method,
-            oauth_links: oauth_links,
+            oauth_links: Vec::new(),
             net_id: 0,
             pos_x: 0.0,
             pos_y: 0.0,
@@ -94,8 +93,18 @@ impl Bot {
 
 impl Bot {
     pub fn login(&mut self) {
-        self.get_token();
         self.to_http();
+        match self.get_oauth_links() {
+            Ok(links) => {
+                self.oauth_links = links;
+                info!("Successfully got OAuth links for: apple, google and legacy");
+            }
+            Err(err) => {
+                info!("Failed to get OAuth links: {}", err);
+                return;
+            }
+        }
+        self.get_token();
         self.is_running = true;
         self.login_info.meta = self.parsed_server_data["meta"].clone();
 
@@ -453,6 +462,22 @@ impl Bot {
     pub fn disconnect(&self, peer: &mut Peer<()>) {
         peer.disconnect(0);
     }
+
+    pub fn get_oauth_links(&self) -> Result<Vec<String>, ureq::Error> {
+        let body = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
+            .set("User-Agent", USER_AGENT)
+            .send_string(format!("tankIDName|\ntankIDPass|\nrequestedName|BoardSickle\nf|1\nprotocol|209\ngame_version|4.62\nfz|41745432\nlmode|0\ncbits|1040\nplayer_age|20\nGDPR|3\ncategory|_-5100\ntotalPlaytime|0\nklv|b351d8dacd7a776848b31c74d3d550ec61dbb9b96c3ac67aea85034a84401a87\nhash2|841545814\nmeta|{}\nfhash|-716928004\nrid|01F9EBD204B52C940285667E15C00D62\nplatformID|0,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|617169524\n", self.parsed_server_data["meta"]).as_str())?
+            .into_string()?;
+
+        let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
+        let links = pattern
+            .unwrap()
+            .find_iter(&body)
+            .map(|m| m.as_str().to_owned())
+            .collect::<Vec<String>>();
+
+        Ok(links)
+    }
 }
 
 pub fn extract_token_from_html(body: &str) -> Option<String> {
@@ -460,20 +485,4 @@ pub fn extract_token_from_html(body: &str) -> Option<String> {
     regex
         .captures(body)
         .and_then(|cap| cap.get(1).map(|match_| match_.as_str().to_string()))
-}
-
-pub fn get_oauth_links() -> Result<Vec<String>, ureq::Error> {
-    let body = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
-        .set("User-Agent", USER_AGENT)
-        .send_string("requestedName|\nprotocol|208\ngame_version|4.62\n")?
-        .into_string()?;
-
-    let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
-    let links = pattern
-        .unwrap()
-        .find_iter(&body)
-        .map(|m| m.as_str().to_owned())
-        .collect::<Vec<String>>();
-
-    Ok(links)
 }

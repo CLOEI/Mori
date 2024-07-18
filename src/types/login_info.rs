@@ -38,7 +38,7 @@ impl LoginInfo {
     pub fn new() -> LoginInfo {
         LoginInfo {
             uuid: String::new(),
-            protocol: "208".to_string(),
+            protocol: "209".to_string(),
             fhash: "-716928004".to_string(),
             mac: random_mac_address(),
             requested_name: "BraveDuck".to_string(),
