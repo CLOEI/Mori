@@ -1,6 +1,7 @@
+mod astar;
+mod inventory;
 mod packet_handler;
 mod variant_handler;
-mod world;
 
 use crate::types::e_login_method::ELoginMethod;
 use crate::types::e_tank_packet_type::ETankPacketType;
@@ -18,9 +19,10 @@ use std::sync::Arc;
 use byteorder::{ByteOrder, LittleEndian};
 use enet::*;
 use gtitem_r::structs::ItemDatabase;
+use gtworld_r::World;
+use inventory::Inventory;
 use regex::Regex;
 use spdlog::info;
-use world::World;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -36,7 +38,6 @@ pub struct Bot {
     pub password: String,
     method: ELoginMethod,
     oauth_links: Vec<String>,
-    pub current_world: String,
     pub net_id: u32,
     pub pos_x: f32,
     pub pos_y: f32,
@@ -50,6 +51,7 @@ pub struct Bot {
     pub server: Server,
     pub login_info: LoginInfo,
     pub world: World,
+    pub inventory: Inventory,
 }
 
 impl Bot {
@@ -66,7 +68,6 @@ impl Bot {
             password: password,
             method: method,
             oauth_links: oauth_links,
-            current_world: "EXIT".to_string(),
             net_id: 0,
             pos_x: 0.0,
             pos_y: 0.0,
@@ -83,6 +84,7 @@ impl Bot {
             },
             login_info: LoginInfo::new(),
             world: World::new(item_database),
+            inventory: Inventory::new(),
         }
     }
 }

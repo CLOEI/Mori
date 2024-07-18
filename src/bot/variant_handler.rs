@@ -21,9 +21,10 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
             let server_data = variant.get(4).unwrap().as_string();
             let parsed_server_data = text_parse::parse_and_store_as_vec(&server_data);
 
-            if bot.username.is_empty() {
-                bot.username = variant.get(6).unwrap().as_string();
-            }
+            // if bot.display_name.is_empty() {
+            //     bot.username = variant.get(6).unwrap().as_string();
+            //     error!("Username: {}", bot.username);
+            // }
 
             bot.is_redirect = true;
             bot.server.ip = parsed_server_data.get(0).unwrap().to_string();

@@ -402,6 +402,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gtworld-r"
+version = "0.1.0"
+source = "git+https://github.com/CLOEI/gtworld-r#f30bb5c76bb22c5484c970416d89626aaac3da6f"
+dependencies = [
+ "byteorder",
+ "gtitem-r",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -566,6 +575,7 @@ dependencies = [
  "byteorder",
  "enet",
  "gtitem-r",
+ "gtworld-r",
  "hex",
  "json",
  "md5",
