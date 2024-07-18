@@ -90,16 +90,16 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
             let message = variant.get(2).unwrap().as_string();
             print!("Received talk bubble: {}", message);
             if message.contains("mate right") {
-                bot.walk(peer, 1.0, 0.0);
+                bot.walk(peer, 1.0, 0.0, false);
             }
             if message.contains("mate left") {
-                bot.walk(peer, -1.0, 0.0);
+                bot.walk(peer, -1.0, 0.0, false);
             }
             if message.contains("mate up") {
-                bot.walk(peer, 0.0, -1.0);
+                bot.walk(peer, 0.0, -1.0, false);
             }
             if message.contains("mate down") {
-                bot.walk(peer, 0.0, 1.0);
+                bot.walk(peer, 0.0, 1.0, false);
             }
             if message.contains("mate say") {
                 bot.talk(peer, "Hello, world!");
@@ -108,7 +108,6 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
                 bot.punch(peer, 0, 1);
             }
             if message.contains("mate findp") {
-                println!("{} {}", bot.pos_x, bot.pos_y);
                 bot.find_path(peer, 0, 0);
             }
         }

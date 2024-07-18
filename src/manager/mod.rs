@@ -36,7 +36,11 @@ impl Manager {
 
 impl Manager {
     pub fn add_bot(&mut self, username: &str, password: &str, method: ELoginMethod) {
-        info!("Adding bot: {}", username);
+        if method == ELoginMethod::LEGACY {
+            info!("Adding bot: {}", username);
+        } else {
+            info!("Adding bot with method: {:?}", method);
+        }
         let mut bot = Bot::new(
             username.to_string(),
             password.to_string(),

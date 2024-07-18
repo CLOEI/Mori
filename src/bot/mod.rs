@@ -320,17 +320,19 @@ impl Bot {
     }
 
     pub fn find_path(&mut self, peer: &mut Peer<()>, x: u32, y: u32) {
-        match self
-            .astar
-            .find_path(self.pos_x as u32, self.pos_y as u32, x, y)
-        {
-            Some(path) => {
-                // print all path
-                println!("Path: {:?}", path);
-                path
-            }
-            None => return,
-        };
+        let paths =
+            match self
+                .astar
+                .find_path((self.pos_x as u32) / 32, (self.pos_y as u32) / 32, x, y)
+            {
+                Some(path) => path,
+                None => return,
+            };
+
+        for i in 0..paths.len() {
+            let node = &paths[i];
+            self.walk(peer, node.x as f32, node.y as f32, true);
+        }
     }
 
     pub fn parse_server_data(&mut self, data: String) {
@@ -346,9 +348,15 @@ impl Bot {
             .collect::<HashMap<String, String>>();
     }
 
-    pub fn walk(&mut self, peer: &mut Peer<()>, x: f32, y: f32) {
-        self.pos_x += x * 32.0;
-        self.pos_y += y * 32.0;
+    // ap = absolute path, should be self explanatory
+    pub fn walk(&mut self, peer: &mut Peer<()>, x: f32, y: f32, ap: bool) {
+        if ap {
+            self.pos_x = x * 32.0;
+            self.pos_y = y * 32.0;
+        } else {
+            self.pos_x += x * 32.0;
+            self.pos_y += y * 32.0;
+        }
 
         let mut pkt = TankPacketType::new();
         let mut flags: u32 = 0;
@@ -359,7 +367,6 @@ impl Bot {
         pkt.vector_x = self.pos_x;
         pkt.vector_y = self.pos_y;
         pkt.flags = flags;
-        print!("{}", pkt.flags);
         pkt.int_x = -1;
         pkt.int_y = -1;
 
