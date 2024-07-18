@@ -55,6 +55,8 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
             }
             if tank_packet.packet_type == ETankPacketType::NetGamePacketSendMapData {
                 bot.world.parse(&data[56..]);
+                bot.astar
+                    .update(&bot.world.tiles, bot.world.width, bot.world.height);
             }
             if tank_packet.packet_type == ETankPacketType::NetGamePacketSendInventoryState {
                 bot.inventory.parse(&data[56..]);

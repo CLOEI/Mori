@@ -16,6 +16,7 @@ use std::io;
 use std::process::Command;
 use std::sync::Arc;
 
+use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
 use enet::*;
 use gtitem_r::structs::ItemDatabase;
@@ -52,6 +53,7 @@ pub struct Bot {
     pub login_info: LoginInfo,
     pub world: World,
     pub inventory: Inventory,
+    pub astar: AStar,
 }
 
 impl Bot {
@@ -83,8 +85,9 @@ impl Bot {
                 port: String::new(),
             },
             login_info: LoginInfo::new(),
-            world: World::new(item_database),
+            world: World::new(Arc::clone(&item_database)),
             inventory: Inventory::new(),
+            astar: AStar::new(Arc::clone(&item_database)),
         }
     }
 }
@@ -307,6 +310,20 @@ impl Bot {
         self.parse_server_data(body);
     }
 
+    pub fn find_path(&mut self, peer: &mut Peer<()>, x: u32, y: u32) {
+        match self
+            .astar
+            .find_path(self.pos_x as u32, self.pos_y as u32, x, y)
+        {
+            Some(path) => {
+                // print all path
+                println!("Path: {:?}", path);
+                path
+            }
+            None => return,
+        };
+    }
+
     pub fn parse_server_data(&mut self, data: String) {
         self.parsed_server_data = data
             .lines()
@@ -448,7 +465,7 @@ pub fn extract_token_from_html(body: &str) -> Option<String> {
 pub fn get_oauth_links() -> Result<Vec<String>, ureq::Error> {
     let body = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
         .set("User-Agent", USER_AGENT)
-        .send_string("requestedName|\nprotocol|208\ngame_version|4.61\n")?
+        .send_string("requestedName|\nprotocol|208\ngame_version|4.62\n")?
         .into_string()?;
 
     let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
