@@ -108,7 +108,7 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
                 bot.punch(peer, 0, 1);
             }
             if message.contains("mate findp") {
-                bot.find_path(peer, 0, 0);
+                bot.find_path(peer, 30, 5);
             }
         }
         _ => {}

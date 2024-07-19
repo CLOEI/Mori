@@ -15,5 +15,6 @@ fn main() {
             return;
         }
     };
-    manager.add_bot("", "", ELoginMethod::GOOGLE);
+    manager.add_bot("".to_string(), "".to_string(), ELoginMethod::GOOGLE);
+    loop {}
 }

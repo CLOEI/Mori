@@ -13,7 +13,7 @@ pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<String, ur
     let body = agent
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
-        .set("Ubi-AppId", "afb4b43c-f1f7-41b7-bcef-a635d8c83822")
+        .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Authorization", &format!("rm_v1 t={}", ticket))
         .set("Content-Type", "application/json")
@@ -37,7 +37,7 @@ pub fn post_ubisoft_2fa_ticket(
     let body = agent
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
-        .set("Ubi-AppId", "afb4b43c-f1f7-41b7-bcef-a635d8c83822")
+        .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Ubi-2faCode", &format!("{}", code))
         .set("Authorization", &format!("ubi_2fa_v1 t={}", ticket))
@@ -70,22 +70,10 @@ pub fn get_ubisoft_session(
     let body = agent
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
-        .set("Accept", "application/json")
-        .set("Accept-Language", "en-US,en;q=0.5")
-        .set("Accept-Encoding", "gzip, deflate, br, zstd")
-        .set("Content-Type", "application/json")
-        .set("Ubi-RequestedPlatformType", "uplay")
-        .set("Ubi-AppId", "afb4b43c-f1f7-41b7-bcef-a635d8c83822")
         .set("Authorization", &format!("Basic {}", encoded))
-        .set("Ubi-TransactionId", "51ffc1a6-bfa8-42b6-8319-4bcc5f5616a1")
-        .set("Origin", "https://connect.ubisoft.com")
-        .set("Connection", "keep-alive")
-        .set("Referer", "https://connect.ubisoft.com/")
-        .set("Sec-Fetch-Dest", "empty")
-        .set("Sec-Fetch-Mode", "cors")
-        .set("Sec-Fetch-Site", "cross-site")
-        .set("Priority", "u=1")
-        .set("TE", "trailers")
+        .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
+        .set("Ubi-RequestedPlatformType", "uplay")
+        .set("Content-Type", "application/json")
         .send_string(
             json::stringify(json::object! {
                 "rememberMe": true,
@@ -117,15 +105,16 @@ pub fn get_ubisoft_token(email: &str, password: &str) {
         }
     };
 
+    let formated = format!("UbiTicket|{}\nrequestedName|\nf|1\nprotocol|209\ngame_version|4.62\nfz|46297624\nlmode|0\ncbits|1024\nplayer_age|25\nGDPR|1\ncategory|_-5100\ntotalPlaytime|0\nklv|461a6affd0aac154c25c9e867c789ef8c7b5017bbe723d1f86a578ff325b97fe\nhash2|841545814\nmeta|+NlguMhpl2JQ1iP7kyp2Z8W8n9OKDNn57/xI5jJp7/g=\nfhash|-716928004\nrid|020F3BE731F0CF30002CA0AB1843B2A1\nplatformID|13,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|1390211647", session);
     let body = agent
         .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
-        .set("User-Agent", USER_AGENT)
         .set("cache-control", "max-age=0")
         .set("sec-ch-ua", "\"Not/A)Brand\";v=\"8\", \"Chromium\";v=\"126\", \"Microsoft Edge\";v=\"126\", \"Microsoft Edge WebView2\";v=\"126\"")
         .set("sec-ch-ua-mobile", "?0")
         .set("sec-ch-ua-platform", "\"Windows\"")
         .set("content-type", "application/x-www-form-urlencoded")
         .set("upgrade-insecure-requests", "1")
+        .set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0")
         .set("origin", "null")
         .set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
         .set("sec-fetch-site", "none")
@@ -134,11 +123,10 @@ pub fn get_ubisoft_token(email: &str, password: &str) {
         .set("sec-fetch-dest", "document")
         .set("accept-encoding", "gzip, deflate, br, zstd")
         .set("accept-language", "en-US,en;q=0.9")
-        .send_string(&format!("UbiTicket|{}\nrequestedName|\nf|1\nprotocol|209\ngame_version|4.62\nfz|46297624\nlmode|0\ncbits|1024\nplayer_age|25\nGDPR|1\ncategory|_-5100\ntotalPlaytime|0\nklv|461a6affd0aac154c25c9e867c789ef8c7b5017bbe723d1f86a578ff325b97fe\nhash2|841545814\nmeta|+NlguMhpl2JQ1iP7kyp2Z8W8n9OKDNn57/xI5jJp7/g=\nfhash|-716928004\nrid|020F3BE731F0CF30002CA0AB1843B2A1\nplatformID|13,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|1390211647", session))
-        .unwrap()
-        .into_string()
+        .send_string(&formated)
         .unwrap();
 
+    let body = body.into_string().unwrap();
     println!("{}", body);
 }
 
