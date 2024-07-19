@@ -46,7 +46,7 @@ impl LoginInfo {
             fz: "47142936".to_string(),
             f: "1".to_string(),
             player_age: "20".to_string(),
-            game_version: "4.61".to_string(),
+            game_version: "4.62".to_string(),
             lmode: "1".to_string(),
             cbits: "1040".to_string(),
             rid: random_hex(32, true),

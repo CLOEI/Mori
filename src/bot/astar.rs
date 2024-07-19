@@ -117,7 +117,13 @@ impl AStar {
     }
 
     fn calculate_h(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> u32 {
-        ((to_x as i32 - from_x as i32).abs() + (to_y as i32 - from_y as i32).abs()) as u32
+        let dx = (from_x as i32 - to_x as i32).abs();
+        let dy = (from_y as i32 - to_y as i32).abs();
+        if dx == dy {
+            14 * dx as u32
+        } else {
+            10 * (dx + dy) as u32
+        }
     }
 
     fn get_neighbors(&self, node: &Node) -> Vec<Node> {

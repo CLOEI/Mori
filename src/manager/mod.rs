@@ -12,16 +12,6 @@ pub struct Manager {
 
 impl Manager {
     pub fn new() -> Result<Manager, String> {
-        // info!("Getting OAuth links...");
-        // let links = match get_oauth_links() {
-        //     Ok(links) => links,
-        //     Err(err) => return Err(err.to_string()),
-        // };
-        // if links.len() < 3 {
-        //     return Err("Something's wrong".to_string());
-        // }
-        // info!("Successfully got OAuth links for: apple, google and legacy");
-
         info!("Loading items database...");
         let item_database = gtitem_r::load_from_file("items.dat").unwrap();
         info!("Successfully loaded items database");

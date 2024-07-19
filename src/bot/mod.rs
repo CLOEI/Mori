@@ -1,5 +1,6 @@
 mod astar;
 mod inventory;
+pub mod login;
 mod packet_handler;
 mod variant_handler;
 
@@ -12,8 +13,6 @@ use crate::utils::random::random_hex;
 use crate::{types::e_packet_type::EPacketType, utils::proton::generate_klv};
 
 use std::collections::HashMap;
-use std::io;
-use std::process::Command;
 use std::sync::Arc;
 
 use astar::AStar;
@@ -22,7 +21,6 @@ use enet::*;
 use gtitem_r::structs::ItemDatabase;
 use gtworld_r::World;
 use inventory::Inventory;
-use regex::Regex;
 use spdlog::info;
 
 static USER_AGENT: &str =
@@ -195,116 +193,26 @@ impl Bot {
     pub fn get_token(&mut self) {
         info!("Getting token for {}", self.username);
         match self.method {
+            ELoginMethod::UBISOFT => login::get_ubisoft_token(&self.username, &self.password),
             ELoginMethod::APPLE => {
-                let res = self.get_apple_token(self.oauth_links[0].as_str()).unwrap();
+                let res = login::get_apple_token(self.oauth_links[0].as_str()).unwrap();
                 self.token = res;
             }
             ELoginMethod::GOOGLE => {
-                let res = self.get_google_token(self.oauth_links[1].as_str()).unwrap();
+                let res = login::get_google_token(self.oauth_links[1].as_str()).unwrap();
                 self.token = res;
             }
             ELoginMethod::LEGACY => {
-                let res = self
-                    .get_legacy_token(
-                        self.oauth_links[2].as_str(),
-                        self.username.as_str(),
-                        self.password.as_str(),
-                    )
-                    .unwrap();
+                let res = login::get_legacy_token(
+                    self.oauth_links[2].as_str(),
+                    self.username.as_str(),
+                    self.password.as_str(),
+                )
+                .unwrap();
                 self.token = res;
             }
         }
         info!("Received the token: {}", self.token);
-    }
-
-    pub fn get_apple_token(&self, url: &str) -> Result<String, std::io::Error> {
-        println!("Getting apple token");
-        #[cfg(target_os = "windows")]
-        {
-            Command::new("cmd")
-                .args(&["/c", "start", "", url])
-                .spawn()
-                .expect("Failed to open URL on Windows");
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            Command::new("xdg-open")
-                .arg(url)
-                .spawn()
-                .expect("Failed to open URL on Linux");
-        }
-
-        let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer)?;
-        Ok(buffer)
-    }
-
-    pub fn get_google_token(&self, url: &str) -> Result<String, std::io::Error> {
-        println!("Getting google token");
-        #[cfg(target_os = "windows")]
-        {
-            Command::new("cmd")
-                .args(&["/c", "start", "", url])
-                .spawn()
-                .expect("Failed to open URL on Windows");
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            Command::new("xdg-open")
-                .arg(url)
-                .spawn()
-                .expect("Failed to open URL on Linux");
-        }
-
-        let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer)?;
-        let data = json::parse(&buffer).unwrap();
-        Ok(data["token"].to_string())
-    }
-
-    pub fn get_legacy_token(
-        &self,
-        url: &str,
-        username: &str,
-        password: &str,
-    ) -> Result<String, ureq::Error> {
-        let agent = ureq::AgentBuilder::new().build();
-        let body = agent.get(url)
-            .set("User-Agent", USER_AGENT)
-            .set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
-            .set("Accept-Language", "en-US,en;q=0.5")
-            .set("Accept-Encoding", "gzip, deflate, br, zstd")
-            .set("DNT", "1")
-            .set("Sec-GPC", "1")
-            .set("Connection", "keep-alive")
-            .set("Upgrade-Insecure-Requests", "1")
-            .set("Sec-Fetch-Dest", "document")
-            .set("Sec-Fetch-Mode", "navigate")
-            .set("Sec-Fetch-Site", "none")
-            .set("Sec-Fetch-User", "?1")
-            .set("Sec-CH-UA-Platform", "Windows")
-            .set("Sec-CH-UA", "\"Edge\";v=\"120\", \"Chromium\";v=\"120\", \"Not=A?Brand\";v=\"24\"")
-            .set("Sec-CH-UA-Mobile", "?0")
-            .set("Priority", "u=1")
-            .set("TE", "trailers").call()?.into_string()?;
-
-        let token = match extract_token_from_html(&body) {
-            Some(token) => token,
-            None => panic!("Failed to extract token"),
-        };
-        let req = agent
-            .post("https://login.growtopiagame.com/player/growid/login/validate")
-            .send_form(&[
-                ("_token", &token),
-                ("growId", &username),
-                ("password", &password),
-            ])?;
-
-        let body = req.into_string().unwrap();
-        let json = json::parse(&body).unwrap();
-        Ok(json["token"].to_string())
     }
 
     pub fn to_http(&mut self) {
@@ -485,11 +393,4 @@ impl Bot {
 
         Ok(links)
     }
-}
-
-pub fn extract_token_from_html(body: &str) -> Option<String> {
-    let regex = Regex::new(r#"name="_token"\s+type="hidden"\s+value="([^"]*)""#).unwrap();
-    regex
-        .captures(body)
-        .and_then(|cap| cap.get(1).map(|match_| match_.as_str().to_string()))
 }
