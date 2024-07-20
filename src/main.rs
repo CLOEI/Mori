@@ -19,7 +19,7 @@ fn main() {
         "".to_string(),
         "".to_string(),
         "".to_string(),
-        ELoginMethod::GOOGLE,
+        ELoginMethod::UBISOFT,
     );
     loop {}
 }

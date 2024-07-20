@@ -95,14 +95,16 @@ impl Bot {
 impl Bot {
     pub fn login(&mut self) {
         self.to_http();
-        match self.get_oauth_links() {
-            Ok(links) => {
-                self.oauth_links = links;
-                info!("Successfully got OAuth links for: apple, google and legacy");
-            }
-            Err(err) => {
-                info!("Failed to get OAuth links: {}", err);
-                return;
+        if self.method != ELoginMethod::UBISOFT {
+            match self.get_oauth_links() {
+                Ok(links) => {
+                    self.oauth_links = links;
+                    info!("Successfully got OAuth links for: apple, google and legacy");
+                }
+                Err(err) => {
+                    info!("Failed to get OAuth links: {}", err);
+                    return;
+                }
             }
         }
         self.get_token();
@@ -194,10 +196,13 @@ impl Bot {
     }
 
     pub fn get_token(&mut self) {
+        // TODO: Handle error, loop with delay until token is received
         info!("Getting token for {}", self.username);
         match self.method {
             ELoginMethod::UBISOFT => {
-                login::get_ubisoft_token(&self.username, &self.password, &self.code)
+                let res =
+                    login::get_ubisoft_token(&self.username, &self.password, &self.code).unwrap();
+                self.token = res;
             }
             ELoginMethod::APPLE => {
                 let res = login::get_apple_token(self.oauth_links[0].as_str()).unwrap();

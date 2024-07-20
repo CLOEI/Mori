@@ -3,7 +3,6 @@ use std::{io, process::Command};
 use base64::{engine::general_purpose, Engine};
 use json::JsonValue::Null;
 use regex::Regex;
-use spdlog::error;
 use ureq::Agent;
 
 static USER_AGENT: &str =
@@ -94,13 +93,12 @@ pub fn get_ubisoft_session(
     Ok(json["ticket"].to_string())
 }
 
-pub fn get_ubisoft_token(email: &str, password: &str, code: &str) {
+pub fn get_ubisoft_token(email: &str, password: &str, code: &str) -> Result<String, ureq::Error> {
     let agent = ureq::AgentBuilder::new().redirects(5).build();
     let session = match get_ubisoft_session(&agent, email, password, code) {
         Ok(res) => res,
         Err(err) => {
-            error!("Error: {}", err);
-            return;
+            return Err(err);
         }
     };
 
@@ -113,7 +111,7 @@ pub fn get_ubisoft_token(email: &str, password: &str, code: &str) {
         .set("sec-ch-ua-platform", "\"Windows\"")
         .set("content-type", "application/x-www-form-urlencoded")
         .set("upgrade-insecure-requests", "1")
-        .set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0")
+        .set("user-agent", USER_AGENT)
         .set("origin", "null")
         .set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
         .set("sec-fetch-site", "none")
@@ -122,11 +120,11 @@ pub fn get_ubisoft_token(email: &str, password: &str, code: &str) {
         .set("sec-fetch-dest", "document")
         .set("accept-encoding", "gzip, deflate, br, zstd")
         .set("accept-language", "en-US,en;q=0.9")
-        .send_string(&formated)
-        .unwrap();
+        .send_string(&formated)?;
 
-    let body = body.into_string().unwrap();
-    println!("{}", body);
+    let body = body.into_string()?;
+    let json = json::parse(&body).unwrap();
+    Ok(json["token"].to_string())
 }
 
 pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
