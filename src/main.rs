@@ -2,6 +2,7 @@ mod bot;
 mod manager;
 mod types;
 mod utils;
+mod webserver;
 
 use manager::Manager;
 use spdlog::prelude::*;
@@ -21,5 +22,6 @@ fn main() {
         "".to_string(),
         ELoginMethod::UBISOFT,
     );
-    loop {}
+
+    webserver::start();
 }

@@ -10,7 +10,7 @@ gtworld-r = { git = "https://github.com/CLOEI/gtworld-r" }
 gtitem-r = { git = "https://github.com/CLOEI/gtitem-r" }
 regex = "1.10.5"
 spdlog-rs = "0.3.13"
-ureq = {version = "2.10.0", features = ["cookies"]}
+ureq = { version = "2.10.0", features = ["cookies"] }
 json = "0.12.4"
 byteorder = "1.5.0"
 rand = "0.8.5"
@@ -19,3 +19,4 @@ md5 = "0.7.0"
 hex = "0.4.3"
 base64 = "0.22.1"
 rust-otp = "2.0.0"
+axum = { version = "0.7.5", features = ["ws"] }

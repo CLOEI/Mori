@@ -111,6 +111,11 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
                 bot.find_path(peer, 30, 5);
             }
         }
+        "OnClearTutorialArrow" => {
+            let v1 = variant.get(1).unwrap().as_string();
+
+            println!("Received OnClearTutorialArrow: {} ", v1);
+        }
         _ => {}
     }
 }
