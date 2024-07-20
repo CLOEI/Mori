@@ -35,6 +35,7 @@ pub struct Bot {
     pub display_name: String,
     pub username: String,
     pub password: String,
+    pub code: String,
     method: ELoginMethod,
     oauth_links: Vec<String>,
     pub net_id: u32,
@@ -58,6 +59,7 @@ impl Bot {
     pub fn new(
         username: String,
         password: String,
+        code: String,
         method: ELoginMethod,
         item_database: Arc<ItemDatabase>,
     ) -> Bot {
@@ -65,6 +67,7 @@ impl Bot {
             display_name: String::new(),
             username: username,
             password: password,
+            code: code,
             method: method,
             oauth_links: Vec::new(),
             net_id: 0,
@@ -193,7 +196,9 @@ impl Bot {
     pub fn get_token(&mut self) {
         info!("Getting token for {}", self.username);
         match self.method {
-            ELoginMethod::UBISOFT => login::get_ubisoft_token(&self.username, &self.password),
+            ELoginMethod::UBISOFT => {
+                login::get_ubisoft_token(&self.username, &self.password, &self.code)
+            }
             ELoginMethod::APPLE => {
                 let res = login::get_apple_token(self.oauth_links[0].as_str()).unwrap();
                 self.token = res;

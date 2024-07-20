@@ -3,7 +3,7 @@ use std::{io, process::Command};
 use base64::{engine::general_purpose, Engine};
 use json::JsonValue::Null;
 use regex::Regex;
-use spdlog::{error, warn};
+use spdlog::error;
 use ureq::Agent;
 
 static USER_AGENT: &str =
@@ -32,14 +32,14 @@ pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<String, ur
 pub fn post_ubisoft_2fa_ticket(
     agent: &Agent,
     ticket: &str,
-    code: &str,
+    token: &str,
 ) -> Result<String, ureq::Error> {
     let body = agent
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
         .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
         .set("Ubi-RequestedPlatformType", "uplay")
-        .set("Ubi-2faCode", &format!("{}", code))
+        .set("Ubi-2faCode", &format!("{}", token))
         .set("Authorization", &format!("ubi_2fa_v1 t={}", ticket))
         .set("Content-Type", "application/json")
         .send_string(
@@ -71,7 +71,7 @@ pub fn get_ubisoft_session(
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
         .set("Authorization", &format!("Basic {}", encoded))
-        .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
+        .set("Ubi-AppId", "afb4b43c-f1f7-41b7-bcef-a635d8c83822")
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Content-Type", "application/json")
         .send_string(
@@ -87,17 +87,16 @@ pub fn get_ubisoft_session(
         && json["twoFactorAuthenticationTicket"] != Null
     {
         let ticket = &json["twoFactorAuthenticationTicket"].to_string();
-        let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer)?;
-        let session_ticket = post_ubisoft_2fa_ticket(&agent, ticket, buffer.trim())?;
+        let token = rust_otp::make_totp(&code.to_ascii_uppercase(), 30, 0).unwrap();
+        let session_ticket = post_ubisoft_2fa_ticket(&agent, ticket, &token.to_string())?;
         return Ok(session_ticket);
     }
     Ok(json["ticket"].to_string())
 }
 
-pub fn get_ubisoft_token(email: &str, password: &str) {
+pub fn get_ubisoft_token(email: &str, password: &str, code: &str) {
     let agent = ureq::AgentBuilder::new().redirects(5).build();
-    let session = match get_ubisoft_session(&agent, email, password, "XEUYDK") {
+    let session = match get_ubisoft_session(&agent, email, password, code) {
         Ok(res) => res,
         Err(err) => {
             error!("Error: {}", err);

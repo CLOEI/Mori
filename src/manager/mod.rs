@@ -26,7 +26,13 @@ impl Manager {
 }
 
 impl Manager {
-    pub fn add_bot(&mut self, username: String, password: String, method: ELoginMethod) {
+    pub fn add_bot(
+        &mut self,
+        username: String,
+        password: String,
+        code: String,
+        method: ELoginMethod,
+    ) {
         if method == ELoginMethod::LEGACY {
             info!("Adding bot: {}", username);
         } else {
@@ -34,7 +40,7 @@ impl Manager {
         }
         let items_database_clone = Arc::clone(&self.items_database);
         let handle = spawn(move || {
-            let mut bot = Bot::new(username, password, method, items_database_clone);
+            let mut bot = Bot::new(username, password, code, method, items_database_clone);
             bot.login();
         });
         self.bots.lock().unwrap().push(handle);
