@@ -3,6 +3,7 @@ use std::{io, process::Command};
 use base64::{engine::general_purpose, Engine};
 use json::JsonValue::Null;
 use regex::Regex;
+use serde_json::Value;
 use ureq::Agent;
 
 static USER_AGENT: &str =
@@ -24,7 +25,7 @@ pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<String, ur
         )?
         .into_string()?;
 
-    let json = json::parse(&body).unwrap();
+    let json: Value = serde_json::from_str(&body).unwrap();
     Ok(json["ticket"].to_string())
 }
 
@@ -49,11 +50,10 @@ pub fn post_ubisoft_2fa_ticket(
         )?
         .into_string()?;
 
-    let json = json::parse(&body).unwrap();
+    let json: Value = serde_json::from_str(&body).unwrap();
     let ticket = &json["ticket"].to_string();
-    if json.has_key("rememberMeTicket") {
-        let remember_me_ticket = &json["rememberMeTicket"].to_string();
-        let ticket = post_ubisoft_rememberme(&agent, remember_me_ticket)?;
+    if let Some(remember_me_ticket) = json.get("rememberMeTicket") {
+        let ticket = post_ubisoft_rememberme(&agent, &remember_me_ticket.to_string())?;
         return Ok(ticket.to_string());
     }
     Ok(ticket.to_string())
@@ -81,14 +81,14 @@ pub fn get_ubisoft_session(
         )?
         .into_string()?;
 
-    let json = json::parse(&body).unwrap();
-    if json.has_key("twoFactorAuthenticationTicket")
-        && json["twoFactorAuthenticationTicket"] != Null
-    {
-        let ticket = &json["twoFactorAuthenticationTicket"].to_string();
-        let token = rust_otp::make_totp(&code.to_ascii_uppercase(), 30, 0).unwrap();
-        let session_ticket = post_ubisoft_2fa_ticket(&agent, ticket, &token.to_string())?;
-        return Ok(session_ticket);
+    let json: Value = serde_json::from_str(&body).unwrap();
+    if let Some(ticket_value) = json.get("twoFactorAuthenticationTicket") {
+        if !ticket_value.is_null() {
+            let ticket = ticket_value.to_string();
+            let token = rust_otp::make_totp(&code.to_ascii_uppercase(), 30, 0).unwrap();
+            let session_ticket = post_ubisoft_2fa_ticket(&agent, &ticket, &token.to_string())?;
+            return Ok(session_ticket);
+        }
     }
     Ok(json["ticket"].to_string())
 }
@@ -123,7 +123,7 @@ pub fn get_ubisoft_token(email: &str, password: &str, code: &str) -> Result<Stri
         .send_string(&formated)?;
 
     let body = body.into_string()?;
-    let json = json::parse(&body).unwrap();
+    let json: Value = serde_json::from_str(&body).unwrap();
     Ok(json["token"].to_string())
 }
 
@@ -170,7 +170,7 @@ pub fn get_google_token(url: &str) -> Result<String, std::io::Error> {
 
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer)?;
-    let data = json::parse(&buffer).unwrap();
+    let data: Value = serde_json::from_str(&buffer).unwrap();
     Ok(data["token"].to_string())
 }
 
@@ -217,7 +217,7 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
         ])?;
 
     let body = req.into_string().unwrap();
-    let json = json::parse(&body).unwrap();
+    let json: Value = serde_json::from_str(&body).unwrap();
     Ok(json["token"].to_string())
 }
 

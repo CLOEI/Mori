@@ -16,12 +16,6 @@ fn main() {
             return;
         }
     };
-    manager.add_bot(
-        "".to_string(),
-        "".to_string(),
-        "".to_string(),
-        ELoginMethod::UBISOFT,
-    );
 
     webserver::start();
 }

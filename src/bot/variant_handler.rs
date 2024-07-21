@@ -1,5 +1,5 @@
 use enet::Peer;
-use spdlog::info;
+use spdlog::{info, warn};
 
 use crate::types::e_packet_type::EPacketType;
 use crate::types::tank_packet_type::TankPacketType;
@@ -79,6 +79,25 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[
             info!("Received position: {:?}", pos);
             bot.pos_x = pos.0;
             bot.pos_y = pos.1;
+            if bot.is_ingame {
+                bot.place(peer, 0, -1, 9640);
+            }
+        }
+        "ShowStartFTUEPopup" => {
+            return;
+        }
+        "OnFtueButtonDataSet" => {
+            let unknown_1 = variant.get(1).unwrap().as_int32();
+            let current_progress = variant.get(2).unwrap().as_int32();
+            let total_progress = variant.get(3).unwrap().as_int32();
+            let info = variant.get(4).unwrap().as_string();
+            info!(
+                "Received FTUE button data set: {} {} {} {}",
+                unknown_1, current_progress, total_progress, info
+            );
+        }
+        "OnHideMenusRequest" => {
+            warn!("Received OnHideMenusRequest");
         }
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();

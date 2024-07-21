@@ -21,7 +21,7 @@ use enet::*;
 use gtitem_r::structs::ItemDatabase;
 use gtworld_r::World;
 use inventory::Inventory;
-use spdlog::info;
+use spdlog::{error, info};
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";

@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use std::thread::{spawn, JoinHandle, Thread};
+use std::thread::{spawn, JoinHandle};
 
 use crate::bot::Bot;
 use crate::types::e_login_method::ELoginMethod;
