@@ -10,23 +10,24 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use spdlog::info;
 
 use crate::{manager::Manager, types::e_login_method::ELoginMethod};
 
 #[derive(Serialize, Deserialize)]
-struct Data {
-    game_version: String,
-    protocol: String,
-    bots: Vec<Bot>,
+pub struct Data {
+    pub game_version: String,
+    pub protocol: String,
+    pub bots: Vec<Bot>,
 }
 
-#[derive(Serialize, Deserialize)]
-struct Bot {
-    username: String,
-    password: String,
-    token: String,
-    login_method: ELoginMethod,
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Bot {
+    pub username: String,
+    pub password: String,
+    pub token: String,
+    pub login_method: ELoginMethod,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -37,7 +38,6 @@ struct AddBotMessage {
 
 #[tokio::main]
 pub async fn start(manager: Arc<Manager>) {
-    // read json file called data.json in the folder root if not exist create the file
     let _ = match fs::read_to_string("data.json") {
         Ok(data) => data,
         Err(_) => {
@@ -46,7 +46,7 @@ pub async fn start(manager: Arc<Manager>) {
                 protocol: "209".to_string(),
                 bots: vec![],
             };
-            let serialized = serde_json::to_string(&data).expect("Failed to serialize data");
+            let serialized = serde_json::to_string_pretty(&data).expect("Failed to serialize data");
             fs::write("data.json", &serialized).unwrap();
             serialized
         }
@@ -64,11 +64,11 @@ async fn handler(ws: WebSocketUpgrade, manager: Arc<Manager>) -> impl IntoRespon
 }
 
 async fn handle_socket(mut socket: WebSocket, manager: Arc<Manager>) {
-    println!("Socket connected");
     while let Some(msg) = socket.recv().await {
         match msg {
             Ok(Message::Text(text)) => {
-                if text == "get_data" {
+                let msg = serde_json::from_str::<Value>(&text).unwrap();
+                if msg["_type"] == "get_data" {
                     let data = fs::read_to_string("data.json").unwrap();
                     let message = json::stringify(json::object! {
                         "_type" => "data",
@@ -76,7 +76,7 @@ async fn handle_socket(mut socket: WebSocket, manager: Arc<Manager>) {
                     });
                     socket.send(Message::Text(message)).await.unwrap();
                 }
-                if text == "get_item_database" {
+                if msg["_type"] == "get_item_database" {
                     let item_database = &manager.items_database;
                     let message = serde_json::to_string(&serde_json::json!({
                         "_type": "item_database",
@@ -89,9 +89,9 @@ async fn handle_socket(mut socket: WebSocket, manager: Arc<Manager>) {
                     .unwrap();
                     socket.send(Message::Text(message)).await.unwrap();
                 }
-                if text == "add_bot" {
-                    let messsage: AddBotMessage =
-                        serde_json::from_str(&text).expect("Wrong format to use add_bot");
+                if msg["_type"] == "add_bot" {
+                    let messsage: AddBotMessage = serde_json::from_str(&msg.to_string())
+                        .expect("Wrong format to use add_bot");
                     let data = fs::read_to_string("data.json").unwrap();
                     let mut data: Data = serde_json::from_str(&data).unwrap();
                     let bot = Bot {
@@ -100,18 +100,21 @@ async fn handle_socket(mut socket: WebSocket, manager: Arc<Manager>) {
                         token: messsage.data.token,
                         login_method: messsage.data.login_method,
                     };
-                    data.bots.push(bot);
+                    data.bots.push(bot.clone());
                     let serialized =
                         serde_json::to_string(&data).expect("Failed to serialize data");
                     fs::write("data.json", &serialized).unwrap();
-                    let message = json::stringify(json::object! {
-                        "type" => "data",
-                        "data" => serialized
-                    });
+                    let data = fs::read_to_string("data.json").unwrap();
+                    let message = serde_json::to_string_pretty(&serde_json::json!({
+                        "_type": "data",
+                        "data": data
+                    }))
+                    .unwrap();
                     socket.send(Message::Text(message)).await.unwrap();
                 }
-                if text == "remove_bot" {}
-                if text == "update_bot" {}
+                if msg["_type"] == "get_world" {}
+                if msg["_type"] == "remove_bot" {}
+                if msg["_type"] == "update_bot" {}
             }
             Ok(Message::Binary(bin)) => {
                 println!("Received: {:?}", bin);

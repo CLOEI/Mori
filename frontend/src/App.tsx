@@ -36,6 +36,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import { Code } from "lucide-react";
+import { Sprite, Stage } from "@pixi/react";
 
 type Message = {
   _type: string;
@@ -90,12 +93,31 @@ interface ItemDatabase {
   items: Record<number, Item>;
 }
 
+type Data = {
+  game_version: string;
+  protocol: string;
+  bots: Bot[];
+};
+
+type Bot = {
+  username: string;
+  password: string;
+  token: string;
+  login_method: string;
+};
+
 function App() {
   const wsRef = useRef<WebSocket | null>(null);
-  const [data, setData] = useState<string>("");
+  const [data, setData] = useState<Data | null>(null);
   const [itemDatabase, setItemDatabase] = useState<ItemDatabase | null>(null);
   const [search, setSearch] = useState<string>("");
   const [itemPage, setItemPage] = useState<number>(1);
+  // Bad practice, I only do this because I'm prototyping
+  const usernameRef = useRef<HTMLInputElement | null>(null);
+  const passwordRef = useRef<HTMLInputElement | null>(null);
+  const tokenRef = useRef<HTMLInputElement | null>(null);
+  const methodRef = useRef<string | null>(null);
+  const [selectedBot, setSelectedBot] = useState<Bot | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:3000/ws");
@@ -103,15 +125,18 @@ function App() {
 
     ws.addEventListener("open", () => {
       console.log("Connection established");
-      ws.send("get_data");
+      ws.send(
+        JSON.stringify({
+          _type: "get_data",
+        })
+      );
     });
 
     ws.addEventListener("message", (event) => {
       const { _type, data }: Message = JSON.parse(event.data);
-      console.log("Data received: ", data);
       switch (_type) {
         case "data":
-          setData(data);
+          setData(JSON.parse(data));
           break;
         case "item_database": {
           const typedData = data as unknown as ItemDatabase;
@@ -141,96 +166,194 @@ function App() {
   }, []);
 
   const getItemDatabase = () => {
+    setSearch("");
+    setItemPage(1);
     if (itemDatabase) return;
-    wsRef.current?.send("get_item_database");
+    wsRef.current?.send(
+      JSON.stringify({
+        _type: "get_item_database",
+      })
+    );
   };
-  console.log(!!itemDatabase);
+
+  const addBot = () => {
+    if (
+      !usernameRef.current?.value ||
+      !passwordRef.current?.value ||
+      !tokenRef.current?.value ||
+      !methodRef.current
+    )
+      return;
+    wsRef.current?.send(
+      JSON.stringify({
+        _type: "add_bot",
+        data: {
+          username: usernameRef.current.value,
+          password: passwordRef.current.value,
+          token: tokenRef.current.value,
+          login_method: methodRef.current,
+        },
+      })
+    );
+  };
 
   return (
-    <div className="p-10 overflow-x-hidden">
+    <div className="p-4 md:p-10 overflow-x-hidden min-h-full">
       <div className="py-2">
         <h1 className="text-4xl font-bold">Mate - Companion</h1>
       </div>
-      <Tabs defaultValue="bots">
-        <TabsList>
-          <TabsTrigger value="bots">Bots</TabsTrigger>
-          <TabsTrigger value="database" onClick={getItemDatabase}>
-            Item database
-          </TabsTrigger>
-        </TabsList>
+      <Alert>
+        <Code className="h-4 w-4" />
+        <AlertTitle>Heads up!</AlertTitle>
+        <AlertDescription>
+          Currently heavily under development, expect bugs and missing features
+        </AlertDescription>
+      </Alert>
+      <Tabs defaultValue="bots" className="mt-2">
+        <div className="flex space-x-2">
+          <TabsList>
+            <TabsTrigger value="bots">Bots</TabsTrigger>
+            <TabsTrigger value="database" onClick={getItemDatabase}>
+              Item database
+            </TabsTrigger>
+          </TabsList>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>Add bot</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add bot</DialogTitle>
+                <DialogDescription>
+                  Add and connect a bot to the server
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="username" className="text-right">
+                    Username
+                  </Label>
+                  <Input
+                    id="username"
+                    placeholder="cloei"
+                    className="col-span-3"
+                    ref={usernameRef}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="password" className="text-right">
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    placeholder="123123"
+                    className="col-span-3"
+                    ref={passwordRef}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="token" className="text-right">
+                    Token
+                  </Label>
+                  <Input
+                    id="token"
+                    placeholder="adnudiiem"
+                    className="col-span-3"
+                    ref={tokenRef}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="method" className="text-right">
+                    Login method
+                  </Label>
+                  <Select
+                    defaultValue="LEGACY"
+                    onValueChange={(e) => (methodRef.current = e)}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select a login method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="LEGACY">Legacy</SelectItem>
+                        <SelectItem value="GOOGLE">Google</SelectItem>
+                        <SelectItem value="APPLE">Apple</SelectItem>
+                        <SelectItem value="UBISOFT">Ubisoft Connect</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="submit" onClick={addBot}>
+                    Submit
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
         <TabsContent value="bots">
-          <div className="grid">
-            <div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>Add bot</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Add bot</DialogTitle>
-                    <DialogDescription>
-                      Add and connect a bot to the server
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="username" className="text-right">
-                        Username
-                      </Label>
-                      <Input
-                        id="username"
-                        placeholder="cloei"
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="password" className="text-right">
-                        Password
-                      </Label>
-                      <Input
-                        id="password"
-                        placeholder="123123"
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="token" className="text-right">
-                        Token
-                      </Label>
-                      <Input
-                        id="token"
-                        placeholder="adnudiiem"
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="method" className="text-right">
-                        Login method
-                      </Label>
-                      <Select defaultValue="3">
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select a login method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="3">Legacy</SelectItem>
-                            <SelectItem value="2">Google</SelectItem>
-                            <SelectItem value="1">Apple</SelectItem>
-                            <SelectItem value="0">Ubisoft Connect</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button type="submit">Submit</Button>
-                    </DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+          {data && (
+            <div className="grid grid-cols-4">
+              <div className="space-y-2">
+                {data.bots.map((bot) => {
+                  return (
+                    <Card
+                      key={bot.username}
+                      onClick={() => setSelectedBot(bot)}
+                      className="rounded-none"
+                    >
+                      <CardHeader>
+                        <CardTitle>{bot.username}</CardTitle>
+                        <CardDescription>{bot.login_method}</CardDescription>
+                      </CardHeader>
+                    </Card>
+                  );
+                })}
+              </div>
+              <div className="col-span-3">
+                {selectedBot && (
+                  <Card className="h-full rounded-none">
+                    <Tabs className="p-2">
+                      <TabsList>
+                        <TabsTrigger value="general">General</TabsTrigger>
+                        <TabsTrigger value="world">World</TabsTrigger>
+                        <TabsTrigger value="console">Console</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="general">
+                        <CardContent>
+                          <p>Username: {selectedBot.username}</p>
+                          <p>Password: {selectedBot.password}</p>
+                          <p>Token: {selectedBot.token}</p>
+                          <p>Login method: {selectedBot.login_method}</p>
+                        </CardContent>
+                      </TabsContent>
+                      <TabsContent value="world">
+                        <CardContent>
+                          <Stage
+                            className="mx-auto"
+                            width={(100 * 32) / 4}
+                            height={(60 * 32) / 4}
+                          >
+                            <Sprite image={`/generic_menu.png`} />
+                          </Stage>
+                          <div className="flex justify-center space-x-4">
+                            <p className="text-center">
+                              World name :{" "}
+                              <span className="text-rose-500">EXIT</span>{" "}
+                            </p>
+                            <p>Pos ( -:- )</p>
+                          </div>
+                        </CardContent>
+                      </TabsContent>
+                    </Tabs>
+                  </Card>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </TabsContent>
         <TabsContent value="database">
           {itemDatabase && (
