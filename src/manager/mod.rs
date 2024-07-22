@@ -8,7 +8,7 @@ use spdlog::prelude::*;
 
 pub struct Manager {
     pub bots: Mutex<Vec<JoinHandle<()>>>,
-    items_database: Arc<ItemDatabase>,
+    pub items_database: Arc<ItemDatabase>,
 }
 
 impl Manager {

@@ -1,8 +1,8 @@
-use std::{fs, net::SocketAddr};
+use std::{fs, net::SocketAddr, sync::Arc};
 
 use axum::{
     extract::{
-        ws::{Message, WebSocket},
+        ws::{self, Message, WebSocket},
         WebSocketUpgrade,
     },
     response::IntoResponse,
@@ -12,7 +12,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use spdlog::info;
 
-use crate::types::e_login_method::ELoginMethod;
+use crate::{manager::Manager, types::e_login_method::ELoginMethod};
 
 #[derive(Serialize, Deserialize)]
 struct Data {
@@ -36,7 +36,7 @@ struct AddBotMessage {
 }
 
 #[tokio::main]
-pub async fn start() {
+pub async fn start(manager: Arc<Manager>) {
     // read json file called data.json in the folder root if not exist create the file
     let _ = match fs::read_to_string("data.json") {
         Ok(data) => data,
@@ -52,18 +52,18 @@ pub async fn start() {
         }
     };
 
-    let app = Router::new().route("/ws", get(handler));
+    let app = Router::new().route("/ws", get(|ws: WebSocketUpgrade| handler(ws, manager)));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     info!("Socket started on localhost with port 3000");
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn handler(ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket))
+async fn handler(ws: WebSocketUpgrade, manager: Arc<Manager>) -> impl IntoResponse {
+    ws.on_upgrade(|socket| handle_socket(socket, manager))
 }
 
-async fn handle_socket(mut socket: WebSocket) {
+async fn handle_socket(mut socket: WebSocket, manager: Arc<Manager>) {
     println!("Socket connected");
     while let Some(msg) = socket.recv().await {
         match msg {
@@ -74,6 +74,19 @@ async fn handle_socket(mut socket: WebSocket) {
                         "_type" => "data",
                         "data" => data
                     });
+                    socket.send(Message::Text(message)).await.unwrap();
+                }
+                if text == "get_item_database" {
+                    let item_database = &manager.items_database;
+                    let message = serde_json::to_string(&serde_json::json!({
+                        "_type": "item_database",
+                        "data": {
+                            "version": item_database.version,
+                            "item_count": item_database.item_count,
+                            "items": item_database.items
+                        }
+                    }))
+                    .unwrap();
                     socket.send(Message::Text(message)).await.unwrap();
                 }
                 if text == "add_bot" {
