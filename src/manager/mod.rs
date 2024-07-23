@@ -33,7 +33,6 @@ impl Manager {
         code: String,
         method: ELoginMethod,
     ) {
-        println!("{} {} {} {:?}", username, password, code, method);
         if method == ELoginMethod::LEGACY {
             info!("Adding bot: {}", username);
         } else {

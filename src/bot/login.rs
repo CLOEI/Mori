@@ -25,7 +25,7 @@ pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<String, ur
         )?
         .into_string()?;
 
-    let json: Value = serde_json::from_str(&body).unwrap();
+    let json = json::parse(&body).unwrap();
     Ok(json["ticket"].to_string())
 }
 
@@ -45,15 +45,17 @@ pub fn post_ubisoft_2fa_ticket(
         .send_string(
             json::stringify(json::object! {
                 "rememberMe": true,
+                "trustedDevice": Null,
             })
             .as_str(),
         )?
         .into_string()?;
 
-    let json: Value = serde_json::from_str(&body).unwrap();
+    let json = json::parse(&body).unwrap();
     let ticket = &json["ticket"].to_string();
-    if let Some(remember_me_ticket) = json.get("rememberMeTicket") {
-        let ticket = post_ubisoft_rememberme(&agent, &remember_me_ticket.to_string())?;
+    if json.has_key("rememberMeTicket") {
+        let remember_me_ticket = &json["rememberMeTicket"].to_string();
+        let ticket = post_ubisoft_rememberme(&agent, remember_me_ticket)?;
         return Ok(ticket.to_string());
     }
     Ok(ticket.to_string())
@@ -81,14 +83,14 @@ pub fn get_ubisoft_session(
         )?
         .into_string()?;
 
-    let json: Value = serde_json::from_str(&body).unwrap();
-    if let Some(ticket_value) = json.get("twoFactorAuthenticationTicket") {
-        if !ticket_value.is_null() {
-            let ticket = ticket_value.to_string();
-            let token = rust_otp::make_totp(&code.to_ascii_uppercase(), 30, 0).unwrap();
-            let session_ticket = post_ubisoft_2fa_ticket(&agent, &ticket, &token.to_string())?;
-            return Ok(session_ticket);
-        }
+    let json = json::parse(&body).unwrap();
+    if json.has_key("twoFactorAuthenticationTicket")
+        && json["twoFactorAuthenticationTicket"] != Null
+    {
+        let ticket = &json["twoFactorAuthenticationTicket"].to_string();
+        let token = rust_otp::make_totp(&code.to_ascii_uppercase(), 30, 0).unwrap();
+        let session_ticket = post_ubisoft_2fa_ticket(&agent, ticket, &token.to_string())?;
+        return Ok(session_ticket);
     }
     Ok(json["ticket"].to_string())
 }
@@ -104,26 +106,26 @@ pub fn get_ubisoft_token(email: &str, password: &str, code: &str) -> Result<Stri
 
     let formated = format!("UbiTicket|{}\nrequestedName|\nf|1\nprotocol|209\ngame_version|4.62\nfz|46297624\nlmode|0\ncbits|1024\nplayer_age|25\nGDPR|1\ncategory|_-5100\ntotalPlaytime|0\nklv|461a6affd0aac154c25c9e867c789ef8c7b5017bbe723d1f86a578ff325b97fe\nhash2|841545814\nmeta|+NlguMhpl2JQ1iP7kyp2Z8W8n9OKDNn57/xI5jJp7/g=\nfhash|-716928004\nrid|020F3BE731F0CF30002CA0AB1843B2A1\nplatformID|13,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|1390211647", session);
     let body = agent
-        .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
-        .set("cache-control", "max-age=0")
-        .set("sec-ch-ua", "\"Not/A)Brand\";v=\"8\", \"Chromium\";v=\"126\", \"Microsoft Edge\";v=\"126\", \"Microsoft Edge WebView2\";v=\"126\"")
-        .set("sec-ch-ua-mobile", "?0")
-        .set("sec-ch-ua-platform", "\"Windows\"")
-        .set("content-type", "application/x-www-form-urlencoded")
-        .set("upgrade-insecure-requests", "1")
-        .set("user-agent", USER_AGENT)
-        .set("origin", "null")
-        .set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-        .set("sec-fetch-site", "none")
-        .set("sec-fetch-mode", "navigate")
-        .set("sec-fetch-user", "?1")
-        .set("sec-fetch-dest", "document")
-        .set("accept-encoding", "gzip, deflate, br, zstd")
-        .set("accept-language", "en-US,en;q=0.9")
-        .send_string(&formated)?;
+            .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
+            .set("cache-control", "max-age=0")
+            .set("sec-ch-ua", "\"Not/A)Brand\";v=\"8\", \"Chromium\";v=\"126\", \"Microsoft Edge\";v=\"126\", \"Microsoft Edge WebView2\";v=\"126\"")
+            .set("sec-ch-ua-mobile", "?0")
+            .set("sec-ch-ua-platform", "\"Windows\"")
+            .set("content-type", "application/x-www-form-urlencoded")
+            .set("upgrade-insecure-requests", "1")
+            .set("user-agent", USER_AGENT)
+            .set("origin", "null")
+            .set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+            .set("sec-fetch-site", "none")
+            .set("sec-fetch-mode", "navigate")
+            .set("sec-fetch-user", "?1")
+            .set("sec-fetch-dest", "document")
+            .set("accept-encoding", "gzip, deflate, br, zstd")
+            .set("accept-language", "en-US,en;q=0.9")
+            .send_string(&formated)?;
 
     let body = body.into_string()?;
-    let json: Value = serde_json::from_str(&body).unwrap();
+    let json = json::parse(&body).unwrap();
     Ok(json["token"].to_string())
 }
 
