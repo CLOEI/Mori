@@ -14,7 +14,7 @@ pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<String, ur
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
         .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
-        .set("Ubi-RequestedPlatformType", "uplay")
+        .set("Ubi-RequestedPlatformType", "steam")
         .set("Authorization", &format!("rm_v1 t={}", ticket))
         .set("Content-Type", "application/json")
         .send_string(
@@ -38,7 +38,7 @@ pub fn post_ubisoft_2fa_ticket(
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
         .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
-        .set("Ubi-RequestedPlatformType", "uplay")
+        .set("Ubi-RequestedPlatformType", "steam")
         .set("Ubi-2faCode", &format!("{}", token))
         .set("Authorization", &format!("ubi_2fa_v1 t={}", ticket))
         .set("Content-Type", "application/json")

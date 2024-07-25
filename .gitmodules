@@ -1,0 +1,3 @@
+[submodule "mate-frontend"]
+	path = mate-frontend
+	url = https://github.com/CLOEI/mate-frontend.git
