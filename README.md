@@ -1,6 +1,6 @@
 <br/>
 <div align="center">
-<h3 align="center">Mate</h3>
+<h3 align="center">Mori</h3>
 <p align="center">
 Your Cross-Platform Growtopia Companion
 </p>
