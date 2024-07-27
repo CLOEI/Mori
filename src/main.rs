@@ -3,9 +3,25 @@ mod manager;
 mod types;
 mod utils;
 
+use std::fs;
+
 use eframe::egui::{self, ViewportBuilder};
 use manager::Manager;
-use types::e_login_method::ELoginMethod;
+use serde::{Deserialize, Serialize};
+use types::{e_login_method::ELoginMethod, login_info};
+
+#[derive(Serialize, Deserialize)]
+struct Data {
+    bots: Vec<Bot>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Bot {
+    username: String,
+    password: String,
+    code: String,
+    method: ELoginMethod,
+}
 
 fn main() {
     let options = eframe::NativeOptions {
@@ -21,28 +37,49 @@ fn main() {
 }
 struct App {
     current_menu: String,
-    item_search: String,
+    search_query: String,
     manager: Manager,
     new_bot_username: String,
     new_bot_password: String,
     new_bot_code: String,
     new_bot_method: ELoginMethod,
     show_add_bot_dialog: bool,
+    bots: Vec<Bot>,
 }
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let manager = Manager::new().unwrap();
+        let mut manager = Manager::new().unwrap();
+
+        let data = match fs::read_to_string("data.json") {
+            Ok(data) => data,
+            Err(_) => {
+                let data = Data { bots: vec![] };
+                let json = serde_json::to_string_pretty(&data).unwrap();
+                fs::write("data.json", &json).unwrap();
+                json
+            }
+        };
+        let json = serde_json::from_str::<Data>(&data).unwrap();
+        for bot in &json.bots {
+            manager.add_bot(
+                bot.username.clone(),
+                bot.password.clone(),
+                bot.code.clone(),
+                bot.method.clone(),
+            );
+        }
 
         Self {
             current_menu: "bots".to_string(),
-            item_search: "".to_string(),
+            search_query: "".to_string(),
             manager,
             new_bot_username: "".to_string(),
             new_bot_password: "".to_string(),
             new_bot_code: "".to_string(),
             new_bot_method: ELoginMethod::LEGACY,
             show_add_bot_dialog: false,
+            bots: json.bots,
         }
     }
 }
@@ -86,6 +123,13 @@ impl eframe::App for App {
                                 ui.label("2FA Code");
                                 ui.label("Login Method");
                                 ui.end_row();
+                                for bot in &self.bots {
+                                    ui.label(bot.username.clone());
+                                    ui.label(bot.password.clone());
+                                    ui.label(bot.code.clone());
+                                    ui.label(format!("{:?}", bot.method));
+                                    ui.end_row();
+                                }
                             });
                     });
                     ui.separator();
@@ -101,7 +145,7 @@ impl eframe::App for App {
                     ui.label("Items count:");
                     ui.label(self.manager.items_database.item_count.to_string());
                     ui.separator();
-                    ui.text_edit_singleline::<String>(&mut self.item_search);
+                    ui.text_edit_singleline::<String>(&mut self.search_query);
                 });
                 ui.separator();
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
@@ -185,6 +229,28 @@ impl eframe::App for App {
                                 ui.end_row();
                             });
                         if ui.button("Add").clicked() {
+                            self.manager.add_bot(
+                                self.new_bot_username.clone(),
+                                self.new_bot_password.clone(),
+                                self.new_bot_code.clone(),
+                                self.new_bot_method.clone(),
+                            );
+                            let mut data = serde_json::from_str::<Data>(
+                                &fs::read_to_string("data.json").unwrap(),
+                            )
+                            .unwrap();
+                            data.bots.push(Bot {
+                                username: self.new_bot_username.clone(),
+                                password: self.new_bot_password.clone(),
+                                code: self.new_bot_code.clone(),
+                                method: self.new_bot_method.clone(),
+                            });
+                            fs::write("data.json", &serde_json::to_string_pretty(&data).unwrap())
+                                .unwrap();
+                            self.new_bot_username.clear();
+                            self.new_bot_password.clear();
+                            self.new_bot_code.clear();
+                            self.new_bot_method = ELoginMethod::LEGACY;
                             close_dialog = true;
                         }
                     });

@@ -23,7 +23,7 @@ pub fn handle(bot: &mut Bot, peer: &mut Peer<()>, packet_type: EPacketType, data
             } else {
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
-                    208, bot.token, "0,1,1"
+                    209, bot.token, "0,1,1"
                 );
                 bot.send_packet(peer, EPacketType::NetMessageGenericText, message);
             }

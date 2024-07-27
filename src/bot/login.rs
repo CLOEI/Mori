@@ -219,7 +219,7 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
         ])?;
 
     let body = req.into_string().unwrap();
-    let json: Value = serde_json::from_str(&body).unwrap();
+    let json = json::parse(&body).unwrap();
     Ok(json["token"].to_string())
 }
 
