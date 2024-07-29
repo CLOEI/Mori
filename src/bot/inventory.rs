@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Inventory {
     pub size: u32,
     pub item_count: u16,

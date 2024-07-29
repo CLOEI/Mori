@@ -1,6 +1,8 @@
 use std::{io, process::Command};
 
 use base64::{engine::general_purpose, Engine};
+use chromiumoxide::{Browser, BrowserConfig};
+use futures::StreamExt;
 use json::JsonValue::Null;
 use regex::Regex;
 use serde_json::Value;
@@ -151,29 +153,42 @@ pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
     io::stdin().read_line(&mut buffer)?;
     Ok(buffer)
 }
+#[tokio::main]
+pub async fn get_google_token(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let (mut browser, mut handler) = Browser::launch(
+        BrowserConfig::builder()
+            .with_head()
+            .args(vec!["--excludeSwitches=enable-automation"])
+            .build()?,
+    )
+    .await?;
 
-pub fn get_google_token(url: &str) -> Result<String, std::io::Error> {
-    println!("Getting google token");
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("cmd")
-            .args(&["/c", "start", "", url])
-            .spawn()
-            .expect("Failed to open URL on Windows");
-    }
+    let handle = tokio::spawn(async move {
+        while let Some(h) = handler.next().await {
+            if h.is_err() {
+                break;
+            }
+        }
+    });
 
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(url)
-            .spawn()
-            .expect("Failed to open URL on Linux");
-    }
+    let page = browser.new_page(url).await?;
+    page.enable_stealth_mode_with_agent(USER_AGENT).await?;
+    let elem = page.find_xpath("//*[@id=\"yDmH0d\"]/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/form/span/section/div/div/div/div/ul/li[1]/div").await?;
+    elem.click().await?;
+    page.wait_for_navigation_response().await?;
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    let source = page
+        .find_element("body")
+        .await?
+        .inner_text()
+        .await?
+        .unwrap();
+    let json = json::parse(&source).unwrap();
+    println!("{}", json["token"]);
 
-    let mut buffer = String::new();
-    io::stdin().read_line(&mut buffer)?;
-    let data: Value = serde_json::from_str(&buffer).unwrap();
-    Ok(data["token"].to_string())
+    browser.close().await?;
+    handle.await?;
+    Ok(json["token"].to_string())
 }
 
 pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<String, ureq::Error> {

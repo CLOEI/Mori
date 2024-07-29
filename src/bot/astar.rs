@@ -1,7 +1,12 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use gtitem_r::structs::ItemDatabase;
 use gtworld_r::Tile;
+
+use super::Bot;
 
 pub struct AStar {
     pub width: u32,
@@ -42,16 +47,17 @@ impl AStar {
         }
     }
 
-    pub fn update(&mut self, tiles: &Vec<Tile>, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
-        for i in 0..tiles.len() {
+    pub fn update(&mut self, bot_mutex: &Arc<Mutex<Bot>>) {
+        let bot = bot_mutex.lock().unwrap();
+        self.width = bot.world.width;
+        self.height = bot.world.height;
+        for i in 0..bot.world.tiles.len() {
             let mut node = Node::new();
-            node.x = (i as u32) % width;
-            node.y = (i as u32) / width;
+            node.x = (i as u32) % bot.world.width;
+            node.y = (i as u32) / bot.world.width;
             let item = self
                 .item_database
-                .get_item(&(tiles[i].foreground_item_id as u32))
+                .get_item(&(bot.world.tiles[i].foreground_item_id as u32))
                 .unwrap();
             node.collision_type = item.collision_type;
             self.grid.push(node);

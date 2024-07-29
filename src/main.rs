@@ -8,7 +8,7 @@ use std::fs;
 use eframe::egui::{self, ViewportBuilder};
 use manager::Manager;
 use serde::{Deserialize, Serialize};
-use types::{e_login_method::ELoginMethod, login_info};
+use types::e_login_method::ELoginMethod;
 
 #[derive(Serialize, Deserialize)]
 struct Data {

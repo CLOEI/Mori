@@ -1,13 +1,13 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{spawn, JoinHandle};
 
-use crate::bot::Bot;
+use crate::bot::{self, Bot};
 use crate::types::e_login_method::ELoginMethod;
 use gtitem_r::structs::ItemDatabase;
 use spdlog::prelude::*;
 
 pub struct Manager {
-    pub bots: Mutex<Vec<JoinHandle<()>>>,
+    pub bots: Vec<(Arc<Mutex<Bot>>, JoinHandle<()>)>,
     pub items_database: Arc<ItemDatabase>,
 }
 
@@ -19,7 +19,7 @@ impl Manager {
         info!("Initialized Manager");
 
         Ok(Manager {
-            bots: Mutex::new(Vec::new()),
+            bots: vec![],
             items_database: Arc::new(item_database),
         })
     }
@@ -39,11 +39,19 @@ impl Manager {
             info!("Adding bot with method: {:?}", method);
         }
         let items_database_clone = Arc::clone(&self.items_database);
+        let new_bot = Arc::new(Mutex::new(Bot::new(
+            username,
+            password,
+            code,
+            method,
+            items_database_clone,
+        )));
+        let newbot_clone = Arc::clone(&new_bot);
+
         let handle = spawn(move || {
-            let mut bot = Bot::new(username, password, code, method, items_database_clone);
-            bot.login();
+            bot::login(newbot_clone);
         });
-        self.bots.lock().unwrap().push(handle);
+        self.bots.push((new_bot, handle));
     }
     pub fn remove_bot(&mut self, username: &str) {}
     pub fn get_bot(&self, username: &str) {}
