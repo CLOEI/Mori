@@ -14,6 +14,7 @@ use crate::{types::e_packet_type::EPacketType, utils::proton::generate_klv};
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
@@ -53,6 +54,7 @@ pub struct Bot {
     pub world: World,
     pub inventory: Inventory,
     pub astar: AStar,
+    pub ping: u32,
 }
 
 impl Bot {
@@ -88,6 +90,7 @@ impl Bot {
             world: World::new(Arc::clone(&item_database)),
             inventory: Inventory::new(),
             astar: AStar::new(Arc::clone(&item_database)),
+            ping: 0,
         }
     }
 }
@@ -166,13 +169,14 @@ impl Bot {
                     )
                     .expect("Failed to connect to the server");
             }
-            self.is_ingame = false;
             loop {
                 match enet_host.service(1000).expect("Service failed") {
-                    Some(Event::Connect(..)) => {
+                    Some(Event::Connect(ref mut sender)) => {
+                        self.set_ping(sender.mean_rtt());
                         info!("Connected to the server");
                     }
-                    Some(Event::Disconnect(..)) => {
+                    Some(Event::Disconnect(ref mut sender, ..)) => {
+                        self.set_ping(sender.mean_rtt());
                         info!("Disconnected from the server");
                         break;
                     }
@@ -181,6 +185,7 @@ impl Bot {
                         ref mut sender,
                         ..
                     }) => {
+                        self.set_ping(sender.mean_rtt());
                         let data = packet.data();
                         if data.len() < 4 {
                             continue;
@@ -402,5 +407,9 @@ impl Bot {
             .collect::<Vec<String>>();
 
         Ok(links)
+    }
+
+    pub fn set_ping(&mut self, ping: Duration) {
+        self.ping = ping.as_millis() as u32;
     }
 }
