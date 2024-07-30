@@ -196,7 +196,12 @@ pub fn get_token(bot: &Arc<Mutex<Bot>>) {
             bot.info.token = res;
         }
         ELoginMethod::GOOGLE => {
-            let res = login::get_google_token(bot.info.oauth_links[1].as_str()).unwrap();
+            let res = login::get_google_token(
+                &bot.info.username,
+                &bot.info.password,
+                bot.info.oauth_links[1].as_str(),
+            )
+            .unwrap();
             bot.info.token = res;
         }
         ELoginMethod::LEGACY => {

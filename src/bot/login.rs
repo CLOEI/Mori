@@ -1,7 +1,7 @@
 use std::{io, process::Command};
 
 use base64::{engine::general_purpose, Engine};
-use chromiumoxide::{Browser, BrowserConfig};
+use chromiumoxide::{Browser, BrowserConfig, Page};
 use futures::StreamExt;
 use json::JsonValue::Null;
 use regex::Regex;
@@ -154,11 +154,19 @@ pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 #[tokio::main]
-pub async fn get_google_token(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn get_google_token(
+    email: &str,
+    password: &str,
+    url: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     let (mut browser, mut handler) = Browser::launch(
         BrowserConfig::builder()
             .with_head()
-            .args(vec!["--excludeSwitches=enable-automation"])
+            .args(vec![
+                "--excludeSwitches=enable-automation",
+                "--disable-blink-features=AutomationControlled",
+                "--lang=en-EN",
+            ])
             .build()?,
     )
     .await?;
@@ -172,11 +180,29 @@ pub async fn get_google_token(url: &str) -> Result<String, Box<dyn std::error::E
     });
 
     let page = browser.new_page(url).await?;
-    page.enable_stealth_mode_with_agent(USER_AGENT).await?;
-    let elem = page.find_xpath("//*[@id=\"yDmH0d\"]/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/form/span/section/div/div/div/div/ul/li[1]/div").await?;
-    elem.click().await?;
+    match page
+        .find_xpath(format!("//li/div[@data-identifier='{}']", email))
+        .await
+    {
+        Ok(elem) => {
+            elem.click().await?;
+        }
+        Err(..) => match page.find_xpath("//*[@id=\"identifierId\"]").await {
+            Ok(..) => {
+                handle_google_login_form(email, password, &page).await?;
+            }
+            Err(..) => {
+                page.find_xpath("//li/div[not(@data-identifier)]")
+                    .await?
+                    .click()
+                    .await?;
+                page.wait_for_navigation_response().await?;
+                handle_google_login_form(email, password, &page).await?;
+            }
+        },
+    };
     page.wait_for_navigation_response().await?;
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     let source = page
         .find_element("body")
         .await?
@@ -184,11 +210,40 @@ pub async fn get_google_token(url: &str) -> Result<String, Box<dyn std::error::E
         .await?
         .unwrap();
     let json = json::parse(&source).unwrap();
-    println!("{}", json["token"]);
 
     browser.close().await?;
     handle.await?;
     Ok(json["token"].to_string())
+}
+
+async fn handle_google_login_form(
+    email: &str,
+    password: &str,
+    page: &Page,
+) -> Result<(), Box<dyn std::error::Error>> {
+    page.find_xpath("//*[@id=\"identifierId\"]")
+        .await?
+        .type_str(email)
+        .await?;
+
+    page.find_xpath("//*[@id=\"identifierNext\"]/div/button/span")
+        .await?
+        .click()
+        .await?;
+    page.wait_for_navigation_response().await?;
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    page.find_xpath("//*[@id=\"password\"]/div[1]/div/div[1]/input")
+        .await?
+        .type_str(password)
+        .await?;
+    page.find_xpath("//*[@id=\"passwordNext\"]/div/button/span")
+        .await?
+        .click()
+        .await?;
+    page.wait_for_navigation_response().await?;
+
+    Ok(())
 }
 
 pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<String, ureq::Error> {
