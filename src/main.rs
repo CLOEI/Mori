@@ -1,4 +1,5 @@
 mod bot;
+mod gui;
 mod manager;
 mod types;
 mod utils;
@@ -6,6 +7,7 @@ mod utils;
 use std::fs;
 
 use eframe::egui::{self, ViewportBuilder};
+use gui::{add_bot_dialog::AddBotDialog, item_database::ItemDatabase, warp_dialog::WarpDialog};
 use manager::Manager;
 use serde::{Deserialize, Serialize};
 use types::e_login_method::ELoginMethod;
@@ -37,13 +39,10 @@ fn main() {
 }
 struct App {
     current_menu: String,
-    search_query: String,
+    item_database: ItemDatabase,
     manager: Manager,
-    new_bot_username: String,
-    new_bot_password: String,
-    new_bot_code: String,
-    new_bot_method: ELoginMethod,
-    show_add_bot_dialog: bool,
+    add_bot_dialog: AddBotDialog,
+    warp_dialog: WarpDialog,
     bots: Vec<Bot>,
     selected_bot_name: String,
 }
@@ -73,13 +72,10 @@ impl App {
 
         Self {
             current_menu: "bots".to_string(),
-            search_query: "".to_string(),
+            item_database: Default::default(),
             manager,
-            new_bot_username: "".to_string(),
-            new_bot_password: "".to_string(),
-            new_bot_code: "".to_string(),
-            new_bot_method: ELoginMethod::LEGACY,
-            show_add_bot_dialog: false,
+            add_bot_dialog: Default::default(),
+            warp_dialog: Default::default(),
             bots: json.bots,
             selected_bot_name: "".to_string(),
         }
@@ -109,7 +105,7 @@ impl eframe::App for App {
                 }
                 ui.separator();
                 if ui.button("Add bot").clicked() {
-                    self.show_add_bot_dialog = true;
+                    self.add_bot_dialog.open = true;
                 }
             });
             ui.separator();
@@ -163,131 +159,21 @@ impl eframe::App for App {
                                     ui.label(bot.position.x.to_string());
                                     ui.label(bot.position.y.to_string());
                                 });
+                                if ui.button("Warp").clicked() {
+                                    self.warp_dialog.open = true;
+                                }
                             }
                         }
                     });
                 });
             } else if self.current_menu == "item_database" {
-                ui.horizontal(|ui| {
-                    ui.label("Database version:");
-                    ui.label(self.manager.items_database.version.to_string());
-                    ui.separator();
-                    ui.label("Items count:");
-                    ui.label(self.manager.items_database.item_count.to_string());
-                    ui.separator();
-                    ui.text_edit_singleline::<String>(&mut self.search_query);
-                });
-                ui.separator();
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                    let text_style = egui::TextStyle::Body;
-                    let row_height = ui.text_style_height(&text_style);
-                    egui::ScrollArea::vertical().show_rows(
-                        ui,
-                        row_height,
-                        (self.manager.items_database.item_count) as usize,
-                        |ui, row_range| {
-                            ui.vertical(|ui| {
-                                egui::Grid::new("item_database_grid")
-                                    .min_col_width(300.0)
-                                    .max_col_width(300.0)
-                                    .show(ui, |ui| {
-                                        for i in row_range {
-                                            ui.label(
-                                                self.manager.items_database.items[&(i as u32)]
-                                                    .name
-                                                    .clone(),
-                                            );
-                                            ui.end_row();
-                                        }
-                                    });
-                            })
-                        },
-                    );
-                    ui.separator();
-                    ui.vertical(|ui| {
-                        ui.label("Item info");
-                    });
-                });
+                self.item_database.render(ui, &mut self.manager, ctx);
             } else {
                 ui.label("Not implemented yet");
             }
-
-            if self.show_add_bot_dialog {
-                let mut close_dialog = false;
-                egui::Window::new("Add bot")
-                    .resizable(false)
-                    .open(&mut self.show_add_bot_dialog)
-                    .show(ctx, |ui| {
-                        egui::Grid::new("add_bot_grid")
-                            .min_col_width(100.0)
-                            .max_col_width(100.0)
-                            .show(ui, |ui| {
-                                ui.label("Username");
-                                ui.text_edit_singleline(&mut self.new_bot_username);
-                                ui.end_row();
-                                ui.label("Password");
-                                ui.text_edit_singleline(&mut self.new_bot_password);
-                                ui.end_row();
-                                ui.label("2FA Code");
-                                ui.text_edit_singleline(&mut self.new_bot_code);
-                                ui.end_row();
-                                ui.label("Login Method");
-                                egui::ComboBox::from_id_source("login_method")
-                                    .selected_text(format!("{:?}", self.new_bot_method))
-                                    .show_ui(ui, |ui| {
-                                        ui.selectable_value(
-                                            &mut self.new_bot_method,
-                                            ELoginMethod::LEGACY,
-                                            "LEGACY",
-                                        );
-                                        ui.selectable_value(
-                                            &mut self.new_bot_method,
-                                            ELoginMethod::GOOGLE,
-                                            "GOOGLE",
-                                        );
-                                        ui.selectable_value(
-                                            &mut self.new_bot_method,
-                                            ELoginMethod::APPLE,
-                                            "APPLE",
-                                        );
-                                        ui.selectable_value(
-                                            &mut self.new_bot_method,
-                                            ELoginMethod::UBISOFT,
-                                            "UBISOFT",
-                                        );
-                                    });
-                                ui.end_row();
-                            });
-                        if ui.button("Add").clicked() {
-                            self.manager.add_bot(
-                                self.new_bot_username.clone(),
-                                self.new_bot_password.clone(),
-                                self.new_bot_code.clone(),
-                                self.new_bot_method.clone(),
-                            );
-                            let mut data = serde_json::from_str::<Data>(
-                                &fs::read_to_string("data.json").unwrap(),
-                            )
-                            .unwrap();
-                            data.bots.push(Bot {
-                                username: self.new_bot_username.clone(),
-                                password: self.new_bot_password.clone(),
-                                code: self.new_bot_code.clone(),
-                                method: self.new_bot_method.clone(),
-                            });
-                            fs::write("data.json", &serde_json::to_string_pretty(&data).unwrap())
-                                .unwrap();
-                            self.new_bot_username.clear();
-                            self.new_bot_password.clear();
-                            self.new_bot_code.clear();
-                            self.new_bot_method = ELoginMethod::LEGACY;
-                            close_dialog = true;
-                        }
-                    });
-                if close_dialog {
-                    self.show_add_bot_dialog = false;
-                }
-            }
         });
+        self.add_bot_dialog.render(&mut self.manager, ctx);
+        self.warp_dialog
+            .render(&self.selected_bot_name, &mut self.manager, ctx);
     }
 }
