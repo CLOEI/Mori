@@ -26,3 +26,5 @@ chromiumoxide = { version = "0.6.0", features = [
   "tokio-runtime",
 ], default-features = false }
 futures = "0.3.30"
+egui_extras = { version = "*", features = ["all_loaders"] }
+image = { version = "0.25", features = ["png"] }

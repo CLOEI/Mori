@@ -6,7 +6,7 @@ mod utils;
 
 use std::fs;
 
-use eframe::egui::{self, ViewportBuilder};
+use eframe::egui::{self, include_image, IconData, ViewportBuilder};
 use gui::{add_bot_dialog::AddBotDialog, item_database::ItemDatabase, warp_dialog::WarpDialog};
 use manager::Manager;
 use serde::{Deserialize, Serialize};
@@ -28,15 +28,19 @@ struct Bot {
 fn main() {
     let options = eframe::NativeOptions {
         centered: true,
-        viewport: ViewportBuilder {
-            inner_size: Some(egui::vec2(800.0, 400.0)),
-            resizable: Some(false),
-            ..Default::default()
-        },
+        viewport: ViewportBuilder::default()
+            .with_title("Mori")
+            .with_icon(
+                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/logo.png")[..])
+                    .expect("Failed to load icon"),
+            )
+            .with_inner_size([800.0, 400.0])
+            .with_resizable(false),
         ..Default::default()
     };
     let _ = eframe::run_native("Mori", options, Box::new(|cc| Ok(Box::new(App::new(cc)))));
 }
+
 struct App {
     current_menu: String,
     item_database: ItemDatabase,
@@ -61,14 +65,14 @@ impl App {
             }
         };
         let json = serde_json::from_str::<Data>(&data).unwrap();
-        for bot in &json.bots {
-            manager.add_bot(
-                bot.username.clone(),
-                bot.password.clone(),
-                bot.code.clone(),
-                bot.method.clone(),
-            );
-        }
+        // for bot in &json.bots {
+        //     manager.add_bot(
+        //         bot.username.clone(),
+        //         bot.password.clone(),
+        //         bot.code.clone(),
+        //         bot.method.clone(),
+        //     );
+        // }
 
         Self {
             current_menu: "bots".to_string(),
@@ -84,27 +88,64 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        egui_extras::install_image_loaders(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Mori");
                 ui.separator();
-                if ui.button("Bots").clicked() {
+                if ui
+                    .add(egui::Button::image_and_text(
+                        egui::include_image!("../assets/bot.png"),
+                        "Bots",
+                    ))
+                    .clicked()
+                {
                     self.current_menu = "bots".to_string();
                 }
-                if ui.button("World").clicked() {
+                if ui
+                    .add(egui::Button::image_and_text(
+                        include_image!("../assets/earth.png"),
+                        "World",
+                    ))
+                    .clicked()
+                {
                     self.current_menu = "world".to_string();
                 }
-                if ui.button("Item database").clicked() {
+                if ui
+                    .add(egui::Button::image_and_text(
+                        include_image!("../assets/database.png"),
+                        "Item database",
+                    ))
+                    .clicked()
+                {
                     self.current_menu = "item_database".to_string();
                 }
-                if ui.button("Features").clicked() {
+                if ui
+                    .add(egui::Button::image_and_text(
+                        include_image!("../assets/blocks.png"),
+                        "Features",
+                    ))
+                    .clicked()
+                {
                     self.current_menu = "features".to_string();
                 }
-                if ui.button("Settings").clicked() {
+                if ui
+                    .add(egui::Button::image_and_text(
+                        include_image!("../assets/settings.png"),
+                        "Settings",
+                    ))
+                    .clicked()
+                {
                     self.current_menu = "settings".to_string();
                 }
                 ui.separator();
-                if ui.button("Add bot").clicked() {
+                if ui
+                    .add(egui::Button::image_and_text(
+                        include_image!("../assets/plus.png"),
+                        "Add bot",
+                    ))
+                    .clicked()
+                {
                     self.add_bot_dialog.open = true;
                 }
             });
