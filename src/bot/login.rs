@@ -211,6 +211,9 @@ pub async fn get_google_token(
         .inner_text()
         .await?
         .unwrap();
+    if source.contains("too many people") {
+        return Err("Too many people trying to login".into());
+    }
     let json = json::parse(&source).unwrap();
 
     browser.close().await?;

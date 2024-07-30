@@ -14,6 +14,7 @@ pub struct Info {
     pub login_info: LoginInfo,
     pub ping: u32,
     pub parsed_server_data: HashMap<String, String>,
+    pub status: String,
 }
 
 #[derive(Default)]

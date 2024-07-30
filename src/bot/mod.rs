@@ -23,7 +23,7 @@ use enet::*;
 use gtitem_r::structs::ItemDatabase;
 use gtworld_r::World;
 use inventory::Inventory;
-use spdlog::info;
+use spdlog::{error, info};
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -102,11 +102,20 @@ pub fn start_event_loop(bot_mutex: &Arc<Mutex<Bot>>) {
     let enet = Enet::new().expect("Failed to initialize ENet");
 
     loop {
-        {
+        let (is_running, is_redirect, is_ingame, server_ip, server_port, parsed_server_data) = {
             let bot = bot_mutex.lock().unwrap();
-            if !bot.state.is_running {
-                break;
-            }
+            (
+                bot.state.is_running,
+                bot.state.is_redirect,
+                bot.state.is_ingame,
+                bot.server.ip.clone(),
+                bot.server.port.clone(),
+                bot.info.parsed_server_data.clone(),
+            )
+        };
+
+        if !is_running {
+            break;
         }
 
         let mut enet_host = Enet::create_host::<()>(
@@ -119,53 +128,58 @@ pub fn start_event_loop(bot_mutex: &Arc<Mutex<Bot>>) {
             true,
         )
         .expect("Failed to create ENet host");
-        if bot_mutex.lock().unwrap().state.is_redirect {
-            let bot = bot_mutex.lock().unwrap();
-            info!("Redirecting to {}:{}...", &bot.server.ip, &bot.server.port);
-            connect_to_server(&mut enet_host, &bot.server.ip, &bot.server.port);
+
+        if is_redirect {
+            info!("Redirecting to {}:{}...", &server_ip, &server_port);
+            connect_to_server(&mut enet_host, &server_ip, &server_port);
         } else {
-            if bot_mutex.lock().unwrap().state.is_ingame {
+            if is_ingame {
                 get_token(&bot_mutex);
             }
             to_http(&bot_mutex);
-            let bot = bot_mutex.lock().unwrap();
             info!(
                 "Connecting to {}:{}",
-                bot.info.parsed_server_data["server"], bot.info.parsed_server_data["port"]
+                parsed_server_data["server"], parsed_server_data["port"]
             );
             connect_to_server(
                 &mut enet_host,
-                &bot.info.parsed_server_data["server"],
-                &bot.info.parsed_server_data["port"],
+                &parsed_server_data["server"],
+                &parsed_server_data["port"],
             );
         }
-        loop {
-            match enet_host.service(1000).expect("Service failed") {
-                Some(Event::Connect(ref mut sender)) => {
-                    // self.set_ping(sender.mean_rtt());
-                    info!("Connected to the server");
-                }
-                Some(Event::Disconnect(ref mut sender, ..)) => {
-                    // self.set_ping(sender.mean_rtt());
-                    info!("Disconnected from the server");
-                    break;
-                }
-                Some(Event::Receive {
-                    ref packet,
-                    ref mut sender,
-                    ..
-                }) => {
-                    // self.set_ping(sender.mean_rtt());
-                    let data = packet.data();
-                    if data.len() < 4 {
-                        continue;
-                    }
-                    let packet_id = LittleEndian::read_u32(&data[0..4]);
-                    let packet_type = EPacketType::from(packet_id);
-                    packet_handler::handle(&bot_mutex, sender, packet_type, &data[4..]);
-                }
-                _ => (),
+        process_events(&bot_mutex, &mut enet_host);
+    }
+}
+
+fn process_events(bot_mutex: &Arc<Mutex<Bot>>, enet_host: &mut Host<()>) {
+    loop {
+        match enet_host.service(1000).expect("Service failed") {
+            Some(Event::Connect(ref mut sender)) => {
+                bot_mutex.lock().unwrap().info.status = "Connected".to_string();
+                set_ping(&bot_mutex, sender.mean_rtt());
+                info!("Connected to the server");
             }
+            Some(Event::Disconnect(ref mut sender, ..)) => {
+                bot_mutex.lock().unwrap().info.status = "Disconnected".to_string();
+                set_ping(&bot_mutex, sender.mean_rtt());
+                info!("Disconnected from the server");
+                break;
+            }
+            Some(Event::Receive {
+                ref packet,
+                ref mut sender,
+                ..
+            }) => {
+                set_ping(&bot_mutex, sender.mean_rtt());
+                let data = packet.data();
+                if data.len() < 4 {
+                    continue;
+                }
+                let packet_id = LittleEndian::read_u32(&data[0..4]);
+                let packet_type = EPacketType::from(packet_id);
+                packet_handler::handle(bot_mutex, sender, packet_type, &data[4..]);
+            }
+            _ => (),
         }
     }
 }
@@ -180,44 +194,61 @@ fn connect_to_server(enet_host: &mut Host<()>, ip: &str, port: &str) {
         .expect("Failed to connect to the server");
 }
 
-pub fn get_token(bot: &Arc<Mutex<Bot>>) {
-    let mut bot = bot.lock().unwrap();
-    // TODO: Handle error, loop with delay until token is received
-    info!("Getting token for {}", bot.info.username);
-    match bot.info.method {
-        ELoginMethod::UBISOFT => {
-            let res =
-                login::get_ubisoft_token(&bot.info.username, &bot.info.password, &bot.info.code)
-                    .unwrap();
-            bot.info.token = res;
-        }
-        ELoginMethod::APPLE => {
-            let res = login::get_apple_token(bot.info.oauth_links[0].as_str()).unwrap();
-            bot.info.token = res;
-        }
-        ELoginMethod::GOOGLE => {
-            let res = login::get_google_token(
-                &bot.info.username,
-                &bot.info.password,
-                bot.info.oauth_links[1].as_str(),
-            )
-            .unwrap();
-            bot.info.token = res;
-        }
-        ELoginMethod::LEGACY => {
-            let res = login::get_legacy_token(
-                bot.info.oauth_links[2].as_str(),
-                bot.info.username.as_str(),
-                bot.info.password.as_str(),
-            )
-            .unwrap();
-            bot.info.token = res;
-        }
+pub fn get_token(bot_mutex: &Arc<Mutex<Bot>>) {
+    let (username, password, code, method, oauth_links) = {
+        let bot = bot_mutex.lock().unwrap();
+        (
+            bot.info.username.clone(),
+            bot.info.password.clone(),
+            bot.info.code.clone(),
+            bot.info.method.clone(),
+            bot.info.oauth_links.clone(),
+        )
+    };
+
+    {
+        let mut bot = bot_mutex.lock().unwrap();
+        bot.info.status = "Getting token".to_string();
     }
-    info!("Received the token: {}", bot.info.token);
+
+    info!("Getting token for {}", username);
+
+    let token_result = match method {
+        ELoginMethod::UBISOFT => login::get_ubisoft_token(&username, &password, &code),
+        ELoginMethod::APPLE => match login::get_apple_token(oauth_links[0].as_str()) {
+            Ok(res) => Ok(res),
+            Err(..) => {
+                return;
+            }
+        },
+        ELoginMethod::GOOGLE => {
+            match login::get_google_token(&username, &password, oauth_links[1].as_str()) {
+                Ok(res) => Ok(res),
+                Err(err) => {
+                    if err.to_string().contains("too many people") {
+                        error!("Too many people trying to login");
+                        let mut bot = bot_mutex.lock().unwrap();
+                        bot.info.status = "Too many people trying to login".to_string();
+                    }
+                    return;
+                }
+            }
+        }
+
+        ELoginMethod::LEGACY => {
+            login::get_legacy_token(oauth_links[2].as_str(), &username, &password)
+        }
+    };
+
+    if let Ok(token) = token_result {
+        let mut bot = bot_mutex.lock().unwrap();
+        bot.info.token = token;
+        info!("Received the token: {}", bot.info.token);
+    }
 }
 
 pub fn to_http(bot_mutex: &Arc<Mutex<Bot>>) {
+    bot_mutex.lock().unwrap().info.status = "Connecting to HTTP server".to_string();
     let req = ureq::post("https://www.growtopia1.com/growtopia/server_data.php").set(
         "User-Agent",
         "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
@@ -249,6 +280,7 @@ pub fn find_path(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: u32, y: u3
 
 pub fn parse_server_data(bot_mutex: &Arc<Mutex<Bot>>, data: String) {
     let mut bot = bot_mutex.lock().unwrap();
+    bot.info.status = "Parsing server data".to_string();
     bot.info.parsed_server_data = data
         .lines()
         .filter_map(|line| {
@@ -392,7 +424,8 @@ pub fn disconnect(peer: &mut Peer<()>) {
 }
 
 pub fn get_oauth_links(bot_mutex: &Arc<Mutex<Bot>>) -> Result<Vec<String>, ureq::Error> {
-    let bot = bot_mutex.lock().unwrap();
+    let mut bot = bot_mutex.lock().unwrap();
+    bot.info.status = "Getting OAuth links".to_string();
     let body = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
             .set("User-Agent", USER_AGENT)
             .send_string(format!("tankIDName|\ntankIDPass|\nrequestedName|BoardSickle\nf|1\nprotocol|209\ngame_version|4.62\nfz|41745432\nlmode|0\ncbits|1040\nplayer_age|20\nGDPR|3\ncategory|_-5100\ntotalPlaytime|0\nklv|b351d8dacd7a776848b31c74d3d550ec61dbb9b96c3ac67aea85034a84401a87\nhash2|841545814\nmeta|{}\nfhash|-716928004\nrid|01F9EBD204B52C940285667E15C00D62\nplatformID|0,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|617169524\n", bot.info.parsed_server_data["meta"]).as_str())?

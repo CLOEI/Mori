@@ -45,6 +45,7 @@ struct App {
     new_bot_method: ELoginMethod,
     show_add_bot_dialog: bool,
     bots: Vec<Bot>,
+    selected_bot_name: String,
 }
 
 impl App {
@@ -80,6 +81,7 @@ impl App {
             new_bot_method: ELoginMethod::LEGACY,
             show_add_bot_dialog: false,
             bots: json.bots,
+            selected_bot_name: "".to_string(),
         }
     }
 }
@@ -124,7 +126,9 @@ impl eframe::App for App {
                                 ui.label("Login Method");
                                 ui.end_row();
                                 for bot in &self.bots {
-                                    ui.label(bot.username.clone());
+                                    if ui.button(bot.username.clone()).clicked() {
+                                        self.selected_bot_name = bot.username.clone();
+                                    }
                                     ui.label(bot.password.clone());
                                     ui.label(bot.code.clone());
                                     ui.label(format!("{:?}", bot.method));
@@ -135,6 +139,32 @@ impl eframe::App for App {
                     ui.separator();
                     ui.vertical(|ui| {
                         ui.label("Bot info");
+                        if !self.selected_bot_name.is_empty() {
+                            if let Some(bot_mutex) = self.manager.get_bot(&self.selected_bot_name) {
+                                let bot = bot_mutex.lock().unwrap();
+                                ui.horizontal(|ui| {
+                                    ui.label("Status:");
+                                    ui.label(bot.info.status.clone());
+                                    ui.separator();
+                                    ui.label("Ping:");
+                                    ui.label(bot.info.ping.clone().to_string());
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label("World:");
+                                    let world = if bot.world.name.is_empty() {
+                                        "EXIT".to_string()
+                                    } else {
+                                        bot.world.name.clone()
+                                    };
+                                    ui.label(world);
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label("Position:");
+                                    ui.label(bot.position.x.to_string());
+                                    ui.label(bot.position.y.to_string());
+                                });
+                            }
+                        }
                     });
                 });
             } else if self.current_menu == "item_database" {

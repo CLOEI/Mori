@@ -26,4 +26,3 @@ chromiumoxide = { version = "0.6.0", features = [
   "tokio-runtime",
 ], default-features = false }
 futures = "0.3.30"
-chromiumoxide_stealth = "0.1.1"

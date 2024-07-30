@@ -54,5 +54,13 @@ impl Manager {
         self.bots.push((new_bot, handle));
     }
     pub fn remove_bot(&mut self, username: &str) {}
-    pub fn get_bot(&self, username: &str) {}
+    pub fn get_bot(&self, username: &str) -> Option<&Arc<Mutex<Bot>>> {
+        for (bot, _) in &self.bots {
+            let bot_mutex = bot.lock().unwrap();
+            if bot_mutex.info.username == username {
+                return Some(bot);
+            }
+        }
+        None
+    }
 }
