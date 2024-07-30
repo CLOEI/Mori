@@ -5,11 +5,10 @@ use chromiumoxide::{Browser, BrowserConfig, Page};
 use futures::StreamExt;
 use json::JsonValue::Null;
 use regex::Regex;
-use serde_json::Value;
 use ureq::Agent;
 
 static USER_AGENT: &str =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<String, ureq::Error> {
     let body = agent
@@ -161,11 +160,13 @@ pub async fn get_google_token(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let (mut browser, mut handler) = Browser::launch(
         BrowserConfig::builder()
-            .with_head()
+            // .with_head()
             .args(vec![
                 "--excludeSwitches=enable-automation",
                 "--disable-blink-features=AutomationControlled",
                 "--lang=en-EN",
+                "--window-size=1920,1080",
+                &format!("--user-agent={}", USER_AGENT),
             ])
             .build()?,
     )
@@ -180,6 +181,7 @@ pub async fn get_google_token(
     });
 
     let page = browser.new_page(url).await?;
+    page.enable_stealth_mode().await?;
     match page
         .find_xpath(format!("//li/div[@data-identifier='{}']", email))
         .await
@@ -250,7 +252,7 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
     let agent = ureq::AgentBuilder::new().build();
     let body = agent
         .get(url)
-        .set("User-Agent", USER_AGENT)
+        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0")
         .set(
             "Accept",
             "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
