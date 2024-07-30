@@ -30,13 +30,13 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
             //     error!("Username: {}", bot.username);
             // }
 
-            bot.is_redirect = true;
+            bot.state.is_redirect = true;
             bot.server.ip = parsed_server_data.get(0).unwrap().to_string();
             bot.server.port = port.to_string();
-            bot.login_info.token = token.to_string();
-            bot.login_info.user = user_id.to_string();
-            bot.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
-            bot.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
+            bot.info.login_info.token = token.to_string();
+            bot.info.login_info.user = user_id.to_string();
+            bot.info.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
+            bot.info.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
             disconnect(peer);
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
@@ -45,7 +45,7 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
                 EPacketType::NetMessageGenericText,
                 "action|enter_game\n".to_string(),
             );
-            bot.is_redirect = false;
+            bot.state.is_redirect = false;
         }
         "OnCountryState" => {
             // I'm not sure why this is sent twice, but it is.
@@ -72,7 +72,7 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
         }
         "OnSetBux" => {
             let bux = variant.get(1).unwrap().as_int32();
-            bot.gems = bux;
+            bot.state.gems = bux;
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
@@ -81,9 +81,9 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
             info!("Received position: {:?}", pos);
-            bot.pos_x = pos.0;
-            bot.pos_y = pos.1;
-            if bot.is_ingame {
+            bot.position.x = pos.0;
+            bot.position.y = pos.1;
+            if bot.state.is_ingame {
                 place(&bot_mutex, peer, 0, -1, 9640);
             }
         }
@@ -106,8 +106,8 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
             let data = text_parse::parse_and_store_as_map(&message);
-            bot.is_ingame = true;
-            bot.net_id = data.get("netID").unwrap().parse().unwrap();
+            bot.state.is_ingame = true;
+            bot.state.net_id = data.get("netID").unwrap().parse().unwrap();
         }
         "OnTalkBubble" => {
             let message = variant.get(2).unwrap().as_string();

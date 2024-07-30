@@ -1,9 +1,6 @@
-use crate::utils::{
-    proton::hash_string,
-    random::{random_hex, random_mac_address},
-};
+use crate::utils::random::{random_hex, random_mac_address};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LoginInfo {
     pub uuid: String,
     pub protocol: String,

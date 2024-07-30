@@ -4,6 +4,7 @@ mod login;
 mod packet_handler;
 mod variant_handler;
 
+use crate::types::bot_info::{Info, Position, Server, State};
 use crate::types::e_login_method::ELoginMethod;
 use crate::types::e_tank_packet_type::ETankPacketType;
 use crate::types::login_info::LoginInfo;
@@ -27,34 +28,14 @@ use spdlog::info;
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
 
-pub struct Server {
-    ip: String,
-    port: String,
-}
-
 pub struct Bot {
-    pub display_name: String,
-    pub username: String,
-    pub password: String,
-    pub code: String,
-    pub method: ELoginMethod,
-    pub oauth_links: Vec<String>,
-    pub net_id: u32,
-    pub pos_x: f32,
-    pub pos_y: f32,
-    pub gems: i32,
-    pub parsed_server_data: HashMap<String, String>,
-    pub token: String,
-    pub is_redirect: bool,
-    pub is_running: bool,
-    pub is_banned: bool,
-    pub is_ingame: bool,
+    pub info: Info,
+    pub state: State,
+    pub position: Position,
     pub server: Server,
-    pub login_info: LoginInfo,
     pub world: World,
     pub inventory: Inventory,
     pub astar: AStar,
-    pub ping: u32,
 }
 
 impl Bot {
@@ -66,42 +47,31 @@ impl Bot {
         item_database: Arc<ItemDatabase>,
     ) -> Bot {
         Bot {
-            display_name: String::new(),
-            username: username,
-            password: password,
-            code: code,
-            method: method,
-            oauth_links: Vec::new(),
-            net_id: 0,
-            pos_x: 0.0,
-            pos_y: 0.0,
-            gems: 0,
-            parsed_server_data: HashMap::new(),
-            token: String::new(),
-            is_redirect: false,
-            is_running: false,
-            is_banned: false,
-            is_ingame: false,
-            server: Server {
-                ip: String::new(),
-                port: String::new(),
+            info: Info {
+                username,
+                password,
+                code,
+                method,
+                login_info: LoginInfo::new(),
+                ..Default::default()
             },
-            login_info: LoginInfo::new(),
+            state: Default::default(),
+            position: Default::default(),
+            server: Default::default(),
             world: World::new(Arc::clone(&item_database)),
             inventory: Inventory::new(),
             astar: AStar::new(Arc::clone(&item_database)),
-            ping: 0,
         }
     }
 }
 
 pub fn login(bot_mutex: Arc<Mutex<Bot>>) {
     to_http(&bot_mutex);
-    if bot_mutex.lock().unwrap().method != ELoginMethod::UBISOFT {
+    if bot_mutex.lock().unwrap().info.method != ELoginMethod::UBISOFT {
         match get_oauth_links(&bot_mutex) {
             Ok(links) => {
                 let mut bot = bot_mutex.lock().unwrap();
-                bot.oauth_links = links;
+                bot.info.oauth_links = links;
                 info!("Successfully got OAuth links for: apple, google and legacy");
             }
             Err(err) => {
@@ -112,16 +82,18 @@ pub fn login(bot_mutex: Arc<Mutex<Bot>>) {
     }
     get_token(&bot_mutex);
     let mut bot = bot_mutex.lock().unwrap();
-    bot.is_running = true;
-    bot.login_info.meta = bot.parsed_server_data["meta"].clone();
+    bot.state.is_running = true;
+    bot.info.login_info.meta = bot.info.parsed_server_data["meta"].clone();
 
-    bot.login_info.klv = generate_klv(
-        &bot.login_info.protocol,
-        &bot.login_info.game_version,
-        &bot.login_info.rid,
+    bot.info.login_info.klv = generate_klv(
+        &bot.info.login_info.protocol,
+        &bot.info.login_info.game_version,
+        &bot.info.login_info.rid,
     );
-    bot.login_info.hash = hash_string(format!("{}RT", bot.login_info.mac).as_str()).to_string();
-    bot.login_info.hash2 = hash_string(format!("{}RT", random_hex(16, true)).as_str()).to_string();
+    bot.info.login_info.hash =
+        hash_string(format!("{}RT", bot.info.login_info.mac).as_str()).to_string();
+    bot.info.login_info.hash2 =
+        hash_string(format!("{}RT", random_hex(16, true)).as_str()).to_string();
     drop(bot);
     start_event_loop(&bot_mutex);
 }
@@ -132,7 +104,7 @@ pub fn start_event_loop(bot_mutex: &Arc<Mutex<Bot>>) {
     loop {
         {
             let bot = bot_mutex.lock().unwrap();
-            if !bot.is_running {
+            if !bot.state.is_running {
                 break;
             }
         }
@@ -147,39 +119,25 @@ pub fn start_event_loop(bot_mutex: &Arc<Mutex<Bot>>) {
             true,
         )
         .expect("Failed to create ENet host");
-        if bot_mutex.lock().unwrap().is_redirect {
+        if bot_mutex.lock().unwrap().state.is_redirect {
             let bot = bot_mutex.lock().unwrap();
-            info!("Redirecting to {}:{}...", bot.server.ip, bot.server.port);
-            enet_host
-                .connect(
-                    &Address::new(
-                        bot.server.ip.parse().unwrap(),
-                        bot.server.port.parse().unwrap(),
-                    ),
-                    2,
-                    0,
-                )
-                .expect("Failed to connect to the server");
+            info!("Redirecting to {}:{}...", &bot.server.ip, &bot.server.port);
+            connect_to_server(&mut enet_host, &bot.server.ip, &bot.server.port);
         } else {
-            if bot_mutex.lock().unwrap().is_ingame {
+            if bot_mutex.lock().unwrap().state.is_ingame {
                 get_token(&bot_mutex);
             }
             to_http(&bot_mutex);
             let bot = bot_mutex.lock().unwrap();
             info!(
                 "Connecting to {}:{}",
-                bot.parsed_server_data["server"], bot.parsed_server_data["port"]
+                bot.info.parsed_server_data["server"], bot.info.parsed_server_data["port"]
             );
-            enet_host
-                .connect(
-                    &Address::new(
-                        bot.parsed_server_data["server"].parse().unwrap(),
-                        bot.parsed_server_data["port"].parse().unwrap(),
-                    ),
-                    2,
-                    0,
-                )
-                .expect("Failed to connect to the server");
+            connect_to_server(
+                &mut enet_host,
+                &bot.info.parsed_server_data["server"],
+                &bot.info.parsed_server_data["port"],
+            );
         }
         loop {
             match enet_host.service(1000).expect("Service failed") {
@@ -212,34 +170,46 @@ pub fn start_event_loop(bot_mutex: &Arc<Mutex<Bot>>) {
     }
 }
 
+fn connect_to_server(enet_host: &mut Host<()>, ip: &str, port: &str) {
+    enet_host
+        .connect(
+            &Address::new(ip.parse().unwrap(), port.parse().unwrap()),
+            2,
+            0,
+        )
+        .expect("Failed to connect to the server");
+}
+
 pub fn get_token(bot: &Arc<Mutex<Bot>>) {
     let mut bot = bot.lock().unwrap();
     // TODO: Handle error, loop with delay until token is received
-    info!("Getting token for {}", bot.username);
-    match bot.method {
+    info!("Getting token for {}", bot.info.username);
+    match bot.info.method {
         ELoginMethod::UBISOFT => {
-            let res = login::get_ubisoft_token(&bot.username, &bot.password, &bot.code).unwrap();
-            bot.token = res;
+            let res =
+                login::get_ubisoft_token(&bot.info.username, &bot.info.password, &bot.info.code)
+                    .unwrap();
+            bot.info.token = res;
         }
         ELoginMethod::APPLE => {
-            let res = login::get_apple_token(bot.oauth_links[0].as_str()).unwrap();
-            bot.token = res;
+            let res = login::get_apple_token(bot.info.oauth_links[0].as_str()).unwrap();
+            bot.info.token = res;
         }
         ELoginMethod::GOOGLE => {
-            let res = login::get_google_token(bot.oauth_links[1].as_str()).unwrap();
-            bot.token = res;
+            let res = login::get_google_token(bot.info.oauth_links[1].as_str()).unwrap();
+            bot.info.token = res;
         }
         ELoginMethod::LEGACY => {
             let res = login::get_legacy_token(
-                bot.oauth_links[2].as_str(),
-                bot.username.as_str(),
-                bot.password.as_str(),
+                bot.info.oauth_links[2].as_str(),
+                bot.info.username.as_str(),
+                bot.info.password.as_str(),
             )
             .unwrap();
-            bot.token = res;
+            bot.info.token = res;
         }
     }
-    info!("Received the token: {}", bot.token);
+    info!("Received the token: {}", bot.info.token);
 }
 
 pub fn to_http(bot_mutex: &Arc<Mutex<Bot>>) {
@@ -256,10 +226,12 @@ pub fn to_http(bot_mutex: &Arc<Mutex<Bot>>) {
 
 pub fn find_path(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: u32, y: u32) {
     let bot = bot_mutex.lock().unwrap();
-    let paths = match bot
-        .astar
-        .find_path((bot.pos_x as u32) / 32, (bot.pos_y as u32) / 32, x, y)
-    {
+    let paths = match bot.astar.find_path(
+        (bot.position.x as u32) / 32,
+        (bot.position.y as u32) / 32,
+        x,
+        y,
+    ) {
         Some(path) => path,
         None => return,
     };
@@ -272,7 +244,7 @@ pub fn find_path(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: u32, y: u3
 
 pub fn parse_server_data(bot_mutex: &Arc<Mutex<Bot>>, data: String) {
     let mut bot = bot_mutex.lock().unwrap();
-    bot.parsed_server_data = data
+    bot.info.parsed_server_data = data
         .lines()
         .filter_map(|line| {
             let mut parts = line.splitn(2, '|');
@@ -288,11 +260,11 @@ pub fn parse_server_data(bot_mutex: &Arc<Mutex<Bot>>, data: String) {
 pub fn walk(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: f32, y: f32, ap: bool) {
     let mut bot = bot_mutex.lock().unwrap();
     if ap {
-        bot.pos_x = x * 32.0;
-        bot.pos_y = y * 32.0;
+        bot.position.x = x * 32.0;
+        bot.position.y = y * 32.0;
     } else {
-        bot.pos_x += x * 32.0;
-        bot.pos_y += y * 32.0;
+        bot.position.x += x * 32.0;
+        bot.position.y += y * 32.0;
     }
 
     let mut pkt = TankPacketType::new();
@@ -301,8 +273,8 @@ pub fn walk(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: f32, y: f32, ap
     flags |= 1 << 5; // is on a solid block
 
     pkt.packet_type = ETankPacketType::NetGamePacketState;
-    pkt.vector_x = bot.pos_x;
-    pkt.vector_y = bot.pos_y;
+    pkt.vector_x = bot.position.x;
+    pkt.vector_y = bot.position.y;
     pkt.flags = flags;
     pkt.int_x = -1;
     pkt.int_y = -1;
@@ -350,10 +322,10 @@ pub fn place(
     let mut pkt = TankPacketType::new();
 
     pkt.packet_type = ETankPacketType::NetGamePacketTileChangeRequest;
-    pkt.vector_x = bot.pos_x;
-    pkt.vector_y = bot.pos_y;
-    pkt.int_x = ((bot.pos_x / 32.0).floor() as i32) + offset_x;
-    pkt.int_y = ((bot.pos_y / 32.0).floor() as i32) + offset_y;
+    pkt.vector_x = bot.position.x;
+    pkt.vector_y = bot.position.y;
+    pkt.int_x = ((bot.position.x / 32.0).floor() as i32) + offset_x;
+    pkt.int_y = ((bot.position.y / 32.0).floor() as i32) + offset_y;
     pkt.value = block_id;
 
     let mut packet_data = Vec::new();
@@ -376,10 +348,10 @@ pub fn place(
     packet_data.extend_from_slice(&pkt.int_y.to_le_bytes());
     packet_data.extend_from_slice(&pkt.extended_data_length.to_le_bytes());
 
-    if pkt.int_x <= (bot.pos_x / 32.0).floor() as i32 + 4
-        && pkt.int_x >= (bot.pos_x / 32.0).floor() as i32 - 4
-        && pkt.int_y <= (bot.pos_y / 32.0).floor() as i32 + 4
-        && pkt.int_y >= (bot.pos_y / 32.0).floor() as i32 - 4
+    if pkt.int_x <= (bot.position.x / 32.0).floor() as i32 + 4
+        && pkt.int_x >= (bot.position.x / 32.0).floor() as i32 - 4
+        && pkt.int_y <= (bot.position.y / 32.0).floor() as i32 + 4
+        && pkt.int_y >= (bot.position.y / 32.0).floor() as i32 - 4
     {
         let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
         peer.send_packet(pkt, 0).unwrap();
@@ -418,7 +390,7 @@ pub fn get_oauth_links(bot_mutex: &Arc<Mutex<Bot>>) -> Result<Vec<String>, ureq:
     let bot = bot_mutex.lock().unwrap();
     let body = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
             .set("User-Agent", USER_AGENT)
-            .send_string(format!("tankIDName|\ntankIDPass|\nrequestedName|BoardSickle\nf|1\nprotocol|209\ngame_version|4.62\nfz|41745432\nlmode|0\ncbits|1040\nplayer_age|20\nGDPR|3\ncategory|_-5100\ntotalPlaytime|0\nklv|b351d8dacd7a776848b31c74d3d550ec61dbb9b96c3ac67aea85034a84401a87\nhash2|841545814\nmeta|{}\nfhash|-716928004\nrid|01F9EBD204B52C940285667E15C00D62\nplatformID|0,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|617169524\n", bot.parsed_server_data["meta"]).as_str())?
+            .send_string(format!("tankIDName|\ntankIDPass|\nrequestedName|BoardSickle\nf|1\nprotocol|209\ngame_version|4.62\nfz|41745432\nlmode|0\ncbits|1040\nplayer_age|20\nGDPR|3\ncategory|_-5100\ntotalPlaytime|0\nklv|b351d8dacd7a776848b31c74d3d550ec61dbb9b96c3ac67aea85034a84401a87\nhash2|841545814\nmeta|{}\nfhash|-716928004\nrid|01F9EBD204B52C940285667E15C00D62\nplatformID|0,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|617169524\n", bot.info.parsed_server_data["meta"]).as_str())?
             .into_string()?;
 
     let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
@@ -433,5 +405,5 @@ pub fn get_oauth_links(bot_mutex: &Arc<Mutex<Bot>>) -> Result<Vec<String>, ureq:
 
 pub fn set_ping(bot_mutex: &Arc<Mutex<Bot>>, ping: Duration) {
     let mut bot = bot_mutex.lock().unwrap();
-    bot.ping = ping.as_millis() as u32;
+    bot.info.ping = ping.as_millis() as u32;
 }

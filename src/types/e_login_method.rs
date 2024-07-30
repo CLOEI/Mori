@@ -7,3 +7,9 @@ pub enum ELoginMethod {
     GOOGLE,
     LEGACY,
 }
+
+impl Default for ELoginMethod {
+    fn default() -> Self {
+        ELoginMethod::LEGACY
+    }
+}

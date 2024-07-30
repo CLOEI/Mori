@@ -22,16 +22,16 @@ pub fn handle(
         EPacketType::NetMessageServerHello => {
             info!("Received NetMessageServerHello");
             let bot = bot_mutex.lock().unwrap();
-            if bot.is_redirect {
+            if bot.state.is_redirect {
                 let message = format!(
                     "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
-                    bot.login_info.uuid, bot.login_info.protocol, bot.login_info.fhash, bot.login_info.mac, bot.login_info.requested_name, bot.login_info.hash2, bot.login_info.fz, bot.login_info.f, bot.login_info.player_age, bot.login_info.game_version, bot.login_info.lmode, bot.login_info.cbits, bot.login_info.rid, bot.login_info.gdpr, bot.login_info.hash, bot.login_info.category, bot.login_info.token, bot.login_info.total_playtime, bot.login_info.door_id, bot.login_info.klv, bot.login_info.meta, bot.login_info.platform_id, bot.login_info.device_version, bot.login_info.zf, bot.login_info.country, bot.login_info.user, bot.login_info.wk
+                    bot.info.login_info.uuid, bot.info.login_info.protocol, bot.info.login_info.fhash, bot.info.login_info.mac, bot.info.login_info.requested_name, bot.info.login_info.hash2, bot.info.login_info.fz, bot.info.login_info.f, bot.info.login_info.player_age, bot.info.login_info.game_version, bot.info.login_info.lmode, bot.info.login_info.cbits, bot.info.login_info.rid, bot.info.login_info.gdpr, bot.info.login_info.hash, bot.info.login_info.category, bot.info.login_info.token, bot.info.login_info.total_playtime, bot.info.login_info.door_id, bot.info.login_info.klv, bot.info.login_info.meta, bot.info.login_info.platform_id, bot.info.login_info.device_version, bot.info.login_info.zf, bot.info.login_info.country, bot.info.login_info.user, bot.info.login_info.wk
                 );
                 send_packet(peer, EPacketType::NetMessageGenericText, message);
             } else {
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
-                    209, bot.token, "0,1,1"
+                    209, bot.info.token, "0,1,1"
                 );
                 send_packet(peer, EPacketType::NetMessageGenericText, message);
             }
@@ -46,12 +46,12 @@ pub fn handle(
             info!("Message: {}", message);
 
             if message.contains("logon_fail") {
-                bot.is_redirect = false;
+                bot.state.is_redirect = false;
                 disconnect(peer);
             }
             if message.contains("currently banned") {
-                bot.is_banned = true;
-                bot.is_running = false;
+                bot.state.is_banned = true;
+                bot.state.is_running = false;
                 disconnect(peer);
             }
         }
