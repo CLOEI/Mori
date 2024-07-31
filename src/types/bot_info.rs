@@ -33,7 +33,7 @@ pub struct Server {
     pub port: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Position {
     pub x: f32,
     pub y: f32,
