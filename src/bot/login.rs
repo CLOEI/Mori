@@ -160,7 +160,7 @@ pub async fn get_google_token(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let (mut browser, mut handler) = Browser::launch(
         BrowserConfig::builder()
-            // .with_head()
+            .with_head()
             .args(vec![
                 "--excludeSwitches=enable-automation",
                 "--disable-blink-features=AutomationControlled",

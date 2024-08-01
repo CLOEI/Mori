@@ -1,6 +1,6 @@
 use eframe::egui::{self, Ui};
 
-use crate::Bot;
+use crate::{bot::warp, Bot};
 
 #[derive(Default)]
 pub struct BotMenu {
@@ -88,7 +88,13 @@ impl BotMenu {
                                 );
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                                if ui.button("Warp").clicked() {}
+                                if ui.button("Warp").clicked() {
+                                    if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                        let bot_mutex = bot.lock().unwrap();
+                                        let peer_id = bot_mutex.peer_id.unwrap().clone();
+                                        warp(peer_id, &self.warp_name);
+                                    }
+                                }
                             });
                         });
                         ui.allocate_space(egui::vec2(half_width, 5.0));

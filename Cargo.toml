@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
-enet = { git = "https://github.com/cloei/enet-rs" }
+enet = { git = "https://github.com/CLOEI/enet-rs" }
 gtworld-r = { git = "https://github.com/CLOEI/gtworld-r" }
 gtitem-r = { git = "https://github.com/CLOEI/gtitem-r", features = ["serde"] }
 regex = "1.10.5"

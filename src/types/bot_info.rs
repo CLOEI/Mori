@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use super::{e_login_method::ELoginMethod, login_info::LoginInfo};
 
-#[derive(Default)]
 pub struct Info {
     pub display_name: String,
     pub username: String,
@@ -17,6 +16,24 @@ pub struct Info {
     pub status: String,
 }
 
+impl Default for Info {
+    fn default() -> Self {
+        Info {
+            display_name: String::new(),
+            username: String::new(),
+            password: String::new(),
+            code: "None".to_string(),
+            method: ELoginMethod::LEGACY,
+            oauth_links: Vec::new(),
+            token: "None".to_string(),
+            login_info: LoginInfo::default(),
+            ping: 0,
+            parsed_server_data: HashMap::new(),
+            status: String::new(),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct State {
     pub net_id: u32,
@@ -27,10 +44,18 @@ pub struct State {
     pub is_ingame: bool,
 }
 
-#[derive(Default)]
 pub struct Server {
     pub ip: String,
     pub port: String,
+}
+
+impl Default for Server {
+    fn default() -> Self {
+        Server {
+            ip: "0.0.0.0".to_string(),
+            port: "00000".to_string(),
+        }
+    }
 }
 
 #[derive(Default, Clone)]

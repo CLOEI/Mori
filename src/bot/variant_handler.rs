@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use enet::Peer;
+use enet::{Peer, PeerID};
 use spdlog::{info, warn};
 
 use crate::bot::{disconnect, find_path, place, punch, send_packet, talk, walk};
@@ -11,7 +11,7 @@ use crate::utils::variant::VariantList;
 
 use super::Bot;
 
-pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacketType, data: &[u8]) {
+pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, pkt: &TankPacketType, data: &[u8]) {
     let mut bot = bot_mutex.lock().unwrap();
     let variant = VariantList::deserialize(&data).unwrap();
     let function_call: String = variant.get(0).unwrap().as_string();
@@ -37,11 +37,13 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
             bot.info.login_info.user = user_id.to_string();
             bot.info.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
             bot.info.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
-            disconnect(peer);
+            let peer_id = bot.peer_id.unwrap();
+            disconnect(peer_id);
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
+            let peer_id = bot.peer_id.unwrap();
             send_packet(
-                peer,
+                peer_id,
                 EPacketType::NetMessageGenericText,
                 "action|enter_game\n".to_string(),
             );
@@ -49,13 +51,14 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
         }
         "OnCountryState" => {
             // I'm not sure why this is sent twice, but it is.
+            let peer_id = bot.peer_id.unwrap();
             send_packet(
-                peer,
+                peer_id,
                 EPacketType::NetMessageGenericText,
                 "action|getDRAnimations\n".to_string(),
             );
             send_packet(
-                peer,
+                peer_id,
                 EPacketType::NetMessageGenericText,
                 "action|getDRAnimations\n".to_string(),
             );
@@ -63,8 +66,9 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
             if message.contains("Gazette") {
+                let peer_id = bot.peer_id.unwrap();
                 send_packet(
-                    peer,
+                    peer_id,
                     EPacketType::NetMessageGenericText,
                     "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string(),
                 );
@@ -84,7 +88,8 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
             bot.position.x = pos.0;
             bot.position.y = pos.1;
             if bot.state.is_ingame {
-                place(&bot_mutex, peer, 0, -1, 9640);
+                let peer_id = bot.peer_id.unwrap();
+                place(&bot_mutex, peer_id, 0, -1, 9640);
             }
         }
         "ShowStartFTUEPopup" => {
@@ -113,25 +118,32 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, pkt: &TankPacket
             let message = variant.get(2).unwrap().as_string();
             print!("Received talk bubble: {}", message);
             if message.contains("mate right") {
-                walk(&bot_mutex, peer, 1.0, 0.0, false);
+                let peer_id = bot.peer_id.unwrap();
+                walk(&bot_mutex, peer_id, 1.0, 0.0, false);
             }
             if message.contains("mate left") {
-                walk(&bot_mutex, peer, -1.0, 0.0, false);
+                let peer_id = bot.peer_id.unwrap();
+                walk(&bot_mutex, peer_id, -1.0, 0.0, false);
             }
             if message.contains("mate up") {
-                walk(&bot_mutex, peer, 0.0, -1.0, false);
+                let peer_id = bot.peer_id.unwrap();
+                walk(&bot_mutex, peer_id, 0.0, -1.0, false);
             }
             if message.contains("mate down") {
-                walk(&bot_mutex, peer, 0.0, 1.0, false);
+                let peer_id = bot.peer_id.unwrap();
+                walk(&bot_mutex, peer_id, 0.0, 1.0, false);
             }
             if message.contains("mate say") {
-                talk(peer, "Hello, world!");
+                let peer_id = bot.peer_id.unwrap();
+                talk(peer_id, "Hello, world!");
             }
             if message.contains("mate punch") {
-                punch(&bot_mutex, peer, 0, 1);
+                let peer_id = bot.peer_id.unwrap();
+                punch(&bot_mutex, peer_id, 0, 1);
             }
             if message.contains("mate findp") {
-                find_path(&bot_mutex, peer, 30, 5);
+                let peer_id = bot.peer_id.unwrap();
+                find_path(&bot_mutex, peer_id, 30, 5);
             }
         }
         "OnClearTutorialArrow" => {

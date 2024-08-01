@@ -15,7 +15,6 @@ use crate::{types::e_packet_type::EPacketType, utils::proton::generate_klv};
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
@@ -24,9 +23,14 @@ use gtitem_r::structs::ItemDatabase;
 use gtworld_r::World;
 use inventory::Inventory;
 use spdlog::{error, info};
+use std::cell::{Cell, RefCell};
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
+
+thread_local! {
+    static ENET_HOST: RefCell<Option<Host<()>>> = RefCell::new(None);
+}
 
 pub struct Bot {
     pub info: Info,
@@ -36,6 +40,7 @@ pub struct Bot {
     pub world: World,
     pub inventory: Inventory,
     pub astar: AStar,
+    pub peer_id: Option<PeerID>,
 }
 
 impl Bot {
@@ -61,6 +66,7 @@ impl Bot {
             world: World::new(Arc::clone(&item_database)),
             inventory: Inventory::new(),
             astar: AStar::new(Arc::clone(&item_database)),
+            peer_id: None,
         }
     }
 }
@@ -118,20 +124,23 @@ pub fn start_event_loop(bot_mutex: &Arc<Mutex<Bot>>) {
             break;
         }
 
-        let mut enet_host = Enet::create_host::<()>(
-            &enet,
-            None,
-            1,
-            ChannelLimit::Limited(1),
-            BandwidthLimit::Unlimited,
-            BandwidthLimit::Unlimited,
-            true,
-        )
-        .expect("Failed to create ENet host");
+        ENET_HOST.set(Some(
+            Enet::create_host::<()>(
+                &enet,
+                None,
+                1,
+                ChannelLimit::Limited(1),
+                BandwidthLimit::Unlimited,
+                BandwidthLimit::Unlimited,
+                true,
+                false,
+            )
+            .expect("Failed to create ENet host"),
+        ));
 
         if is_redirect {
             info!("Redirecting to {}:{}...", &server_ip, &server_port);
-            connect_to_server(&mut enet_host, &server_ip, &server_port);
+            connect_to_server(&server_ip, &server_port);
         } else {
             if is_ingame {
                 get_token(&bot_mutex);
@@ -141,57 +150,78 @@ pub fn start_event_loop(bot_mutex: &Arc<Mutex<Bot>>) {
                 "Connecting to {}:{}",
                 parsed_server_data["server"], parsed_server_data["port"]
             );
-            connect_to_server(
-                &mut enet_host,
-                &parsed_server_data["server"],
-                &parsed_server_data["port"],
-            );
+            connect_to_server(&parsed_server_data["server"], &parsed_server_data["port"]);
         }
-        process_events(&bot_mutex, &mut enet_host);
+        process_events(&bot_mutex);
     }
 }
 
-fn process_events(bot_mutex: &Arc<Mutex<Bot>>, enet_host: &mut Host<()>) {
-    loop {
-        match enet_host.service(1000).expect("Service failed") {
-            Some(Event::Connect(ref mut sender)) => {
-                bot_mutex.lock().unwrap().info.status = "Connected".to_string();
-                set_ping(&bot_mutex, sender.mean_rtt());
-                info!("Connected to the server");
+fn get_event(bot_mutex: &Arc<Mutex<Bot>>) -> Option<EventKind> {
+    ENET_HOST.with(|enet_host| {
+        let mut enet_host = enet_host.borrow_mut();
+        let enet_host = enet_host.as_mut().unwrap();
+        let e = enet_host
+            .service(std::time::Duration::from_secs(1))
+            .expect("Service failed");
+
+        match e {
+            Some(event) => {
+                bot_mutex.lock().unwrap().peer_id = Some(event.peer_id());
+                Some(event.take_kind())
             }
-            Some(Event::Disconnect(ref mut sender, ..)) => {
-                bot_mutex.lock().unwrap().info.status = "Disconnected".to_string();
-                set_ping(&bot_mutex, sender.mean_rtt());
-                info!("Disconnected from the server");
+            None => None,
+        }
+    })
+}
+
+fn process_events(bot_mutex: &Arc<Mutex<Bot>>) {
+    loop {
+        let event = match get_event(bot_mutex) {
+            Some(event) => event,
+            None => {
+                continue;
+            }
+        };
+
+        match event {
+            EventKind::Connect => {
+                if let Ok(mut bot) = bot_mutex.lock() {
+                    bot.info.status = "Connected".to_string();
+                    info!("Connected to the server");
+                }
+            }
+            EventKind::Disconnect { .. } => {
+                if let Ok(mut bot) = bot_mutex.lock() {
+                    bot.info.status = "Disconnected".to_string();
+                    info!("Disconnected from the server");
+                }
                 break;
             }
-            Some(Event::Receive {
-                ref packet,
-                ref mut sender,
-                ..
-            }) => {
-                set_ping(&bot_mutex, sender.mean_rtt());
+            EventKind::Receive { packet, .. } => {
+                set_ping(bot_mutex);
                 let data = packet.data();
                 if data.len() < 4 {
-                    continue;
+                    return;
                 }
                 let packet_id = LittleEndian::read_u32(&data[0..4]);
                 let packet_type = EPacketType::from(packet_id);
-                packet_handler::handle(bot_mutex, sender, packet_type, &data[4..]);
+                packet_handler::handle(bot_mutex, packet_type, &data[4..]);
             }
-            _ => (),
         }
     }
 }
 
-fn connect_to_server(enet_host: &mut Host<()>, ip: &str, port: &str) {
-    enet_host
-        .connect(
-            &Address::new(ip.parse().unwrap(), port.parse().unwrap()),
-            2,
-            0,
-        )
-        .expect("Failed to connect to the server");
+fn connect_to_server(ip: &str, port: &str) {
+    ENET_HOST.with_borrow_mut(|enet_host| {
+        let enet_host = enet_host.as_mut().unwrap();
+        enet_host
+            .connect(
+                &Address::new(ip.parse().unwrap(), port.parse().unwrap()),
+                2,
+                0,
+            )
+            .expect("Failed to connect to the server");
+    });
 }
 
 pub fn get_token(bot_mutex: &Arc<Mutex<Bot>>) {
@@ -260,7 +290,7 @@ pub fn to_http(bot_mutex: &Arc<Mutex<Bot>>) {
     parse_server_data(&bot_mutex, body);
 }
 
-pub fn find_path(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: u32, y: u32) {
+pub fn find_path(bot_mutex: &Arc<Mutex<Bot>>, peer_id: PeerID, x: u32, y: u32) {
     let bot = bot_mutex.lock().unwrap();
     let paths = match bot.astar.find_path(
         (bot.position.x as u32) / 32,
@@ -274,7 +304,7 @@ pub fn find_path(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: u32, y: u3
 
     for i in 0..paths.len() {
         let node = &paths[i];
-        walk(&bot_mutex, peer, node.x as f32, node.y as f32, true);
+        walk(&bot_mutex, peer_id, node.x as f32, node.y as f32, true);
     }
 }
 
@@ -294,7 +324,7 @@ pub fn parse_server_data(bot_mutex: &Arc<Mutex<Bot>>, data: String) {
 }
 
 // ap = absolute path, should be self explanatory
-pub fn walk(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: f32, y: f32, ap: bool) {
+pub fn walk(bot_mutex: &Arc<Mutex<Bot>>, peer_id: PeerID, x: f32, y: f32, ap: bool) {
     let mut bot = bot_mutex.lock().unwrap();
     if ap {
         bot.position.x = x * 32.0;
@@ -336,13 +366,17 @@ pub fn walk(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, x: f32, y: f32, ap
     packet_data.extend_from_slice(&pkt.int_y.to_le_bytes());
     packet_data.extend_from_slice(&pkt.extended_data_length.to_le_bytes());
 
-    let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
-    peer.send_packet(pkt, 0).unwrap();
+    let pkt = Packet::new(packet_data, PacketMode::ReliableSequenced).unwrap();
+    ENET_HOST.with_borrow_mut(|enet_host| {
+        let enet_host = enet_host.as_mut().unwrap();
+        let peer = enet_host.peer_mut(peer_id).unwrap();
+        peer.send_packet(pkt, 0).unwrap();
+    });
 }
 
-pub fn talk(peer: &mut Peer<()>, message: &str) {
+pub fn talk(peer_id: PeerID, message: &str) {
     send_packet(
-        peer,
+        peer_id,
         EPacketType::NetMessageGenericText,
         format!("action|input\n|text|{}\n", message),
     );
@@ -350,7 +384,7 @@ pub fn talk(peer: &mut Peer<()>, message: &str) {
 
 pub fn place(
     bot_mutex: &Arc<Mutex<Bot>>,
-    peer: &mut Peer<()>,
+    peer_id: PeerID,
     offset_x: i32,
     offset_y: i32,
     block_id: u32,
@@ -390,37 +424,56 @@ pub fn place(
         && pkt.int_y <= (bot.position.y / 32.0).floor() as i32 + 4
         && pkt.int_y >= (bot.position.y / 32.0).floor() as i32 - 4
     {
-        let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
-        peer.send_packet(pkt, 0).unwrap();
+        let pkt = Packet::new(packet_data, PacketMode::ReliableSequenced).unwrap();
+        ENET_HOST.with_borrow_mut(|enet_host| {
+            let enet_host = enet_host.as_mut().unwrap();
+            let peer = enet_host.peer_mut(peer_id).unwrap();
+            peer.send_packet(pkt, 0).unwrap();
+        });
     }
 }
 
-pub fn punch(bot_mutex: &Arc<Mutex<Bot>>, peer: &mut Peer<()>, offset_x: i32, offset_y: i32) {
-    place(&bot_mutex, peer, offset_x, offset_y, 18)
+pub fn punch(bot_mutex: &Arc<Mutex<Bot>>, peer_id: PeerID, offset_x: i32, offset_y: i32) {
+    place(&bot_mutex, peer_id, offset_x, offset_y, 18)
 }
 
-pub fn warp(peer: &mut Peer<()>, world: &str) {
+pub fn warp(peer_id: PeerID, world: &str) {
+    info!("Warping to world: {}", world);
     send_packet(
-        peer,
+        peer_id,
         EPacketType::NetMessageGameMessage,
         format!("action|join_request\nname|{}\ninvitedWorld|0\n", world),
     );
 }
 
-pub fn send_packet(peer: &mut Peer<()>, packet_type: EPacketType, message: String) {
+pub fn send_packet(peer_id: PeerID, packet_type: EPacketType, message: String) {
     if packet_type == EPacketType::NetMessageGamePacket {
         // TODO: Implement this
     } else {
         let mut packet_data = Vec::new();
         packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
         packet_data.extend_from_slice(&message.as_bytes());
-        let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
-        peer.send_packet(pkt, 0).unwrap();
+        let pkt = Packet::new(packet_data, PacketMode::ReliableSequenced).unwrap();
+        ENET_HOST.with(|enet_host| {
+            let mut enet_host = enet_host.borrow_mut();
+            if let Some(enet_host) = enet_host.as_mut() {
+                if let Some(peer) = enet_host.peer_mut(peer_id) {
+                    peer.send_packet(pkt, 0).unwrap();
+                }
+            }
+        });
     }
 }
 
-pub fn disconnect(peer: &mut Peer<()>) {
-    peer.disconnect(0);
+pub fn disconnect(peer_id: PeerID) {
+    ENET_HOST.with(|enet_host| {
+        let mut enet_host = enet_host.borrow_mut();
+        if let Some(enet_host) = enet_host.as_mut() {
+            if let Some(peer) = enet_host.peer_mut(peer_id) {
+                peer.disconnect(0);
+            }
+        }
+    });
 }
 
 pub fn get_oauth_links(bot_mutex: &Arc<Mutex<Bot>>) -> Result<Vec<String>, ureq::Error> {
@@ -430,7 +483,7 @@ pub fn get_oauth_links(bot_mutex: &Arc<Mutex<Bot>>) -> Result<Vec<String>, ureq:
             .set("User-Agent", USER_AGENT)
             .send_string(format!("tankIDName|\ntankIDPass|\nrequestedName|BoardSickle\nf|1\nprotocol|209\ngame_version|4.62\nfz|41745432\nlmode|0\ncbits|1040\nplayer_age|20\nGDPR|3\ncategory|_-5100\ntotalPlaytime|0\nklv|b351d8dacd7a776848b31c74d3d550ec61dbb9b96c3ac67aea85034a84401a87\nhash2|841545814\nmeta|{}\nfhash|-716928004\nrid|01F9EBD204B52C940285667E15C00D62\nplatformID|0,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|617169524\n", bot.info.parsed_server_data["meta"]).as_str())?
             .into_string()?;
-
+    drop(bot);
     let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
     let links = pattern
         .unwrap()
@@ -441,7 +494,19 @@ pub fn get_oauth_links(bot_mutex: &Arc<Mutex<Bot>>) -> Result<Vec<String>, ureq:
     Ok(links)
 }
 
-pub fn set_ping(bot_mutex: &Arc<Mutex<Bot>>, ping: Duration) {
+pub fn set_ping(bot_mutex: &Arc<Mutex<Bot>>) {
     let mut bot = bot_mutex.lock().unwrap();
-    bot.info.ping = ping.as_millis() as u32;
+    match bot.peer_id {
+        Some(peer_id) => {
+            ENET_HOST.with(|enet_host| {
+                let mut enet_host = enet_host.borrow_mut();
+                let enet_host = enet_host.as_mut().unwrap();
+                let peer = enet_host.peer_mut(peer_id).unwrap();
+                bot.info.ping = peer.mean_rtt().as_millis() as u32;
+            });
+        }
+        None => {
+            return;
+        }
+    }
 }

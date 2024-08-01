@@ -7,17 +7,12 @@ use crate::types::{
 };
 use crate::utils::bytes;
 
-use super::variant_handler;
 use super::Bot;
-use enet::{Packet, PacketMode, Peer};
+use super::{variant_handler, ENET_HOST};
+use enet::{Packet, PacketMode, PeerID};
 use spdlog::info;
 
-pub fn handle(
-    bot_mutex: &Arc<Mutex<Bot>>,
-    peer: &mut Peer<()>,
-    packet_type: EPacketType,
-    data: &[u8],
-) {
+pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
             info!("Received NetMessageServerHello");
@@ -27,13 +22,15 @@ pub fn handle(
                     "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
                     bot.info.login_info.uuid, bot.info.login_info.protocol, bot.info.login_info.fhash, bot.info.login_info.mac, bot.info.login_info.requested_name, bot.info.login_info.hash2, bot.info.login_info.fz, bot.info.login_info.f, bot.info.login_info.player_age, bot.info.login_info.game_version, bot.info.login_info.lmode, bot.info.login_info.cbits, bot.info.login_info.rid, bot.info.login_info.gdpr, bot.info.login_info.hash, bot.info.login_info.category, bot.info.login_info.token, bot.info.login_info.total_playtime, bot.info.login_info.door_id, bot.info.login_info.klv, bot.info.login_info.meta, bot.info.login_info.platform_id, bot.info.login_info.device_version, bot.info.login_info.zf, bot.info.login_info.country, bot.info.login_info.user, bot.info.login_info.wk
                 );
-                send_packet(peer, EPacketType::NetMessageGenericText, message);
+                let peer_id = bot.peer_id.unwrap().clone();
+                send_packet(peer_id, EPacketType::NetMessageGenericText, message);
             } else {
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
                     209, bot.info.token, "0,1,1"
                 );
-                send_packet(peer, EPacketType::NetMessageGenericText, message);
+                let peer_id = bot.peer_id.unwrap();
+                send_packet(peer_id, EPacketType::NetMessageGenericText, message);
             }
         }
         EPacketType::NetMessageGenericText => {
@@ -47,12 +44,14 @@ pub fn handle(
 
             if message.contains("logon_fail") {
                 bot.state.is_redirect = false;
-                disconnect(peer);
+                let peer_id = bot.peer_id.unwrap();
+                disconnect(peer_id);
             }
             if message.contains("currently banned") {
                 bot.state.is_banned = true;
                 bot.state.is_running = false;
-                disconnect(peer);
+                let peer_id = bot.peer_id.unwrap();
+                disconnect(peer_id);
             }
         }
         EPacketType::NetMessageGamePacket => {
@@ -60,7 +59,7 @@ pub fn handle(
             info!("Received Tank packet type: {:?}", tank_packet.packet_type);
 
             if tank_packet.packet_type == ETankPacketType::NetGamePacketCallFunction {
-                variant_handler::handle(&bot_mutex, peer, &tank_packet, &data[56..]);
+                variant_handler::handle(&bot_mutex, &tank_packet, &data[56..]);
             }
             if tank_packet.packet_type == ETankPacketType::NetGamePacketSendMapData {
                 let mut bot = bot_mutex.lock().unwrap();
@@ -103,8 +102,13 @@ pub fn handle(
                 packet_data.extend_from_slice(&pkt.extended_data_length.to_le_bytes());
                 packet_data.extend_from_slice(&data[56..]);
 
-                let pkt = Packet::new(&packet_data, PacketMode::ReliableSequenced).unwrap();
-                peer.send_packet(pkt, 0).unwrap();
+                let pkt = Packet::new(packet_data, PacketMode::ReliableSequenced).unwrap();
+                ENET_HOST.with_borrow_mut(|enet_host| {
+                    let enet_host = enet_host.as_mut().unwrap();
+                    let peer_id = bot_mutex.lock().unwrap().peer_id.unwrap();
+                    let peer = enet_host.peer_mut(peer_id).unwrap();
+                    peer.send_packet(pkt, 0).unwrap();
+                });
             }
         }
         EPacketType::NetMessageError => {

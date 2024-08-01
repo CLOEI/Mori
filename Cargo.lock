@@ -1440,18 +1440,17 @@ dependencies = [
 
 [[package]]
 name = "enet"
-version = "0.2.3"
-source = "git+https://github.com/cloei/enet-rs#cccc31c71d732d51f409d1a92763afe8a03317ee"
+version = "0.3.0"
+source = "git+https://github.com/CLOEI/enet-rs#53d28c8b84a18152a5e6a09ee3af08647548de17"
 dependencies = [
  "enet-sys",
- "failure",
- "failure_derive",
+ "thiserror",
 ]
 
 [[package]]
 name = "enet-sys"
 version = "1.0.4"
-source = "git+https://github.com/cloei/enet-rs#cccc31c71d732d51f409d1a92763afe8a03317ee"
+source = "git+https://github.com/CLOEI/enet-rs#53d28c8b84a18152a5e6a09ee3af08647548de17"
 dependencies = [
  "bindgen",
  "cmake",
@@ -1615,28 +1614,6 @@ dependencies = [
  "rayon-core",
  "smallvec",
  "zune-inflate",
-]
-
-[[package]]
-name = "failure"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d32e9bd16cc02eae7db7ef620b392808b89f6a5e16bb3497d159c6b92a0f4f86"
-dependencies = [
- "backtrace",
- "failure_derive",
-]
-
-[[package]]
-name = "failure_derive"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa4da3c766cd7a0db8242e326e9e4e081edd567072893ed320008189715366a4"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "synstructure",
 ]
 
 [[package]]
@@ -2058,7 +2035,7 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r#f0b725f73c0a5706ed79295e6c4c4cfd89333d46"
+source = "git+https://github.com/CLOEI/gtworld-r#bfb6a4fe4d1121c1e46dd9099d052b42695d64f7"
 dependencies = [
  "byteorder",
  "gtitem-r",
