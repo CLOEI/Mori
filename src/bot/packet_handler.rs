@@ -63,8 +63,8 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, packet_type: EPacketType, data: &[u8]
             }
             if tank_packet.packet_type == ETankPacketType::NetGamePacketSendMapData {
                 let mut bot = bot_mutex.lock().unwrap();
-                bot.world.parse(&data[56..]);
-                bot.astar.update(&bot_mutex);
+                // bot.world.parse(&data[56..]);
+                // bot.astar.update(&bot_mutex);
             }
             if tank_packet.packet_type == ETankPacketType::NetGamePacketSendInventoryState {
                 let mut bot = bot_mutex.lock().unwrap();

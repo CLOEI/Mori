@@ -43,7 +43,7 @@ impl LoginInfo {
             fz: "47142936".to_string(),
             f: "1".to_string(),
             player_age: "20".to_string(),
-            game_version: "4.62".to_string(),
+            game_version: "4.63".to_string(),
             lmode: "1".to_string(),
             cbits: "1040".to_string(),
             rid: random_hex(32, true),
@@ -62,5 +62,12 @@ impl LoginInfo {
             user: String::new(),
             wk: random_hex(32, true),
         }
+    }
+
+    pub fn to_string(&self) -> String {
+        format!(
+            "uuid|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequested_name|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\ngdpr|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatform_id|{}\ndevice_version|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}",
+            self.uuid, self.protocol, self.fhash, self.mac, self.requested_name, self.hash2, self.fz, self.f, self.player_age, self.game_version, self.lmode, self.cbits, self.rid, self.gdpr, self.hash, self.category, self.token, self.total_playtime, self.door_id, self.klv, self.meta, self.platform_id, self.device_version, self.zf, self.country, self.user, self.wk
+        )
     }
 }

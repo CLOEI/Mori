@@ -13,8 +13,10 @@ use crate::utils::proton::hash_string;
 use crate::utils::random::random_hex;
 use crate::{types::e_packet_type::EPacketType, utils::proton::generate_klv};
 
+use eframe::egui::TextBuffer;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use urlencoding::encode;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
@@ -478,11 +480,12 @@ pub fn disconnect(peer_id: PeerID) {
 
 pub fn get_oauth_links(bot_mutex: &Arc<Mutex<Bot>>) -> Result<Vec<String>, ureq::Error> {
     let mut bot = bot_mutex.lock().unwrap();
+    let data = format!("tankIDName|\ntankIDPass|\nrequestedName|BoardSickle\nf|1\nprotocol|209\ngame_version|4.63\nfz|41745432\nlmode|0\ncbits|1040\nplayer_age|20\nGDPR|3\ncategory|_-5100\ntotalPlaytime|0\nklv|b351d8dacd7a776848b31c74d3d550ec61dbb9b96c3ac67aea85034a84401a87\nhash2|841545814\nmeta|{}\nfhash|-716928004\nrid|01F9EBD204B52C940285667E15C00D62\nplatformID|0,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|617169524\n", bot.info.parsed_server_data["meta"]).to_string();
     bot.info.status = "Getting OAuth links".to_string();
     let body = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
-            .set("User-Agent", USER_AGENT)
-            .send_string(format!("tankIDName|\ntankIDPass|\nrequestedName|BoardSickle\nf|1\nprotocol|209\ngame_version|4.62\nfz|41745432\nlmode|0\ncbits|1040\nplayer_age|20\nGDPR|3\ncategory|_-5100\ntotalPlaytime|0\nklv|b351d8dacd7a776848b31c74d3d550ec61dbb9b96c3ac67aea85034a84401a87\nhash2|841545814\nmeta|{}\nfhash|-716928004\nrid|01F9EBD204B52C940285667E15C00D62\nplatformID|0,1,1\ndeviceVersion|0\ncountry|us\nhash|-1829975549\nmac|b4:8c:9d:90:79:cf\nwk|66A6ABCD9753A066E39975DED77852A8\nzf|617169524\n", bot.info.parsed_server_data["meta"]).as_str())?
-            .into_string()?;
+        .set("User-Agent", USER_AGENT)
+        .send_string(encode(&data).as_str())?
+        .into_string()?;
     drop(bot);
     let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
     let links = pattern
