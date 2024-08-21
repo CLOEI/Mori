@@ -1,6 +1,8 @@
 pub mod bot_info;
-pub mod e_login_method;
-pub mod e_packet_type;
-pub mod e_tank_packet_type;
+pub mod elogin_method;
+pub mod epacket_type;
+pub mod etank_packet_type;
 pub mod login_info;
-pub mod tank_packet_type;
+pub mod player;
+pub mod tank_packet;
+pub mod vector;

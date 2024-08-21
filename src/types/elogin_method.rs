@@ -1,6 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug)]
 pub enum ELoginMethod {
     UBISOFT,
     APPLE,

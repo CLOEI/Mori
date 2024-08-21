@@ -1,8 +1,10 @@
-use crate::utils::random::{random_hex, random_mac_address};
+use crate::utils;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LoginInfo {
     pub uuid: String,
+    pub tank_id_name: String,
+    pub tank_id_pass: String,
     pub protocol: String,
     pub fhash: String,
     pub mac: String,
@@ -32,12 +34,14 @@ pub struct LoginInfo {
 }
 
 impl LoginInfo {
-    pub fn new() -> LoginInfo {
+    pub fn new() -> Self {
         LoginInfo {
             uuid: String::new(),
+            tank_id_name: String::new(),
+            tank_id_pass: String::new(),
             protocol: "209".to_string(),
             fhash: "-716928004".to_string(),
-            mac: random_mac_address(),
+            mac: utils::random::mac_address(),
             requested_name: "BraveDuck".to_string(),
             hash2: String::new(),
             fz: "47142936".to_string(),
@@ -46,7 +50,7 @@ impl LoginInfo {
             game_version: "4.63".to_string(),
             lmode: "1".to_string(),
             cbits: "1040".to_string(),
-            rid: random_hex(32, true),
+            rid: utils::random::hex(32, true),
             gdpr: "3".to_string(),
             hash: "0".to_string(),
             category: "_-5100".to_string(),
@@ -58,16 +62,40 @@ impl LoginInfo {
             platform_id: "0,1,1".to_string(),
             device_version: "0".to_string(),
             zf: "-821693372".to_string(),
-            country: "us".to_string(),
+            country: "jp".to_string(),
             user: String::new(),
-            wk: random_hex(32, true),
+            wk: utils::random::hex(32, true),
         }
     }
 
     pub fn to_string(&self) -> String {
         format!(
-            "uuid|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequested_name|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\ngdpr|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatform_id|{}\ndevice_version|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}",
-            self.uuid, self.protocol, self.fhash, self.mac, self.requested_name, self.hash2, self.fz, self.f, self.player_age, self.game_version, self.lmode, self.cbits, self.rid, self.gdpr, self.hash, self.category, self.token, self.total_playtime, self.door_id, self.klv, self.meta, self.platform_id, self.device_version, self.zf, self.country, self.user, self.wk
-        )
+          "fhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\ngdpr|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotalPlaytime|{}\ndoorID|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}",
+          self.fhash,
+          self.mac,
+          self.requested_name,
+          self.hash2,
+          self.fz,
+          self.f,
+          self.player_age,
+          self.game_version,
+          self.lmode,
+          self.cbits,
+          self.rid,
+          self.gdpr,
+          self.hash,
+          self.category,
+          self.token,
+          self.total_playtime,
+          self.door_id,
+          self.klv,
+          self.meta,
+          self.platform_id,
+          self.device_version,
+          self.zf,
+          self.country,
+          self.user,
+          self.wk
+      )
     }
 }
