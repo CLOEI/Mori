@@ -1,6 +1,6 @@
 use crate::utils;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LoginInfo {
     pub uuid: String,
     pub tank_id_name: String,

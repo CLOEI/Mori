@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{elogin_method::ELoginMethod, login_info::LoginInfo};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Info {
     pub username: String,
     pub password: String,
@@ -17,7 +17,7 @@ pub struct Info {
     pub timeout: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct State {
     pub net_id: u32,
     pub gems: i32,
@@ -28,7 +28,7 @@ pub struct State {
     pub is_banned: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Server {
     pub ip: String,
     pub port: u16,
