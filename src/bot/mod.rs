@@ -1,5 +1,6 @@
 mod login;
 mod packet_handler;
+mod variant_handler;
 
 use byteorder::{ByteOrder, LittleEndian};
 use enet::{
@@ -93,15 +94,7 @@ pub fn logon(bot: &Arc<Bot>) {
         .clone();
     bot.state.lock().unwrap().is_running = true;
     poll(bot);
-    let (ip, port) = {
-        let mut info = bot.info.lock().unwrap();
-        info.login_info.meta = meta;
-
-        (
-            info.server_data.get("server").unwrap().clone(),
-            info.server_data.get("port").unwrap().clone(),
-        )
-    };
+    bot.info.lock().unwrap().login_info.meta = meta;
 
     if bot.info.lock().unwrap().login_method != ELoginMethod::UBISOFT {
         match get_oauth_links(&bot) {
@@ -117,7 +110,6 @@ pub fn logon(bot: &Arc<Bot>) {
     }
 
     get_token(bot);
-    connect_to_server(&bot, ip, port);
     process_events(&bot);
 }
 
@@ -158,7 +150,7 @@ pub fn get_token(bot: &Arc<Bot>) {
 
     let token_result = match method {
         ELoginMethod::GOOGLE => {
-            match login::get_google_token(&username, &password, oauth_links[1].as_str()) {
+            match login::get_google_token(oauth_links[1].as_str(), &username, &password) {
                 Ok(res) => res,
                 Err(err) => {
                     if err.to_string().contains("too many people") {
@@ -280,46 +272,77 @@ fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
 
 fn process_events(bot: &Arc<Bot>) {
     loop {
-        let (event_kind, new_peer_id) = {
-            let mut host = bot.host.lock().unwrap();
-            let e = host
-                .service(Duration::from_millis(100))
-                .expect("Service failed");
+        let (is_running, is_redirecting, ip, port, server_data) = {
+            let state = bot.state.lock().unwrap();
+            let info = bot.info.lock().unwrap();
+            let server = bot.server.lock().unwrap();
 
-            if let Some(event) = e {
-                let peer_id = event.peer_id().clone();
-                let event_kind = event.take_kind();
-                (Some(event_kind), Some(peer_id))
-            } else {
-                (None, None)
-            }
+            (
+                state.is_running,
+                state.is_redirecting,
+                server.ip.clone(),
+                server.port.to_string().clone(),
+                info.server_data.clone(),
+            )
         };
 
-        if let Some(peer_id) = new_peer_id {
-            let mut x = bot.peer_id.lock().unwrap();
-            *x = Some(peer_id);
+        if !is_running {
+            break;
         }
 
-        if let Some(event_kind) = event_kind {
-            match event_kind {
-                EventKind::Connect => {
-                    info!("Connected to the server");
+        if is_redirecting {
+            info!("Redirecting to the server {}:{}", ip, port);
+            connect_to_server(bot, ip, port);
+        } else {
+            connect_to_server(
+                bot,
+                server_data["server"].clone(),
+                server_data["port"].clone(),
+            );
+        }
+
+        loop {
+            let (event_kind, new_peer_id) = {
+                let mut host = bot.host.lock().unwrap();
+                let e = host
+                    .service(Duration::from_millis(100))
+                    .expect("Service failed");
+
+                if let Some(event) = e {
+                    let peer_id = event.peer_id().clone();
+                    let event_kind = event.take_kind();
+                    (Some(event_kind), Some(peer_id))
+                } else {
+                    (None, None)
                 }
-                EventKind::Disconnect { .. } => {
-                    warn!("Disconnected from the server");
-                    break;
-                }
-                EventKind::Receive { packet, .. } => {
-                    let data = packet.data();
-                    if data.len() < 4 {
-                        continue;
+            };
+
+            if let Some(peer_id) = new_peer_id {
+                let mut x = bot.peer_id.lock().unwrap();
+                *x = Some(peer_id);
+            }
+
+            if let Some(event_kind) = event_kind {
+                match event_kind {
+                    EventKind::Connect => {
+                        info!("Connected to the server");
                     }
-                    let packet_id = LittleEndian::read_u32(&data[0..4]);
-                    let packet_type = EPacketType::from(packet_id);
-                    info!("Received packet: {:?}", packet_type);
-                    // packet_handler::handle(bot, packet_type, &data[4..]);
+                    EventKind::Disconnect { .. } => {
+                        warn!("Disconnected from the server");
+                        break;
+                    }
+                    EventKind::Receive { packet, .. } => {
+                        let data = packet.data();
+                        if data.len() < 4 {
+                            continue;
+                        }
+                        let packet_id = LittleEndian::read_u32(&data[0..4]);
+                        let packet_type = EPacketType::from(packet_id);
+                        info!("Received packet: {:?}", packet_type);
+                        packet_handler::handle(bot, packet_type, &data[4..]);
+                    }
+                    _ => continue,
                 }
-                _ => continue,
             }
         }
     }

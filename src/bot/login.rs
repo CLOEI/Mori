@@ -1,9 +1,7 @@
-use chromiumoxide::{Browser, BrowserConfig, Page};
-use futures::StreamExt;
-use paris::info;
+use paris::{error, info};
 use regex::Regex;
 use serde_json::Value;
-use std::{io, process::Command};
+use std::{io, process::Command, time::Duration};
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -31,103 +29,27 @@ pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
     Ok(buffer)
 }
 
-#[tokio::main]
-pub async fn get_google_token(
-    email: &str,
-    password: &str,
-    url: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let (mut browser, mut handler) = Browser::launch(
-        BrowserConfig::builder()
-            .with_head()
-            .args(vec![
-                "--excludeSwitches=enable-automation",
-                "--disable-blink-features=AutomationControlled",
-                "--lang=en-EN",
-                "--window-size=1920,1080",
-                &format!("--user-agent={}", USER_AGENT),
-            ])
-            .build()?,
-    )
-    .await?;
+pub fn get_google_token(url: &str, username: &str, password: &str) -> Result<String, ureq::Error> {
+    loop {
+        let response = ureq::post("http://localhost:5000/token")
+            .timeout(Duration::from_secs(60))
+            .send_form(&[("url", url), ("email", username), ("password", password)]);
 
-    let handle = tokio::spawn(async move {
-        while let Some(h) = handler.next().await {
-            if h.is_err() {
-                break;
+        match response {
+            Ok(res) => {
+                if res.status() == 200 {
+                    return Ok(res.into_string()?);
+                } else {
+                    error!("Failed to get token, retrying...");
+                }
+            }
+            Err(err) => {
+                error!("Request error: {}, retrying...", err);
             }
         }
-    });
 
-    let page = browser.new_page(url).await?;
-    page.enable_stealth_mode().await?;
-    match page
-        .find_xpath(format!("//li/div[@data-identifier='{}']", email))
-        .await
-    {
-        Ok(elem) => {
-            elem.click().await?;
-        }
-        Err(..) => match page.find_xpath("//*[@id=\"identifierId\"]").await {
-            Ok(..) => {
-                handle_google_login_form(email, password, &page).await?;
-            }
-            Err(..) => {
-                page.find_xpath("//li/div[not(@data-identifier)]")
-                    .await?
-                    .click()
-                    .await?;
-                page.wait_for_navigation_response().await?;
-                handle_google_login_form(email, password, &page).await?;
-            }
-        },
-    };
-    page.wait_for_navigation_response().await?;
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    let source = page
-        .find_element("body")
-        .await?
-        .inner_text()
-        .await?
-        .unwrap();
-    if source.contains("too many people") {
-        return Err("Too many people trying to login".into());
+        std::thread::sleep(Duration::from_secs(1));
     }
-    let json: Value = serde_json::from_str(&source).unwrap();
-
-    browser.close().await?;
-    handle.await?;
-    Ok(json["token"].to_string())
-}
-
-async fn handle_google_login_form(
-    email: &str,
-    password: &str,
-    page: &Page,
-) -> Result<(), Box<dyn std::error::Error>> {
-    page.find_xpath("//*[@id=\"identifierId\"]")
-        .await?
-        .type_str(email)
-        .await?;
-
-    page.find_xpath("//*[@id=\"identifierNext\"]/div/button/span")
-        .await?
-        .click()
-        .await?;
-    page.wait_for_navigation_response().await?;
-
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    page.find_xpath("//*[@id=\"password\"]/div[1]/div/div[1]/input")
-        .await?
-        .type_str(password)
-        .await?;
-    page.find_xpath("//*[@id=\"passwordNext\"]/div/button/span")
-        .await?
-        .click()
-        .await?;
-    page.wait_for_navigation_response().await?;
-
-    Ok(())
 }
 
 pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<String, ureq::Error> {

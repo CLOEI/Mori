@@ -1,8 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
+use std::{sync::Arc, thread, time::Duration};
 
 use bot::Bot;
 use types::elogin_method::ELoginMethod;
