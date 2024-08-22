@@ -8,7 +8,7 @@ pub struct Info {
     pub password: String,
     pub recovery_code: String,
     pub login_method: ELoginMethod,
-    pub oauth_links: HashMap<String, String>,
+    pub oauth_links: Vec<String>,
     pub server_data: HashMap<String, String>,
     pub token: String,
     pub login_info: LoginInfo,

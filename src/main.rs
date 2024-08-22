@@ -12,12 +12,12 @@ mod types;
 mod utils;
 
 fn main() {
-    let bot = Arc::new(Mutex::new(Bot::new(
-        "username".to_string(),
-        "password".to_string(),
+    let bot = Arc::new(Bot::new(
+        "".to_string(),
+        "".to_string(),
         "recovery_code".to_string(),
         ELoginMethod::LEGACY,
-    )));
+    ));
 
     let bot_clone = bot.clone();
     thread::spawn(move || bot::logon(&bot_clone));
