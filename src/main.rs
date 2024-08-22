@@ -1,4 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 
 use bot::Bot;
 use types::elogin_method::ELoginMethod;
@@ -8,13 +12,17 @@ mod types;
 mod utils;
 
 fn main() {
-    let bot = Bot::new(
+    let bot = Arc::new(Mutex::new(Bot::new(
         "username".to_string(),
         "password".to_string(),
         "recovery_code".to_string(),
         ELoginMethod::LEGACY,
-    );
-    let bot_arc = Arc::new(Mutex::new(bot));
+    )));
 
-    bot::logon(&bot_arc);
+    let bot_clone = bot.clone();
+    thread::spawn(move || bot::logon(&bot_clone));
+
+    loop {
+        thread::sleep(Duration::from_secs(1));
+    }
 }
