@@ -12,7 +12,7 @@ fn main() {
         "".to_string(),
         "".to_string(),
         "recovery_code".to_string(),
-        ELoginMethod::LEGACY,
+        ELoginMethod::GOOGLE,
     ));
 
     let bot_clone = bot.clone();

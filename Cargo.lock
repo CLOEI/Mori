@@ -3,6 +3,29 @@
 version = 3
 
 [[package]]
+name = "Mori"
+version = "1.0.0"
+dependencies = [
+ "base64",
+ "bincode",
+ "byteorder",
+ "chromiumoxide",
+ "enet",
+ "futures",
+ "hex",
+ "md5",
+ "paris",
+ "rand",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "ureq",
+ "urlencoding",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -350,7 +373,7 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 [[package]]
 name = "enet"
 version = "0.3.0"
-source = "git+https://github.com/CLOEI/enet-rs.git#32249ef5c53a1045169ce2edcf0e5537654e2571"
+source = "git+https://github.com/CLOEI/enet-rs.git#9bc946a588cd158566ed967d7c6cfd10f5c0601f"
 dependencies = [
  "enet-sys",
  "thiserror",
@@ -359,7 +382,7 @@ dependencies = [
 [[package]]
 name = "enet-sys"
 version = "1.0.4"
-source = "git+https://github.com/CLOEI/enet-rs.git#32249ef5c53a1045169ce2edcf0e5537654e2571"
+source = "git+https://github.com/CLOEI/enet-rs.git#9bc946a588cd158566ed967d7c6cfd10f5c0601f"
 dependencies = [
  "bindgen",
  "cmake",
@@ -789,29 +812,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "mori"
-version = "1.0.0"
-dependencies = [
- "base64",
- "bincode",
- "byteorder",
- "chromiumoxide",
- "enet",
- "futures",
- "hex",
- "md5",
- "paris",
- "rand",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "ureq",
- "urlencoding",
 ]
 
 [[package]]

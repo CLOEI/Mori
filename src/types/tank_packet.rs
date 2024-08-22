@@ -1,9 +1,9 @@
 use super::etank_packet_type::ETankPacketType;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TankPacket {
-    pub packet_type: ETankPacketType,
+    pub _type: ETankPacketType,
     pub unk1: u8,
     pub unk2: u8,
     pub unk3: u8,

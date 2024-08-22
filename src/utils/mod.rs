@@ -2,3 +2,4 @@ pub mod proton;
 pub mod random;
 pub mod textparse;
 pub mod variant;
+pub mod mapping;

@@ -28,6 +28,7 @@ use crate::{
         random::{self},
     },
 };
+use crate::types::tank_packet::TankPacket;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -128,7 +129,7 @@ pub fn poll(bot: &Arc<Bot>) {
 pub fn sleep(bot: &Arc<Bot>) {
     let mut info = bot.info.lock().unwrap();
     while info.timeout > 0 {
-        info.timeout = 1;
+        info.timeout -= 1;
         drop(info);
         thread::sleep(Duration::from_secs(1));
         info = bot.info.lock().unwrap();
@@ -233,7 +234,16 @@ pub fn to_http(bot: &Arc<Bot>) {
             "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
         );
 
-        let res = req.send_string("").unwrap();
+        let res = req.send_string("");
+        let res = match res {
+            Ok(res) => res,
+            Err(err) => {
+                error!("Request error: {}, retrying...", err);
+                sleep(bot);
+                continue;
+            }
+        };
+
         if res.status() != 200 {
             warn!("Failed to fetch server data");
             sleep(bot);
@@ -367,4 +377,23 @@ fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
     let mut host = bot.host.lock().unwrap();
     let peer = host.peer_mut(peer_id).unwrap();
     peer.send_packet(pkt, 0).unwrap();
+}
+
+fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
+    let packet_size = std::mem::size_of::<EPacketType>() + std::mem::size_of::<TankPacket>() + packet.extended_data_length as usize;
+    let mut enet_packet_data = vec![0u8; packet_size];
+
+    let packet_type = EPacketType::NetMessageGamePacket as u32;
+    enet_packet_data[..std::mem::size_of::<u32>()].copy_from_slice(&packet_type.to_le_bytes());
+
+    let tank_packet_bytes = bincode::serialize(packet).expect("Failed to serialize TankPacket");
+    print!("{:?}", tank_packet_bytes);
+    enet_packet_data[std::mem::size_of::<u32>()..std::mem::size_of::<u32>() + tank_packet_bytes.len()]
+        .copy_from_slice(&tank_packet_bytes);
+
+    let enet_packet = Packet::new(enet_packet_data, PacketMode::ReliableSequenced).expect("Failed to create ENet packet");
+    let peer_id = bot.peer_id.lock().unwrap().unwrap().clone();
+    let mut host = bot.host.lock().unwrap();
+    let peer = host.peer_mut(peer_id).unwrap();
+    peer.send_packet(enet_packet, 0).expect("Failed to send ENet packet");
 }

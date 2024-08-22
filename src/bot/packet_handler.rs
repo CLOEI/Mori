@@ -7,9 +7,10 @@ use crate::{
     types::{
         epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
     },
+    utils::mapping,
 };
 
-use super::Bot;
+use super::{send_packet_raw, Bot};
 
 pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
@@ -35,15 +36,24 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             let message = String::from_utf8_lossy(&data);
             info!("Message: {}", message);
         }
-        EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
-            Ok(tank_packet) => match tank_packet.packet_type {
+        EPacketType::NetMessageGamePacket => {
+            let tank_packet = mapping::map_slice_to_tank_packet_type(data);
+            match tank_packet._type {
                 ETankPacketType::NetGamePacketCallFunction => {
                     variant_handler::handle(bot, &tank_packet, &data[56..]);
                 }
+                ETankPacketType::NetGamePacketPingRequest => {
+                    let packet = TankPacket {
+                        _type: ETankPacketType::NetGamePacketPingReply,
+                        vector_x: 64.0,
+                        vector_y: 64.0,
+                        value: tank_packet.value + 5000,
+                        ..Default::default()
+                    };
+
+                    send_packet_raw(&bot, &packet);
+                }
                 _ => {}
-            },
-            Err(..) => {
-                error!("Failed to deserialize TankPacket: {:?}", data[0]);
             }
         },
         _ => (),
