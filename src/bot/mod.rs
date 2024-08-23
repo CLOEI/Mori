@@ -1,3 +1,4 @@
+mod inventory;
 mod login;
 mod packet_handler;
 mod variant_handler;
@@ -6,6 +7,8 @@ use byteorder::{ByteOrder, LittleEndian};
 use enet::{
     Address, BandwidthLimit, ChannelLimit, Enet, EventKind, Host, Packet, PacketMode, Peer, PeerID,
 };
+use gtitem_r::structs::ItemDatabase;
+use inventory::Inventory;
 use paris::{error, info, warn};
 use std::{
     collections::HashMap,
@@ -40,6 +43,9 @@ pub struct Bot {
     pub position: Arc<Mutex<Vector2>>,
     pub host: Arc<Mutex<Host<()>>>,
     pub peer_id: Arc<Mutex<Option<PeerID>>>,
+    pub world: Arc<Mutex<gtworld_r::World>>,
+    pub inventory: Arc<Mutex<Inventory>>,
+    pub item_database: Arc<ItemDatabase>,
 }
 
 impl Bot {
@@ -48,6 +54,7 @@ impl Bot {
         password: String,
         recovery_code: String,
         login_method: ELoginMethod,
+        item_database: Arc<ItemDatabase>,
     ) -> Self {
         let enet = Enet::new().expect("could not initialize ENet");
         let host = enet
@@ -77,13 +84,22 @@ impl Bot {
             position: Arc::new(Mutex::new(Vector2::default())),
             host: Arc::new(Mutex::new(host)),
             peer_id: Arc::new(Mutex::new(None)),
+            world: Arc::new(Mutex::new(gtworld_r::World::new(item_database.clone()))),
+            inventory: Arc::new(Mutex::new(Inventory::new())),
+            item_database,
         }
     }
 }
 
 pub fn logon(bot: &Arc<Bot>) {
-    to_http(&bot);
     spoof(&bot);
+    bot.state.lock().unwrap().is_running = true;
+    poll(bot);
+    process_events(&bot);
+}
+
+pub fn reconnect(bot: &Arc<Bot>) {
+    to_http(bot);
 
     let meta = bot
         .info
@@ -93,11 +109,12 @@ pub fn logon(bot: &Arc<Bot>) {
         .get("meta")
         .unwrap()
         .clone();
-    bot.state.lock().unwrap().is_running = true;
-    poll(bot);
+
     bot.info.lock().unwrap().login_info.meta = meta;
 
-    if bot.info.lock().unwrap().login_method != ELoginMethod::UBISOFT {
+    if bot.info.lock().unwrap().login_method != ELoginMethod::UBISOFT
+        && bot.info.lock().unwrap().oauth_links.is_empty()
+    {
         match get_oauth_links(&bot) {
             Ok(links) => {
                 bot.info.lock().unwrap().oauth_links = links;
@@ -111,7 +128,14 @@ pub fn logon(bot: &Arc<Bot>) {
     }
 
     get_token(bot);
-    process_events(&bot);
+    {
+        let info = bot.info.lock().unwrap();
+        connect_to_server(
+            bot,
+            info.server_data["server"].clone(),
+            info.server_data["port"].clone(),
+        );
+    }
 }
 
 pub fn poll(bot: &Arc<Bot>) {
@@ -312,11 +336,7 @@ fn process_events(bot: &Arc<Bot>) {
             info!("Redirecting to the server {}:{}", ip, port);
             connect_to_server(bot, ip, port);
         } else {
-            connect_to_server(
-                bot,
-                server_data["server"].clone(),
-                server_data["port"].clone(),
-            );
+            reconnect(bot);
         }
 
         loop {
@@ -359,7 +379,6 @@ fn process_events(bot: &Arc<Bot>) {
                         info!("Received packet: {:?}", packet_type);
                         packet_handler::handle(bot, packet_type, &data[4..]);
                     }
-                    _ => continue,
                 }
             }
         }

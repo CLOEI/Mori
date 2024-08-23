@@ -7,7 +7,6 @@ use crate::{
     types::{
         epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
     },
-    utils::mapping,
 };
 
 use super::{send_packet_raw, Bot};
@@ -72,6 +71,12 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     };
 
                     send_packet_raw(&bot, &packet);
+                }
+                ETankPacketType::NetGamePacketSendInventoryState => {
+                    bot.inventory.lock().unwrap().parse(&data[56..]);
+                }
+                ETankPacketType::NetGamePacketSendMapData => {
+                    bot.world.lock().unwrap().parse(&data[56..]);
                 }
                 _ => {}
             },
