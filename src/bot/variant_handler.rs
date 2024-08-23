@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use crate::bot::{disconnect, send_packet};
 use crate::types::epacket_type::EPacketType;
+use crate::types::player::Player;
 use crate::types::tank_packet::TankPacket;
+use crate::types::vector::Vector2;
 use crate::utils::variant::VariantList;
 use crate::utils::{self, textparse};
 
@@ -81,7 +83,55 @@ pub fn handle(bot: &Arc<Bot>, pkt: &TankPacket, data: &[u8]) {
         }
         "ShowStartFTUEPopup" => {}
         "OnFtueButtonDataSet" => {}
-        "OnSpawn" => {}
+        "OnSpawn" => {
+            let message = variant.get(1).unwrap().as_string();
+            let data = utils::textparse::parse_and_store_as_map(&message);
+            if data.contains_key("type") {
+                if data.get("type").unwrap() == "local" {
+                    let mut state = bot.state.lock().unwrap();
+                    state.is_ingame = true;
+                    state.net_id = data.get("netID").unwrap().parse().unwrap();
+                    return;
+                }
+            } else {
+                let player = Player {
+                    _type: data.get("type").unwrap().to_string(),
+                    avatar: data.get("avatar").unwrap().to_string(),
+                    net_id: data.get("netID").unwrap().parse().unwrap(),
+                    online_id: data.get("onlineID").unwrap().parse().unwrap(),
+                    e_id: data.get("eid").unwrap().parse().unwrap(),
+                    ip: data.get("ip").unwrap().to_string(),
+                    colrect: data.get("colrect").unwrap().to_string(),
+                    title_icon: data.get("titleIcon").unwrap().to_string(),
+                    mstate: data.get("mstate").unwrap().parse().unwrap(),
+                    user_id: data.get("userID").unwrap().parse().unwrap(),
+                    invis: data.get("invisible").unwrap().parse().unwrap(),
+                    name: data.get("name").unwrap().to_string(),
+                    country: data.get("country").unwrap().to_string(),
+                    position: {
+                        if data.contains_key("posXY") {
+                            let pos_xy = data.get("posXY").unwrap();
+                            Vector2 {
+                                x: pos_xy[..pos_xy.find("|").unwrap()].parse().unwrap(),
+                                y: pos_xy[pos_xy.find("|").unwrap() + 1..].parse().unwrap(),
+                            }
+                        } else {
+                            Vector2 { x: 0.0, y: 0.0 }
+                        }
+                    },
+                };
+                let mut players = bot.players.lock().unwrap();
+                players.push(player);
+            }
+        }
+        "OnRemove" => {
+            let message = variant.get(1).unwrap().as_string();
+            let data = utils::textparse::parse_and_store_as_map(&message);
+            let net_id: u32 = data.get("netID").unwrap().parse().unwrap();
+
+            let mut players = bot.players.lock().unwrap();
+            players.retain(|player| player.net_id != net_id);
+        }
         "OnTalkBubble" => {
             let message = variant.get(2).unwrap().as_string();
             info!("Received talk bubble message: {}", message);
@@ -89,6 +139,7 @@ pub fn handle(bot: &Arc<Bot>, pkt: &TankPacket, data: &[u8]) {
         "OnClearTutorialArrow" => {}
         "OnRequestWorldSelectMenu" => {
             bot.world.lock().unwrap().reset();
+            bot.players.lock().unwrap().clear();
         }
         _ => {}
     }

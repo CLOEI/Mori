@@ -1,8 +1,10 @@
+mod astar;
 mod inventory;
 mod login;
 mod packet_handler;
 mod variant_handler;
 
+use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
 use enet::{
     Address, BandwidthLimit, ChannelLimit, Enet, EventKind, Host, Packet, PacketMode, Peer, PeerID,
@@ -15,10 +17,11 @@ use std::{
     sync::{Arc, Mutex},
     thread,
     time::Duration,
+    vec,
 };
 use urlencoding::encode;
 
-use crate::types::etank_packet_type::ETankPacketType;
+use crate::types::{etank_packet_type::ETankPacketType, player::Player};
 use crate::{
     types::{self, tank_packet::TankPacket},
     utils,
@@ -49,6 +52,8 @@ pub struct Bot {
     pub peer_id: Arc<Mutex<Option<PeerID>>>,
     pub world: Arc<Mutex<gtworld_r::World>>,
     pub inventory: Arc<Mutex<Inventory>>,
+    pub players: Arc<Mutex<Vec<Player>>>,
+    pub astar: Arc<Mutex<AStar>>,
     pub item_database: Arc<ItemDatabase>,
 }
 
@@ -85,6 +90,8 @@ impl Bot {
             peer_id: Arc::new(Mutex::new(None)),
             world: Arc::new(Mutex::new(gtworld_r::World::new(item_database.clone()))),
             inventory: Arc::new(Mutex::new(Inventory::new())),
+            players: Arc::new(Mutex::new(Vec::new())),
+            astar: Arc::new(Mutex::new(AStar::new(item_database.clone()))),
             item_database,
         }
     }
