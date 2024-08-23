@@ -190,17 +190,19 @@ fn update_login_info(bot: &Arc<Bot>, data: String) {
 fn token_still_valid(bot: &Arc<Bot>) -> bool {
     info!("Checking if token is still valid");
 
-    let response;
+    let (token, login_info);
     {
         let info = bot.info.lock().unwrap();
         if info.token.is_empty() {
             return false;
         }
-
-        response = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
-            .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
-            .send_form(&[("refreshToken", info.token.as_str()), ("clientData", info.login_info.to_string().as_str())]);
+        token = info.token.clone();
+        login_info = info.login_info.to_string();
     }
+
+    let response = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
+        .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
+        .send_form(&[("refreshToken", token.as_str()), ("clientData", login_info.as_str())]);
 
     match response {
         Ok(res) => {
@@ -218,7 +220,8 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                     .unwrap_or_default()
                     .to_string();
                 info!("Token is still valid | new token: {}", token);
-                bot.info.lock().unwrap().token = token;
+                let mut info = bot.info.lock().unwrap();
+                info.token = token;
                 return true;
             }
         }
