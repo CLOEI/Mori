@@ -6,11 +6,11 @@ use byteorder::{LittleEndian, ReadBytesExt};
 pub struct Inventory {
     pub size: u32,
     pub item_count: u16,
-    pub items: Vec<Item>,
+    pub items: Vec<InventoryItem>,
 }
 
 #[derive(Debug)]
-pub struct Item {
+pub struct InventoryItem {
     pub id: u16,
     pub amount: u16,
 }
@@ -32,7 +32,7 @@ impl Inventory {
         for _ in 0..self.item_count {
             let id = data.read_u16::<LittleEndian>().unwrap();
             let amount = data.read_u16::<LittleEndian>().unwrap();
-            self.items.push(Item { id, amount });
+            self.items.push(InventoryItem { id, amount });
         }
     }
 }

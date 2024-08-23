@@ -44,7 +44,16 @@ pub fn handle(bot: &Arc<Bot>, pkt: &TankPacket, data: &[u8]) {
             bot.state.lock().unwrap().is_redirecting = false;
         }
         "OnCountryState" => {}
-        "OnDialogRequest" => {}
+        "OnDialogRequest" => {
+            let message = variant.get(1).unwrap().as_string();
+            if message.contains("Gazette") {
+                send_packet(
+                    bot,
+                    EPacketType::NetMessageGenericText,
+                    "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string(),
+                );
+            }
+        }
         "OnSetBux" => {
             let bux = variant.get(1).unwrap().as_int32();
             bot.state.lock().unwrap().gems = bux;
@@ -73,8 +82,14 @@ pub fn handle(bot: &Arc<Bot>, pkt: &TankPacket, data: &[u8]) {
         "ShowStartFTUEPopup" => {}
         "OnFtueButtonDataSet" => {}
         "OnSpawn" => {}
-        "OnTalkBubble" => {}
+        "OnTalkBubble" => {
+            let message = variant.get(2).unwrap().as_string();
+            info!("Received talk bubble message: {}", message);
+        }
         "OnClearTutorialArrow" => {}
+        "OnRequestWorldSelectMenu" => {
+            bot.world.lock().unwrap().reset();
+        }
         _ => {}
     }
 }

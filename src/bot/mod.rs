@@ -232,6 +232,7 @@ pub fn poll(bot: &Arc<Bot>) {
             break;
         }
         drop(state);
+        collect(&bot_clone);
         thread::sleep(Duration::from_millis(20));
     });
 }

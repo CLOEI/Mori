@@ -417,7 +417,7 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#9c199455c6edb1ebab1d8eb1b082499aa4312374"
+source = "git+https://github.com/CLOEI/gtworld-r.git#52d928b4df90b98a4a1b89e5e9236d0a2f38c6c6"
 dependencies = [
  "byteorder",
  "gtitem-r",

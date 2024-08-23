@@ -9,7 +9,10 @@ use crate::{
     },
 };
 
-use super::{send_packet_raw, Bot};
+use super::{
+    inventory::{self, InventoryItem},
+    send_packet_raw, Bot,
+};
 
 pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
@@ -79,6 +82,109 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     warn!("Writing world.dat");
                     fs::write("world.dat", &data[56..]).unwrap();
                     bot.world.lock().unwrap().parse(&data[56..]);
+                }
+                ETankPacketType::NetGamePacketTileChangeRequest => {
+                    if tank_packet.net_id == bot.state.lock().unwrap().net_id
+                        && tank_packet.value != 18
+                    {
+                        for i in 0..bot.inventory.lock().unwrap().items.len() {
+                            let mut inventory = bot.inventory.lock().unwrap();
+                            if inventory.items[i].id == tank_packet.value as u16 {
+                                inventory.items[i].amount -= 1;
+                                if inventory.items[i].amount > 200 {
+                                    inventory.items.remove(i);
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    if let Some(tile) = bot
+                        .world
+                        .lock()
+                        .unwrap()
+                        .get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32)
+                    {
+                        if tank_packet.value == 18 {
+                            if tile.foreground_item_id != 0 {
+                                tile.foreground_item_id = 0;
+                            } else {
+                                tile.background_item_id = 0;
+                            }
+                        } else {
+                            if let Some(item) = bot.item_database.items.get(&tank_packet.value) {
+                                if item.action_type == 22
+                                    || item.action_type == 28
+                                    || item.action_type == 18
+                                {
+                                    tile.background_item_id = tank_packet.value as u16;
+                                } else {
+                                    tile.foreground_item_id = tank_packet.value as u16;
+                                }
+                            }
+                        }
+                    }
+                }
+                ETankPacketType::NetGamePacketItemChangeObject => {
+                    let mut world = bot.world.lock().unwrap();
+                    info!("ItemChangeObject: {:?}", tank_packet);
+
+                    if tank_packet.net_id == u32::MAX {
+                        let item = gtworld_r::DroppedItem {
+                            id: tank_packet.value as u16,
+                            x: tank_packet.vector_x.ceil(),
+                            y: tank_packet.vector_y.ceil(),
+                            count: tank_packet.unk6 as u8,
+                            flags: tank_packet.unk1,
+                            uid: world.dropped.last_dropped_item_uid + 1,
+                        };
+
+                        world.dropped.items.push(item);
+                        world.dropped.last_dropped_item_uid += 1;
+                        world.dropped.items_count += 1;
+                        return;
+                    } else if tank_packet.net_id == u32::MAX - 3 {
+                        for obj in &mut world.dropped.items {
+                            if obj.id == tank_packet.value as u16
+                                && obj.x == tank_packet.vector_x.ceil()
+                                && obj.y == tank_packet.vector_y.ceil()
+                            {
+                                obj.count = tank_packet.unk6 as u8;
+                                break;
+                            }
+                        }
+                    } else if tank_packet.net_id > 0 {
+                        for i in 0..world.dropped.items.len() {
+                            let obj = &world.dropped.items[i];
+                            if obj.uid == tank_packet.value {
+                                if tank_packet.net_id == bot.state.lock().unwrap().net_id {
+                                    if obj.id == 112 {
+                                        bot.state.lock().unwrap().gems += obj.count as i32;
+                                    } else {
+                                        let mut added = false;
+                                        for item in &mut bot.inventory.lock().unwrap().items {
+                                            if item.id == obj.id {
+                                                let temp = item.amount + obj.count as u16;
+                                                item.amount = if temp > 200 { 200 } else { temp };
+                                                added = true;
+                                                break;
+                                            }
+                                        }
+                                        if !added {
+                                            let item = InventoryItem {
+                                                id: obj.id,
+                                                amount: obj.count as u16,
+                                            };
+                                            bot.inventory.lock().unwrap().items.push(item);
+                                        }
+                                    }
+                                }
+                                world.dropped.items.remove(i);
+                                world.dropped.items_count -= 1;
+                                break;
+                            }
+                        }
+                    }
                 }
                 _ => {}
             },
