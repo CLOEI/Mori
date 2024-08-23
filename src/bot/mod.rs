@@ -18,6 +18,7 @@ use std::{
 };
 use urlencoding::encode;
 
+use crate::types::etank_packet_type::ETankPacketType;
 use crate::{
     types::{self, tank_packet::TankPacket},
     utils,
@@ -517,4 +518,129 @@ pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
     let peer = host.peer_mut(peer_id).unwrap();
     peer.send_packet(enet_packet, 0)
         .expect("Failed to send raw packet");
+}
+
+pub fn is_inworld(bot: &Arc<Bot>) -> bool {
+    bot.world.lock().unwrap().name != "EXIT"
+}
+
+pub fn collect(bot: &Arc<Bot>) {
+    if !is_inworld(bot) {
+        return;
+    }
+
+    let world = bot.world.lock().unwrap();
+    for obj in &world.dropped.items {
+        let distance;
+        {
+            let position = bot.position.lock().unwrap();
+            distance = ((position.x - obj.x).powi(2) + (position.y - obj.y).powi(2)).sqrt() / 32.0;
+        }
+        if distance <= 5.0 {
+            let can_collect = true;
+
+            if bot
+                .inventory
+                .lock()
+                .unwrap()
+                .items
+                .get(obj.id as usize)
+                .map_or(0, |item| item.amount)
+                < 200
+            {
+                if can_collect {
+                    let mut pkt = TankPacket::default();
+                    pkt._type = ETankPacketType::NetGamePacketItemActivateObjectRequest;
+                    pkt.vector_x = obj.x;
+                    pkt.vector_y = obj.y;
+                    pkt.value = obj.uid;
+                    send_packet_raw(bot, &pkt);
+                    info!("Collect packet sent");
+                }
+            }
+        }
+    }
+}
+
+fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
+    let mut pkt = TankPacket::default();
+    pkt._type = ETankPacketType::NetGamePacketTileChangeRequest;
+    let base_x;
+    let base_y;
+    {
+        let position = bot.position.lock().unwrap();
+        pkt.vector_x = position.x;
+        pkt.vector_y = position.y;
+        pkt.int_x = (position.x / 32.0).floor() as i32 + offset_x;
+        pkt.int_y = (position.y / 32.0).floor() as i32 + offset_y;
+        pkt.value = item_id;
+
+        base_x = (position.x / 32.0).floor() as i32;
+        base_y = (position.y / 32.0).floor() as i32;
+    }
+
+    if pkt.int_x <= base_x + 4
+        && pkt.int_x >= base_x - 4
+        && pkt.int_y <= base_y + 4
+        && pkt.int_y >= base_y - 4
+    {
+        send_packet_raw(bot, &pkt);
+    }
+}
+
+fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
+    place(bot, offset_x, offset_y, 18);
+}
+
+fn warp(bot: &Arc<Bot>, world_name: String) {
+    if bot.state.lock().unwrap().is_not_allowed_to_warp {
+        return;
+    }
+    info!("Warping to world: {}", world_name);
+    send_packet(
+        bot,
+        EPacketType::NetMessageGameMessage,
+        format!("action|join_request\nname|{}\ninvitedWorld|0\n", world_name),
+    );
+}
+
+fn talk(bot: &Arc<Bot>, message: String) {
+    send_packet(
+        bot,
+        EPacketType::NetMessageGameMessage,
+        format!("action|input\n|text|{}\n", message),
+    );
+}
+
+fn leave(bot: &Arc<Bot>) {
+    if is_inworld(bot) {
+        send_packet(
+            bot,
+            EPacketType::NetMessageGameMessage,
+            "action|quit_to_exit\n".to_string(),
+        );
+    }
+}
+
+fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
+    if !ap {
+        let mut position = bot.position.lock().unwrap();
+        position.x += (x * 32) as f32;
+        position.y += (y * 32) as f32;
+    }
+
+    let mut pkt = TankPacket::default();
+    {
+        let position = bot.position.lock().unwrap();
+        pkt._type = ETankPacketType::NetGamePacketState;
+        pkt.vector_x = position.x;
+        pkt.vector_y = position.y;
+        pkt.int_x = -1;
+        pkt.int_y = -1;
+        pkt.flags |= (1 << 1) | (1 << 5);
+    }
+
+    if bot.state.lock().unwrap().is_running && is_inworld(bot) {
+        send_packet_raw(bot, &pkt);
+    }
 }
