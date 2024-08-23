@@ -9,7 +9,7 @@ pub struct Config {
     pub findpath_delay: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BotConfig {
     pub username: String,
     pub password: String,

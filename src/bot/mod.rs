@@ -596,11 +596,11 @@ fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
     }
 }
 
-fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
+pub fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
     place(bot, offset_x, offset_y, 18);
 }
 
-fn warp(bot: &Arc<Bot>, world_name: String) {
+pub fn warp(bot: &Arc<Bot>, world_name: String) {
     if bot.state.lock().unwrap().is_not_allowed_to_warp {
         return;
     }
@@ -612,7 +612,7 @@ fn warp(bot: &Arc<Bot>, world_name: String) {
     );
 }
 
-fn talk(bot: &Arc<Bot>, message: String) {
+pub fn talk(bot: &Arc<Bot>, message: String) {
     send_packet(
         bot,
         EPacketType::NetMessageGameMessage,
@@ -620,7 +620,7 @@ fn talk(bot: &Arc<Bot>, message: String) {
     );
 }
 
-fn leave(bot: &Arc<Bot>) {
+pub fn leave(bot: &Arc<Bot>) {
     if is_inworld(bot) {
         send_packet(
             bot,
@@ -630,7 +630,7 @@ fn leave(bot: &Arc<Bot>) {
     }
 }
 
-fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
+pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
     if !ap {
         let mut position = bot.position.lock().unwrap();
         position.x += (x * 32) as f32;

@@ -1,16 +1,19 @@
 use std::{
     fs::{self, File},
     io::Write,
-    sync::Arc,
-    thread,
-    time::Duration,
 };
 
 use bot::Bot;
-use paris::info;
-use types::config::Config;
+use eframe::egui::ViewportBuilder;
+use gui::{
+    add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
+};
+use manager::Manager;
+use types::config::{BotConfig, Config};
 
 mod bot;
+mod gui;
+mod manager;
 mod types;
 mod utils;
 
@@ -30,30 +33,64 @@ fn init_config() {
 
 fn main() {
     init_config();
-    let item_database = {
-        match gtitem_r::load_from_file("items.dat") {
-            Ok(item_database) => {
-                info!("Item database loaded successfully");
-                item_database
-            }
-            Err(e) => {
-                info!("Failed to load item database: {}", e);
-                return;
-            }
-        }
+
+    let options = eframe::NativeOptions {
+        centered: true,
+        viewport: ViewportBuilder::default()
+            .with_title("Mori")
+            .with_icon(
+                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/logo.png")[..])
+                    .expect("Failed to load icon"),
+            )
+            .with_inner_size([800.0, 400.0])
+            .with_resizable(false),
+        ..Default::default()
     };
+    let _ = eframe::run_native("Mori", options, Box::new(|cc| Ok(Box::new(App::new(cc)))));
+}
 
-    let bots = utils::config::get_bots();
-    let item_database = Arc::new(item_database);
-    for bot in bots {
-        let bot_data = bot.data.clone();
-        let bot_instance = Arc::new(Bot::new(bot, item_database.clone()));
+struct App {
+    navbar: Navbar,
+    item_database: ItemDatabase,
+    add_bot_dialog: AddBotDialog,
+    manager: Manager,
+    bots: Vec<BotConfig>,
+    bot_menu: BotMenu,
+}
 
-        let bot_clone = bot_instance.clone();
-        thread::spawn(move || bot::logon(&bot_clone, bot_data));
+impl App {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut manager = Manager::new();
+        let bots = utils::config::get_bots();
+        for bot in bots.clone() {
+            manager.add_bot(bot);
+        }
+
+        Self {
+            navbar: Default::default(),
+            item_database: Default::default(),
+            add_bot_dialog: Default::default(),
+            manager: manager,
+            bots: bots,
+            bot_menu: Default::default(),
+        }
     }
+}
 
-    loop {
-        thread::sleep(Duration::from_secs(1));
+impl eframe::App for App {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        egui_extras::install_image_loaders(ctx);
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.navbar.render(ui, &mut self.add_bot_dialog);
+            ui.separator();
+            if self.navbar.current_menu == "bots" {
+                self.bot_menu.render(ui, &self.bots, &self.manager);
+            } else if self.navbar.current_menu == "item_database" {
+                self.item_database.render(ui, &mut self.manager, ctx);
+            } else {
+                ui.label("Not implemented yet");
+            }
+        });
+        self.add_bot_dialog.render(&mut self.manager, ctx);
     }
 }
