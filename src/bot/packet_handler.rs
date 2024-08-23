@@ -55,6 +55,11 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 bot.state.lock().unwrap().is_running = false;
                 disconnect(bot);
             }
+            if message.contains("has been suspended") {
+                bot.state.lock().unwrap().is_running = false;
+                bot.state.lock().unwrap().is_banned = true;
+                disconnect(bot);
+            }
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
             Ok(tank_packet) => match tank_packet._type {
@@ -87,8 +92,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 ETankPacketType::NetGamePacketSendMapData => {
                     warn!("Writing world.dat");
                     fs::write("world.dat", &data[56..]).unwrap();
-                    // bot.world.lock().unwrap().parse(&data[56..]);
-                    // bot.astar.lock().unwrap().update(bot);
+                    bot.world.lock().unwrap().parse(&data[56..]);
+                    bot.astar.lock().unwrap().update(bot);
                 }
                 ETankPacketType::NetGamePacketTileChangeRequest => {
                     if tank_packet.net_id == bot.state.lock().unwrap().net_id

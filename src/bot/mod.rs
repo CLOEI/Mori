@@ -58,8 +58,7 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub fn new(bot_config: types::config::BotConfig, item_database: Arc<ItemDatabase>) -> Self {
-        let enet = Enet::new().expect("could not initialize ENet");
+    pub fn new(bot_config: types::config::BotConfig, enet: Arc<Enet>, item_database: Arc<ItemDatabase>) -> Self {
         let host = enet
             .create_host::<()>(
                 None,

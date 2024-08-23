@@ -1,19 +1,20 @@
 use std::sync::{Arc, Mutex};
 use std::thread::{spawn, JoinHandle};
-
+use enet::Enet;
 use crate::bot::{self, Bot};
 use crate::types::config::BotConfig;
-use crate::types::elogin_method::ELoginMethod;
 use gtitem_r::structs::ItemDatabase;
 use paris::{error, info};
 
 pub struct Manager {
     pub bots: Vec<(Arc<Bot>, JoinHandle<()>)>,
     pub items_database: Arc<ItemDatabase>,
+    pub enet: Arc<Enet>,
 }
 
 impl Manager {
     pub fn new() -> Manager {
+        let enet = Enet::new().expect("could not initialize ENet");
         let item_database = {
             match gtitem_r::load_from_file("items.dat") {
                 Ok(item_database) => {
@@ -30,15 +31,17 @@ impl Manager {
         Manager {
             bots: vec![],
             items_database: Arc::new(item_database),
+            enet: Arc::new(enet),
         }
     }
 }
 
 impl Manager {
-    pub fn add_bot(&mut self, bot: BotConfig) {
+pub fn add_bot(&mut self, bot: BotConfig) {
         let items_database_clone = Arc::clone(&self.items_database);
+        let enet_clone = Arc::clone(&self.enet);
 
-        let new_bot = Arc::new(Bot::new(bot.clone(), items_database_clone));
+        let new_bot = Arc::new(Bot::new(bot.clone(), enet_clone, items_database_clone));
         let newbot_clone = Arc::clone(&new_bot);
 
         let handle = spawn(move || {

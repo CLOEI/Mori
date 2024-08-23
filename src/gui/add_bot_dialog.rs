@@ -3,14 +3,10 @@ use std::fs;
 use bincode::config;
 use eframe::egui::{self};
 
-use crate::{
-    manager::Manager,
-    types::{
-        config::{BotConfig, Config},
-        elogin_method::ELoginMethod,
-    },
-    App, Bot,
-};
+use crate::{manager::Manager, types::{
+    config::{BotConfig, Config},
+    elogin_method::ELoginMethod,
+}, utils, App, Bot};
 
 #[derive(Default)]
 pub struct AddBotDialog {
@@ -79,12 +75,9 @@ impl AddBotDialog {
                             data: "".to_string(),
                         };
                         manager.add_bot(config.clone());
-                        let mut data = serde_json::from_str::<Config>(
-                            &fs::read_to_string("data.json").unwrap(),
-                        )
-                        .unwrap();
+                        let mut data = utils::config::parse_config().unwrap();
                         data.bots.push(config);
-                        fs::write("data.json", &serde_json::to_string_pretty(&data).unwrap())
+                        fs::write("config.json", &serde_json::to_string_pretty(&data).unwrap())
                             .unwrap();
                         self.username.clear();
                         self.password.clear();

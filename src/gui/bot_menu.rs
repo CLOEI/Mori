@@ -58,7 +58,7 @@ impl BotMenu {
                                                     info.timeout,
                                                 )
                                             };
-                                            ui.label("Username");
+                                            ui.label("GrowID");
                                             ui.add(egui::Label::new(username).truncate());
                                             ui.end_row();
                                             ui.label("Status");
@@ -74,7 +74,7 @@ impl BotMenu {
                                             ui.label(timeout.to_string());
                                             ui.end_row();
                                         } else {
-                                            ui.label("Usernmae");
+                                            ui.label("GrowID");
                                             ui.label("EMPTY");
                                             ui.end_row();
                                             ui.label("Status");

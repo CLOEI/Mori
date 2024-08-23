@@ -25,7 +25,6 @@ fn init_config() {
             timeout: 5,
             findpath_delay: 5,
         };
-
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
     }
@@ -79,6 +78,8 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        ctx.request_repaint();
+        self.bots = utils::config::get_bots();
         egui_extras::install_image_loaders(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
             self.navbar.render(ui, &mut self.add_bot_dialog);
