@@ -45,12 +45,25 @@ pub fn handle(bot: &Arc<Bot>, pkt: &TankPacket, data: &[u8]) {
         }
         "OnCountryState" => {}
         "OnDialogRequest" => {}
-        "OnSetBux" => {}
+        "OnSetBux" => {
+            let bux = variant.get(1).unwrap().as_int32();
+            bot.state.lock().unwrap().gems = bux;
+        }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
             info!("Received console message: {}", message);
         }
-        "OnSetPos" => {}
+        "OnSetPos" => {
+            let pos = variant.get(1).unwrap().as_vec2();
+            info!("Received position: {:?}", pos);
+            let mut position = bot.position.lock().unwrap();
+            position.x = pos.0;
+            position.y = pos.1;
+        }
+        "SetHasGrowID" => {
+            let growid = variant.get(2).unwrap().as_string();
+            bot.info.lock().unwrap().login_info.tank_id_name = growid;
+        }
         "ShowStartFTUEPopup" => {}
         "OnFtueButtonDataSet" => {}
         "OnSpawn" => {}

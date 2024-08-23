@@ -1,6 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde_repr::*;
+
+#[derive(Serialize_repr, Deserialize_repr, Debug)]
 #[repr(u8)]
-#[derive(Debug, Serialize, Deserialize)]
 pub enum ETankPacketType {
     NetGamePacketState,
     NetGamePacketCallFunction,

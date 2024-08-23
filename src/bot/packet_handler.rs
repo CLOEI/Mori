@@ -3,7 +3,7 @@ use std::sync::Arc;
 use paris::{error, info, warn};
 
 use crate::{
-    bot::{send_packet, variant_handler},
+    bot::{disconnect, send_packet, variant_handler},
     types::{
         epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
     },
@@ -35,10 +35,30 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
         EPacketType::NetMessageGameMessage => {
             let message = String::from_utf8_lossy(&data);
             info!("Message: {}", message);
+
+            if message.contains("logon_fail") {
+                bot.state.lock().unwrap().is_redirecting = false;
+                disconnect(bot);
+            }
+            if message.contains("currently banned") {
+                {
+                    let mut state = bot.state.lock().unwrap();
+                    state.is_running = false;
+                    state.is_banned = true;
+                }
+                disconnect(bot);
+            }
+            if message.contains("Advanced Account Protection") {
+                bot.state.lock().unwrap().is_running = false;
+                disconnect(bot);
+            }
+            if message.contains("temporarily suspended") {
+                bot.state.lock().unwrap().is_running = false;
+                disconnect(bot);
+            }
         }
-        EPacketType::NetMessageGamePacket => {
-            let tank_packet = mapping::map_slice_to_tank_packet_type(data);
-            match tank_packet._type {
+        EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
+            Ok(tank_packet) => match tank_packet._type {
                 ETankPacketType::NetGamePacketCallFunction => {
                     variant_handler::handle(bot, &tank_packet, &data[56..]);
                 }
@@ -54,6 +74,9 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     send_packet_raw(&bot, &packet);
                 }
                 _ => {}
+            },
+            Err(..) => {
+                error!("Failed to deserialize TankPacket: {:?}", data[0]);
             }
         },
         _ => (),

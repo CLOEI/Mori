@@ -31,7 +31,7 @@ pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
 
 pub fn get_google_token(url: &str, username: &str, password: &str) -> Result<String, ureq::Error> {
     loop {
-        let response = ureq::post("http://localhost:5123/token")
+        let response = ureq::post("http://localhost:5000/token")
             .timeout(Duration::from_secs(60))
             .send_form(&[("url", url), ("email", username), ("password", password)]);
 

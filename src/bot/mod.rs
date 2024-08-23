@@ -4,7 +4,7 @@ mod variant_handler;
 
 use byteorder::{ByteOrder, LittleEndian};
 use enet::{
-    Address, BandwidthLimit, ChannelLimit, Enet, EventKind, Host, Packet, PacketMode, PeerID,
+    Address, BandwidthLimit, ChannelLimit, Enet, EventKind, Host, Packet, PacketMode, Peer, PeerID,
 };
 use paris::{error, info, warn};
 use std::{
@@ -15,6 +15,7 @@ use std::{
 };
 use urlencoding::encode;
 
+use crate::types::tank_packet::TankPacket;
 use crate::{
     types::{
         bot_info::{Info, Server, State},
@@ -28,7 +29,6 @@ use crate::{
         random::{self},
     },
 };
-use crate::types::tank_packet::TankPacket;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -138,7 +138,7 @@ pub fn sleep(bot: &Arc<Bot>) {
 
 pub fn get_token(bot: &Arc<Bot>) {
     info!("Getting token for bot");
-    let (username, password, code, method, oauth_links) = {
+    let (username, password, recovery_code, method, oauth_links) = {
         let info = bot.info.lock().unwrap();
         (
             info.username.clone(),
@@ -193,21 +193,29 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
             .set("User-Agent", USER_AGENT)
             .send_string(&encode(
                 bot.info.lock().unwrap().login_info.to_string().as_str(),
-            ))?;
+            ));
 
-        if res.status() != 200 {
-            warn!("Failed to get OAuth links");
-            sleep(bot);
-        } else {
-            let body = res.into_string().unwrap();
-            let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
-            let links = pattern
-                .unwrap()
-                .find_iter(&body)
-                .map(|m| m.as_str().to_owned())
-                .collect::<Vec<String>>();
+        match res {
+            Ok(res) => {
+                if res.status() != 200 {
+                    warn!("Failed to get OAuth links");
+                    sleep(bot);
+                } else {
+                    let body = res.into_string().unwrap();
+                    let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
+                    let links = pattern
+                        .unwrap()
+                        .find_iter(&body)
+                        .map(|m| m.as_str().to_owned())
+                        .collect::<Vec<String>>();
 
-            return Ok(links);
+                    return Ok(links);
+                }
+            }
+            Err(err) => {
+                error!("Request error: {}, retrying...", err);
+                sleep(bot);
+            }
         }
     }
 }
@@ -358,7 +366,7 @@ fn process_events(bot: &Arc<Bot>) {
     }
 }
 
-fn disconnect(bot: &Arc<Bot>) {
+pub fn disconnect(bot: &Arc<Bot>) {
     let peer_id = bot.peer_id.lock().unwrap().unwrap().clone();
     bot.host
         .lock()
@@ -368,7 +376,7 @@ fn disconnect(bot: &Arc<Bot>) {
         .disconnect(0);
 }
 
-fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
+pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
     let mut packet_data = Vec::new();
     packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
     packet_data.extend_from_slice(&message.as_bytes());
@@ -376,24 +384,28 @@ fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
     let peer_id = bot.peer_id.lock().unwrap().unwrap().clone();
     let mut host = bot.host.lock().unwrap();
     let peer = host.peer_mut(peer_id).unwrap();
-    peer.send_packet(pkt, 0).unwrap();
+    peer.send_packet(pkt, 0).expect("Failed to send packet");
 }
 
-fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
-    let packet_size = std::mem::size_of::<EPacketType>() + std::mem::size_of::<TankPacket>() + packet.extended_data_length as usize;
+pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
+    let packet_size = std::mem::size_of::<EPacketType>()
+        + std::mem::size_of::<TankPacket>()
+        + packet.extended_data_length as usize;
     let mut enet_packet_data = vec![0u8; packet_size];
 
     let packet_type = EPacketType::NetMessageGamePacket as u32;
     enet_packet_data[..std::mem::size_of::<u32>()].copy_from_slice(&packet_type.to_le_bytes());
 
     let tank_packet_bytes = bincode::serialize(packet).expect("Failed to serialize TankPacket");
-    print!("{:?}", tank_packet_bytes);
-    enet_packet_data[std::mem::size_of::<u32>()..std::mem::size_of::<u32>() + tank_packet_bytes.len()]
+    enet_packet_data
+        [std::mem::size_of::<u32>()..std::mem::size_of::<u32>() + tank_packet_bytes.len()]
         .copy_from_slice(&tank_packet_bytes);
 
-    let enet_packet = Packet::new(enet_packet_data, PacketMode::ReliableSequenced).expect("Failed to create ENet packet");
+    let enet_packet = Packet::new(enet_packet_data, PacketMode::ReliableSequenced)
+        .expect("Failed to create ENet packet");
     let peer_id = bot.peer_id.lock().unwrap().unwrap().clone();
     let mut host = bot.host.lock().unwrap();
     let peer = host.peer_mut(peer_id).unwrap();
-    peer.send_packet(enet_packet, 0).expect("Failed to send ENet packet");
+    peer.send_packet(enet_packet, 0)
+        .expect("Failed to send raw packet");
 }
