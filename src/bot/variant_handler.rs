@@ -95,25 +95,51 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 }
             } else {
                 let player = Player {
-                    _type: data.get("type").unwrap().to_string(),
-                    avatar: data.get("avatar").unwrap().to_string(),
-                    net_id: data.get("netID").unwrap().parse().unwrap(),
-                    online_id: data.get("onlineID").unwrap().parse().unwrap(),
-                    e_id: data.get("eid").unwrap().parse().unwrap(),
-                    ip: data.get("ip").unwrap().to_string(),
-                    colrect: data.get("colrect").unwrap().to_string(),
-                    title_icon: data.get("titleIcon").unwrap().to_string(),
-                    mstate: data.get("mstate").unwrap().parse().unwrap(),
-                    user_id: data.get("userID").unwrap().parse().unwrap(),
-                    invis: data.get("invisible").unwrap().parse().unwrap(),
-                    name: data.get("name").unwrap().to_string(),
-                    country: data.get("country").unwrap().to_string(),
+                    _type: data.get("type").unwrap_or(&"".to_string()).to_string(),
+                    avatar: data.get("avatar").unwrap_or(&"".to_string()).to_string(),
+                    net_id: data
+                        .get("netID")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(0),
+                    online_id: data
+                        .get("onlineID")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or("".to_string()),
+                    e_id: data
+                        .get("eid")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or("".to_string()),
+                    ip: data.get("ip").unwrap_or(&"".to_string()).to_string(),
+                    colrect: data.get("colrect").unwrap_or(&"".to_string()).to_string(),
+                    title_icon: data.get("titleIcon").unwrap_or(&"".to_string()).to_string(),
+                    mstate: data
+                        .get("mstate")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(0),
+                    user_id: data
+                        .get("userID")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(0),
+                    invis: data
+                        .get("invis")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(false),
+                    name: data.get("name").unwrap_or(&"".to_string()).to_string(),
+                    country: data.get("country").unwrap_or(&"".to_string()).to_string(),
                     position: {
                         if data.contains_key("posXY") {
                             let pos_xy = data.get("posXY").unwrap();
                             Vector2 {
-                                x: pos_xy[..pos_xy.find("|").unwrap()].parse().unwrap(),
-                                y: pos_xy[pos_xy.find("|").unwrap() + 1..].parse().unwrap(),
+                                x: pos_xy[..pos_xy.find("|").unwrap()].parse().unwrap_or(0.0),
+                                y: pos_xy[pos_xy.find("|").unwrap() + 1..]
+                                    .parse()
+                                    .unwrap_or(0.0),
                             }
                         } else {
                             Vector2 { x: 0.0, y: 0.0 }

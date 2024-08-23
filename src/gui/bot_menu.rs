@@ -47,15 +47,20 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
-                                            let (status, ping, world_name) = {
+                                            let (username, status, ping, world_name, timeout) = {
                                                 let info = bot.info.lock().unwrap();
                                                 let world = bot.world.lock().unwrap();
                                                 (
+                                                    info.login_info.tank_id_name.clone(),
                                                     info.status.clone(),
                                                     info.ping.clone().to_string(),
                                                     world.name.clone(),
+                                                    info.timeout,
                                                 )
                                             };
+                                            ui.label("Username");
+                                            ui.add(egui::Label::new(username).truncate());
+                                            ui.end_row();
                                             ui.label("Status");
                                             ui.add(egui::Label::new(status).truncate());
                                             ui.end_row();
@@ -65,7 +70,13 @@ impl BotMenu {
                                             ui.label("World");
                                             ui.label(world_name);
                                             ui.end_row();
+                                            ui.label("Timeout");
+                                            ui.label(timeout.to_string());
+                                            ui.end_row();
                                         } else {
+                                            ui.label("Usernmae");
+                                            ui.label("EMPTY");
+                                            ui.end_row();
                                             ui.label("Status");
                                             ui.label("EMPTY");
                                             ui.end_row();
@@ -74,6 +85,9 @@ impl BotMenu {
                                             ui.end_row();
                                             ui.label("World");
                                             ui.label("EXIT");
+                                            ui.end_row();
+                                            ui.label("Timeout");
+                                            ui.label("0");
                                             ui.end_row();
                                         }
                                     });
@@ -93,8 +107,11 @@ impl BotMenu {
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                                 if ui.button("Warp").clicked() {
                                     if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                        let bot_clone = bot.clone();
                                         let world_name = self.warp_name.clone();
-                                        warp(bot, world_name);
+                                        thread::spawn(move || {
+                                            warp(&bot_clone, world_name);
+                                        });
                                     }
                                 }
                             });
@@ -148,7 +165,7 @@ impl BotMenu {
                                             let (username, password, code, method) = {
                                                 let info = bot.info.lock().unwrap();
                                                 (
-                                                    info.login_info.tank_id_name.clone(),
+                                                    info.username.clone(),
                                                     info.password.clone(),
                                                     info.recovery_code.clone(),
                                                     info.login_method.clone(),
