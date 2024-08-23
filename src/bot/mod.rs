@@ -18,7 +18,10 @@ use std::{
 };
 use urlencoding::encode;
 
-use crate::types::tank_packet::TankPacket;
+use crate::{
+    types::{self, tank_packet::TankPacket},
+    utils,
+};
 use crate::{
     types::{
         bot_info::{Info, Server, State},
@@ -49,13 +52,7 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub fn new(
-        username: String,
-        password: String,
-        recovery_code: String,
-        login_method: ELoginMethod,
-        item_database: Arc<ItemDatabase>,
-    ) -> Self {
+    pub fn new(bot_config: types::config::BotConfig, item_database: Arc<ItemDatabase>) -> Self {
         let enet = Enet::new().expect("could not initialize ENet");
         let host = enet
             .create_host::<()>(
@@ -71,12 +68,13 @@ impl Bot {
 
         Self {
             info: Arc::new(Mutex::new(Info {
-                username,
-                password,
-                recovery_code,
-                login_method,
+                username: bot_config.username,
+                password: bot_config.password,
+                recovery_code: bot_config.recovery_code,
+                login_method: bot_config.login_method,
+                token: bot_config.token,
                 login_info: LoginInfo::new(),
-                timeout: 5,
+                timeout: 0,
                 ..Default::default()
             })),
             state: Arc::new(Mutex::new(State::default())),
@@ -91,8 +89,12 @@ impl Bot {
     }
 }
 
-pub fn logon(bot: &Arc<Bot>) {
-    spoof(&bot);
+pub fn logon(bot: &Arc<Bot>, data: String) {
+    if data.is_empty() {
+        spoof(&bot);
+    } else {
+        update_login_info(&bot, data);
+    }
     bot.state.lock().unwrap().is_running = true;
     poll(bot);
     process_events(&bot);
@@ -138,6 +140,89 @@ pub fn reconnect(bot: &Arc<Bot>) {
     }
 }
 
+fn update_login_info(bot: &Arc<Bot>, data: String) {
+    let mut info = bot.info.lock().unwrap();
+    let parsed_data = utils::textparse::parse_and_store_as_map(&data);
+    for (key, value) in parsed_data {
+        match key.as_str() {
+            "UUIDToken" => info.login_info.uuid = value.clone(),
+            "protocol" => info.login_info.protocol = value.clone(),
+            "fhash" => info.login_info.fhash = value.clone(),
+            "mac" => info.login_info.mac = value.clone(),
+            "requestedName" => info.login_info.requested_name = value.clone(),
+            "hash2" => info.login_info.hash2 = value.clone(),
+            "fz" => info.login_info.fz = value.clone(),
+            "f" => info.login_info.f = value.clone(),
+            "player_age" => info.login_info.player_age = value.clone(),
+            "game_version" => info.login_info.game_version = value.clone(),
+            "lmode" => info.login_info.lmode = value.clone(),
+            "cbits" => info.login_info.cbits = value.clone(),
+            "rid" => info.login_info.rid = value.clone(),
+            "GDPR" => info.login_info.gdpr = value.clone(),
+            "hash" => info.login_info.hash = value.clone(),
+            "category" => info.login_info.category = value.clone(),
+            "token" => info.login_info.token = value.clone(),
+            "total_playtime" => info.login_info.total_playtime = value.clone(),
+            "door_id" => info.login_info.door_id = value.clone(),
+            "klv" => info.login_info.klv = value.clone(),
+            "meta" => info.login_info.meta = value.clone(),
+            "platformID" => info.login_info.platform_id = value.clone(),
+            "deviceVersion" => info.login_info.device_version = value.clone(),
+            "zf" => info.login_info.zf = value.clone(),
+            "country" => info.login_info.country = value.clone(),
+            "user" => info.login_info.user = value.clone(),
+            "wk" => info.login_info.wk = value.clone(),
+            "tankIDName" => info.login_info.tank_id_name = value.clone(),
+            "tankIDPass" => info.login_info.tank_id_pass = value.clone(),
+            _ => {}
+        }
+    }
+}
+
+fn token_still_valid(bot: &Arc<Bot>) -> bool {
+    info!("Checking if token is still valid");
+
+    let response;
+    {
+        let info = bot.info.lock().unwrap();
+        if info.token.is_empty() {
+            return false;
+        }
+
+        response = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
+            .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
+            .send_form(&[("refreshToken", info.token.as_str()), ("clientData", info.login_info.to_string().as_str())]);
+    }
+
+    match response {
+        Ok(res) => {
+            if res.status() != 200 {
+                error!("Failed to refresh token");
+                return false;
+            }
+
+            let response_text = res.into_string().unwrap_or_default();
+            let json_response: serde_json::Value = serde_json::from_str(&response_text).unwrap();
+
+            if json_response["status"] == "success" {
+                let token = json_response["token"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
+                info!("Token is still valid | new token: {}", token);
+                bot.info.lock().unwrap().token = token;
+                return true;
+            }
+        }
+        Err(err) => {
+            error!("Request error: {}", err);
+            return false;
+        }
+    };
+
+    false
+}
+
 pub fn poll(bot: &Arc<Bot>) {
     let bot_clone = bot.clone();
     thread::spawn(move || loop {
@@ -152,6 +237,7 @@ pub fn poll(bot: &Arc<Bot>) {
 
 pub fn sleep(bot: &Arc<Bot>) {
     let mut info = bot.info.lock().unwrap();
+    info.timeout = utils::config::get_timeout();
     while info.timeout > 0 {
         info.timeout -= 1;
         drop(info);
@@ -161,6 +247,10 @@ pub fn sleep(bot: &Arc<Bot>) {
 }
 
 pub fn get_token(bot: &Arc<Bot>) {
+    if token_still_valid(bot) {
+        return;
+    }
+
     info!("Getting token for bot");
     let (username, password, recovery_code, method, oauth_links) = {
         let info = bot.info.lock().unwrap();

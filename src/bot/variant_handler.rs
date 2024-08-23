@@ -4,8 +4,8 @@ use std::sync::Arc;
 use crate::bot::{disconnect, send_packet};
 use crate::types::epacket_type::EPacketType;
 use crate::types::tank_packet::TankPacket;
-use crate::utils::textparse;
 use crate::utils::variant::VariantList;
+use crate::utils::{self, textparse};
 
 use super::Bot;
 
@@ -62,7 +62,13 @@ pub fn handle(bot: &Arc<Bot>, pkt: &TankPacket, data: &[u8]) {
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();
-            bot.info.lock().unwrap().login_info.tank_id_name = growid;
+            let mut info = bot.info.lock().unwrap();
+            info.login_info.tank_id_name = growid;
+            utils::config::save_token_to_bot(
+                info.username.clone(),
+                info.token.clone(),
+                info.login_info.to_string(),
+            );
         }
         "ShowStartFTUEPopup" => {}
         "OnFtueButtonDataSet" => {}

@@ -1,4 +1,5 @@
 pub mod bot_info;
+pub mod config;
 pub mod elogin_method;
 pub mod epacket_type;
 pub mod etank_packet_type;

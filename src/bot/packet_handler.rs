@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fs, sync::Arc};
 
 use paris::{error, info, warn};
 
@@ -76,6 +76,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     bot.inventory.lock().unwrap().parse(&data[56..]);
                 }
                 ETankPacketType::NetGamePacketSendMapData => {
+                    warn!("Writing world.dat");
+                    fs::write("world.dat", &data[56..]).unwrap();
                     bot.world.lock().unwrap().parse(&data[56..]);
                 }
                 _ => {}
