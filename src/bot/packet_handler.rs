@@ -58,6 +58,15 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
             Ok(tank_packet) => match tank_packet._type {
+                ETankPacketType::NetGamePacketState => {
+                    for player in bot.players.lock().unwrap().iter_mut() {
+                        if player.net_id == tank_packet.net_id {
+                            player.position.x = tank_packet.vector_x;
+                            player.position.y = tank_packet.vector_y;
+                            break;
+                        }
+                    }
+                }
                 ETankPacketType::NetGamePacketCallFunction => {
                     variant_handler::handle(bot, &tank_packet, &data[56..]);
                 }

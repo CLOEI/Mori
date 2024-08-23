@@ -11,7 +11,7 @@ use crate::utils::{self, textparse};
 
 use super::Bot;
 
-pub fn handle(bot: &Arc<Bot>, pkt: &TankPacket, data: &[u8]) {
+pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
     let variant = VariantList::deserialize(&data).unwrap();
     let function_call: String = variant.get(0).unwrap().as_string();
     info!("Received function call: {}", function_call);
