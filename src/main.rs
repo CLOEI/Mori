@@ -79,7 +79,7 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         ctx.request_repaint();
-        self.bots = utils::config::get_bots();
+        // self.bots = utils::config::get_bots();
         egui_extras::install_image_loaders(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
             self.navbar.render(ui, &mut self.add_bot_dialog);

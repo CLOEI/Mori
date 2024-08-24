@@ -1,10 +1,10 @@
-use std::sync::{Arc, Mutex};
-use std::thread::{spawn, JoinHandle};
-use enet::Enet;
 use crate::bot::{self, Bot};
 use crate::types::config::BotConfig;
+use enet::Enet;
 use gtitem_r::structs::ItemDatabase;
 use paris::{error, info};
+use std::sync::Arc;
+use std::thread::{spawn, JoinHandle};
 
 pub struct Manager {
     pub bots: Vec<(Arc<Bot>, JoinHandle<()>)>,
@@ -37,7 +37,7 @@ impl Manager {
 }
 
 impl Manager {
-pub fn add_bot(&mut self, bot: BotConfig) {
+    pub fn add_bot(&mut self, bot: BotConfig) {
         let items_database_clone = Arc::clone(&self.items_database);
         let enet_clone = Arc::clone(&self.enet);
 
@@ -54,7 +54,7 @@ pub fn add_bot(&mut self, bot: BotConfig) {
 
     pub fn get_bot(&self, username: &str) -> Option<&Arc<Bot>> {
         for (bot, _) in &self.bots {
-            if bot.info.lock().unwrap().username == username {
+            if bot.info.read().unwrap().username == username {
                 return Some(bot);
             }
         }

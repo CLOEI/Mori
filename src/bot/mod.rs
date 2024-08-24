@@ -14,7 +14,7 @@ use inventory::Inventory;
 use paris::{error, info, warn};
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     thread,
     time::Duration,
     vec,
@@ -44,21 +44,25 @@ static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
 
 pub struct Bot {
-    pub info: Arc<Mutex<Info>>,
-    pub state: Arc<Mutex<State>>,
-    pub server: Arc<Mutex<Server>>,
-    pub position: Arc<Mutex<Vector2>>,
+    pub info: Arc<RwLock<Info>>,
+    pub state: Arc<RwLock<State>>,
+    pub server: Arc<RwLock<Server>>,
+    pub position: Arc<RwLock<Vector2>>,
     pub host: Arc<Mutex<Host<()>>>,
-    pub peer_id: Arc<Mutex<Option<PeerID>>>,
-    pub world: Arc<Mutex<gtworld_r::World>>,
-    pub inventory: Arc<Mutex<Inventory>>,
-    pub players: Arc<Mutex<Vec<Player>>>,
+    pub peer_id: Arc<RwLock<Option<PeerID>>>,
+    pub world: Arc<RwLock<gtworld_r::World>>,
+    pub inventory: Arc<RwLock<Inventory>>,
+    pub players: Arc<RwLock<Vec<Player>>>,
     pub astar: Arc<Mutex<AStar>>,
     pub item_database: Arc<ItemDatabase>,
 }
 
 impl Bot {
-    pub fn new(bot_config: types::config::BotConfig, enet: Arc<Enet>, item_database: Arc<ItemDatabase>) -> Self {
+    pub fn new(
+        bot_config: types::config::BotConfig,
+        enet: Arc<Enet>,
+        item_database: Arc<ItemDatabase>,
+    ) -> Self {
         let host = enet
             .create_host::<()>(
                 None,
@@ -72,7 +76,7 @@ impl Bot {
             .expect("could not create host");
 
         Self {
-            info: Arc::new(Mutex::new(Info {
+            info: Arc::new(RwLock::new(Info {
                 username: bot_config.username,
                 password: bot_config.password,
                 recovery_code: bot_config.recovery_code,
@@ -82,14 +86,14 @@ impl Bot {
                 timeout: 0,
                 ..Default::default()
             })),
-            state: Arc::new(Mutex::new(State::default())),
-            server: Arc::new(Mutex::new(Server::default())),
-            position: Arc::new(Mutex::new(Vector2::default())),
+            state: Arc::new(RwLock::new(State::default())),
+            server: Arc::new(RwLock::new(Server::default())),
+            position: Arc::new(RwLock::new(Vector2::default())),
             host: Arc::new(Mutex::new(host)),
-            peer_id: Arc::new(Mutex::new(None)),
-            world: Arc::new(Mutex::new(gtworld_r::World::new(item_database.clone()))),
-            inventory: Arc::new(Mutex::new(Inventory::new())),
-            players: Arc::new(Mutex::new(Vec::new())),
+            peer_id: Arc::new(RwLock::new(None)),
+            world: Arc::new(RwLock::new(gtworld_r::World::new(item_database.clone()))),
+            inventory: Arc::new(RwLock::new(Inventory::new())),
+            players: Arc::new(RwLock::new(Vec::new())),
             astar: Arc::new(Mutex::new(AStar::new(item_database.clone()))),
             item_database,
         }
@@ -102,7 +106,7 @@ pub fn logon(bot: &Arc<Bot>, data: String) {
     } else {
         update_login_info(&bot, data);
     }
-    bot.state.lock().unwrap().is_running = true;
+    bot.state.write().unwrap().is_running = true;
     poll(bot);
     process_events(&bot);
 }
@@ -112,21 +116,21 @@ pub fn reconnect(bot: &Arc<Bot>) {
 
     let meta = bot
         .info
-        .lock()
+        .read()
         .unwrap()
         .server_data
         .get("meta")
         .unwrap()
         .clone();
 
-    bot.info.lock().unwrap().login_info.meta = meta;
+    bot.info.write().unwrap().login_info.meta = meta;
 
-    if bot.info.lock().unwrap().login_method != ELoginMethod::UBISOFT
-        && bot.info.lock().unwrap().oauth_links.is_empty()
+    if bot.info.read().unwrap().login_method != ELoginMethod::UBISOFT
+        && bot.info.read().unwrap().oauth_links.is_empty()
     {
         match get_oauth_links(&bot) {
             Ok(links) => {
-                bot.info.lock().unwrap().oauth_links = links;
+                bot.info.write().unwrap().oauth_links = links;
                 info!("Successfully got OAuth links for: apple, google and legacy");
             }
             Err(err) => {
@@ -138,7 +142,7 @@ pub fn reconnect(bot: &Arc<Bot>) {
 
     get_token(bot);
     {
-        let info = bot.info.lock().unwrap();
+        let info = bot.info.read().unwrap();
         connect_to_server(
             bot,
             info.server_data["server"].clone(),
@@ -148,7 +152,7 @@ pub fn reconnect(bot: &Arc<Bot>) {
 }
 
 fn update_login_info(bot: &Arc<Bot>, data: String) {
-    let mut info = bot.info.lock().unwrap();
+    let mut info = bot.info.write().unwrap();
     let parsed_data = utils::textparse::parse_and_store_as_map(&data);
     for (key, value) in parsed_data {
         match key.as_str() {
@@ -191,7 +195,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
 
     let (token, login_info);
     {
-        let info = bot.info.lock().unwrap();
+        let info = bot.info.read().unwrap();
         if info.token.is_empty() {
             return false;
         }
@@ -219,7 +223,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                     .unwrap_or_default()
                     .to_string();
                 info!("Token is still valid | new token: {}", token);
-                let mut info = bot.info.lock().unwrap();
+                let mut info = bot.info.write().unwrap();
                 info.token = token;
                 return true;
             }
@@ -236,7 +240,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
 pub fn poll(bot: &Arc<Bot>) {
     let bot_clone = bot.clone();
     thread::spawn(move || loop {
-        let state = bot_clone.state.lock().unwrap();
+        let state = bot_clone.state.read().unwrap();
         if !state.is_running {
             break;
         }
@@ -247,13 +251,13 @@ pub fn poll(bot: &Arc<Bot>) {
 }
 
 pub fn sleep(bot: &Arc<Bot>) {
-    let mut info = bot.info.lock().unwrap();
+    let mut info = bot.info.write().unwrap();
     info.timeout = utils::config::get_timeout();
     while info.timeout > 0 {
         info.timeout -= 1;
         drop(info);
         thread::sleep(Duration::from_secs(1));
-        info = bot.info.lock().unwrap();
+        info = bot.info.write().unwrap();
     }
 }
 
@@ -264,7 +268,7 @@ pub fn get_token(bot: &Arc<Bot>) {
 
     info!("Getting token for bot");
     let (username, password, recovery_code, method, oauth_links) = {
-        let info = bot.info.lock().unwrap();
+        let info = bot.info.read().unwrap();
         (
             info.username.clone(),
             info.password.clone(),
@@ -306,7 +310,7 @@ pub fn get_token(bot: &Arc<Bot>) {
     };
 
     if token_result.len() > 0 {
-        let mut info = bot.info.lock().unwrap();
+        let mut info = bot.info.write().unwrap();
         info.token = token_result;
         info!("Received the token: {}", info.token);
     }
@@ -317,7 +321,7 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
         let res = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
             .set("User-Agent", USER_AGENT)
             .send_string(&encode(
-                bot.info.lock().unwrap().login_info.to_string().as_str(),
+                bot.info.read().unwrap().login_info.to_string().as_str(),
             ));
 
         match res {
@@ -347,7 +351,7 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
 
 pub fn spoof(bot: &Arc<Bot>) {
     info!("Spoofing bot data");
-    let mut info = bot.info.lock().unwrap();
+    let mut info = bot.info.write().unwrap();
     info.login_info.klv = proton::generate_klv(
         &info.login_info.protocol,
         &info.login_info.game_version,
@@ -390,7 +394,7 @@ pub fn to_http(bot: &Arc<Bot>) {
 
 pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
     info!("Parsing server data");
-    bot.info.lock().unwrap().server_data = data
+    bot.info.write().unwrap().server_data = data
         .lines()
         .filter_map(|line| {
             let mut parts = line.splitn(2, '|');
@@ -416,9 +420,9 @@ fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
 fn process_events(bot: &Arc<Bot>) {
     loop {
         let (is_running, is_redirecting, ip, port, server_data) = {
-            let state = bot.state.lock().unwrap();
-            let info = bot.info.lock().unwrap();
-            let server = bot.server.lock().unwrap();
+            let state = bot.state.read().unwrap();
+            let info = bot.info.read().unwrap();
+            let server = bot.server.read().unwrap();
 
             (
                 state.is_running,
@@ -457,7 +461,7 @@ fn process_events(bot: &Arc<Bot>) {
             };
 
             if let Some(peer_id) = new_peer_id {
-                let mut x = bot.peer_id.lock().unwrap();
+                let mut x = bot.peer_id.write().unwrap();
                 *x = Some(peer_id);
             }
 
@@ -487,7 +491,7 @@ fn process_events(bot: &Arc<Bot>) {
 }
 
 pub fn disconnect(bot: &Arc<Bot>) {
-    let peer_id = bot.peer_id.lock().unwrap().unwrap().clone();
+    let peer_id = bot.peer_id.read().unwrap().unwrap().clone();
     bot.host
         .lock()
         .unwrap()
@@ -501,7 +505,7 @@ pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
     packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
     packet_data.extend_from_slice(&message.as_bytes());
     let pkt = Packet::new(packet_data, PacketMode::ReliableSequenced).unwrap();
-    let peer_id = bot.peer_id.lock().unwrap().unwrap().clone();
+    let peer_id = bot.peer_id.read().unwrap().unwrap().clone();
     let mut host = bot.host.lock().unwrap();
     let peer = host.peer_mut(peer_id).unwrap();
     peer.send_packet(pkt, 0).expect("Failed to send packet");
@@ -523,7 +527,7 @@ pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
 
     let enet_packet = Packet::new(enet_packet_data, PacketMode::ReliableSequenced)
         .expect("Failed to create ENet packet");
-    let peer_id = bot.peer_id.lock().unwrap().unwrap().clone();
+    let peer_id = bot.peer_id.read().unwrap().unwrap().clone();
     let mut host = bot.host.lock().unwrap();
     let peer = host.peer_mut(peer_id).unwrap();
     peer.send_packet(enet_packet, 0)
@@ -531,7 +535,7 @@ pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
 }
 
 pub fn is_inworld(bot: &Arc<Bot>) -> bool {
-    bot.world.lock().unwrap().name != "EXIT"
+    bot.world.read().unwrap().name != "EXIT"
 }
 
 pub fn collect(bot: &Arc<Bot>) {
@@ -539,11 +543,11 @@ pub fn collect(bot: &Arc<Bot>) {
         return;
     }
 
-    let world = bot.world.lock().unwrap();
+    let world = bot.world.read().unwrap();
     for obj in &world.dropped.items {
         let distance;
         {
-            let position = bot.position.lock().unwrap();
+            let position = bot.position.read().unwrap();
             distance = ((position.x - obj.x).powi(2) + (position.y - obj.y).powi(2)).sqrt() / 32.0;
         }
         if distance <= 5.0 {
@@ -551,7 +555,7 @@ pub fn collect(bot: &Arc<Bot>) {
 
             if bot
                 .inventory
-                .lock()
+                .read()
                 .unwrap()
                 .items
                 .get(obj.id as usize)
@@ -578,7 +582,7 @@ fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
     let base_x;
     let base_y;
     {
-        let position = bot.position.lock().unwrap();
+        let position = bot.position.read().unwrap();
         pkt.vector_x = position.x;
         pkt.vector_y = position.y;
         pkt.int_x = (position.x / 32.0).floor() as i32 + offset_x;
@@ -603,7 +607,7 @@ pub fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
 }
 
 pub fn warp(bot: &Arc<Bot>, world_name: String) {
-    if bot.state.lock().unwrap().is_not_allowed_to_warp {
+    if bot.state.read().unwrap().is_not_allowed_to_warp {
         return;
     }
     info!("Warping to world: {}", world_name);
@@ -634,14 +638,14 @@ pub fn leave(bot: &Arc<Bot>) {
 
 pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
     if !ap {
-        let mut position = bot.position.lock().unwrap();
+        let mut position = bot.position.write().unwrap();
         position.x += (x * 32) as f32;
         position.y += (y * 32) as f32;
     }
 
     let mut pkt = TankPacket::default();
     {
-        let position = bot.position.lock().unwrap();
+        let position = bot.position.read().unwrap();
         pkt._type = ETankPacketType::NetGamePacketState;
         pkt.vector_x = position.x;
         pkt.vector_y = position.y;
@@ -650,7 +654,7 @@ pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
         pkt.flags |= (1 << 1) | (1 << 5);
     }
 
-    if bot.state.lock().unwrap().is_running && is_inworld(bot) {
+    if bot.state.read().unwrap().is_running && is_inworld(bot) {
         send_packet_raw(bot, &pkt);
     }
 }

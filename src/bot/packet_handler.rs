@@ -14,8 +14,8 @@ use super::{inventory::InventoryItem, send_packet_raw, Bot};
 pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
-            if bot.state.lock().unwrap().is_redirecting {
-                let info = bot.info.lock().unwrap();
+            if bot.state.read().unwrap().is_redirecting {
+                let info = bot.info.read().unwrap();
                 let message = format!(
                     "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
                     info.login_info.uuid, info.login_info.protocol, info.login_info.fhash, info.login_info.mac, info.login_info.requested_name, info.login_info.hash2, info.login_info.fz, info.login_info.f, info.login_info.player_age, info.login_info.game_version, info.login_info.lmode, info.login_info.cbits, info.login_info.rid, info.login_info.gdpr, info.login_info.hash, info.login_info.category, info.login_info.token, info.login_info.total_playtime, info.login_info.door_id, info.login_info.klv, info.login_info.meta, info.login_info.platform_id, info.login_info.device_version, info.login_info.zf, info.login_info.country, info.login_info.user, info.login_info.wk);
@@ -24,7 +24,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
                     209,
-                    bot.info.lock().unwrap().token,
+                    bot.info.read().unwrap().token,
                     "0,1,1"
                 );
                 send_packet(&bot, EPacketType::NetMessageGenericText, message);
@@ -36,35 +36,35 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             info!("Message: {}", message);
 
             if message.contains("logon_fail") {
-                bot.state.lock().unwrap().is_redirecting = false;
+                bot.state.write().unwrap().is_redirecting = false;
                 disconnect(bot);
             }
             if message.contains("currently banned") {
                 {
-                    let mut state = bot.state.lock().unwrap();
+                    let mut state = bot.state.write().unwrap();
                     state.is_running = false;
                     state.is_banned = true;
                 }
                 disconnect(bot);
             }
             if message.contains("Advanced Account Protection") {
-                bot.state.lock().unwrap().is_running = false;
+                bot.state.write().unwrap().is_running = false;
                 disconnect(bot);
             }
             if message.contains("temporarily suspended") {
-                bot.state.lock().unwrap().is_running = false;
+                bot.state.write().unwrap().is_running = false;
                 disconnect(bot);
             }
             if message.contains("has been suspended") {
-                bot.state.lock().unwrap().is_running = false;
-                bot.state.lock().unwrap().is_banned = true;
+                bot.state.write().unwrap().is_running = false;
+                bot.state.write().unwrap().is_banned = true;
                 disconnect(bot);
             }
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
             Ok(tank_packet) => match tank_packet._type {
                 ETankPacketType::NetGamePacketState => {
-                    for player in bot.players.lock().unwrap().iter_mut() {
+                    for player in bot.players.write().unwrap().iter_mut() {
                         if player.net_id == tank_packet.net_id {
                             player.position.x = tank_packet.vector_x;
                             player.position.y = tank_packet.vector_y;
@@ -87,20 +87,20 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     send_packet_raw(&bot, &packet);
                 }
                 ETankPacketType::NetGamePacketSendInventoryState => {
-                    bot.inventory.lock().unwrap().parse(&data[56..]);
+                    bot.inventory.write().unwrap().parse(&data[56..]);
                 }
                 ETankPacketType::NetGamePacketSendMapData => {
                     warn!("Writing world.dat");
                     fs::write("world.dat", &data[56..]).unwrap();
-                    bot.world.lock().unwrap().parse(&data[56..]);
+                    bot.world.write().unwrap().parse(&data[56..]);
                     bot.astar.lock().unwrap().update(bot);
                 }
                 ETankPacketType::NetGamePacketTileChangeRequest => {
-                    if tank_packet.net_id == bot.state.lock().unwrap().net_id
+                    if tank_packet.net_id == bot.state.read().unwrap().net_id
                         && tank_packet.value != 18
                     {
-                        for i in 0..bot.inventory.lock().unwrap().items.len() {
-                            let mut inventory = bot.inventory.lock().unwrap();
+                        for i in 0..bot.inventory.read().unwrap().items.len() {
+                            let mut inventory = bot.inventory.write().unwrap();
                             if inventory.items[i].id == tank_packet.value as u16 {
                                 inventory.items[i].amount -= 1;
                                 if inventory.items[i].amount > 200 {
@@ -113,7 +113,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
 
                     if let Some(tile) = bot
                         .world
-                        .lock()
+                        .write()
                         .unwrap()
                         .get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32)
                     {
@@ -138,7 +138,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     }
                 }
                 ETankPacketType::NetGamePacketItemChangeObject => {
-                    let mut world = bot.world.lock().unwrap();
+                    let mut world = bot.world.write().unwrap();
                     info!("ItemChangeObject: {:?}", tank_packet);
 
                     if tank_packet.net_id == u32::MAX {
@@ -169,12 +169,12 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         for i in 0..world.dropped.items.len() {
                             let obj = &world.dropped.items[i];
                             if obj.uid == tank_packet.value {
-                                if tank_packet.net_id == bot.state.lock().unwrap().net_id {
+                                if tank_packet.net_id == bot.state.read().unwrap().net_id {
                                     if obj.id == 112 {
-                                        bot.state.lock().unwrap().gems += obj.count as i32;
+                                        bot.state.write().unwrap().gems += obj.count as i32;
                                     } else {
                                         let mut added = false;
-                                        for item in &mut bot.inventory.lock().unwrap().items {
+                                        for item in &mut bot.inventory.write().unwrap().items {
                                             if item.id == obj.id {
                                                 let temp = item.amount + obj.count as u16;
                                                 item.amount = if temp > 200 { 200 } else { temp };
@@ -187,7 +187,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                                 id: obj.id,
                                                 amount: obj.count as u16,
                                             };
-                                            bot.inventory.lock().unwrap().items.push(item);
+                                            bot.inventory.write().unwrap().items.push(item);
                                         }
                                     }
                                 }
