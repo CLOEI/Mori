@@ -3,6 +3,7 @@ mod inventory;
 mod login;
 mod packet_handler;
 mod variant_handler;
+mod features;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
@@ -261,7 +262,7 @@ pub fn poll(bot: &Arc<Bot>) {
 
 pub fn sleep(bot: &Arc<Bot>) {
     let mut info = bot.info.write();
-    info.timeout = utils::config::get_timeout();
+    info.timeout += utils::config::get_timeout();
     while info.timeout > 0 {
         info.timeout -= 1;
         drop(info);
@@ -553,7 +554,9 @@ pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
     let enet_packet = Packet::new(enet_packet_data, PacketMode::ReliableSequenced)
         .expect("Failed to create ENet packet");
     let peer_id = bot.peer_id.read().unwrap().clone();
+    info!("Getting host lock");
     let mut host = bot.host.lock();
+    info!("Got host lock");
     let peer = host.peer_mut(peer_id).unwrap();
     peer.send_packet(enet_packet, 0)
         .expect("Failed to send raw packet");
@@ -680,5 +683,22 @@ pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
 
     if bot.state.read().is_running && is_inworld(bot) {
         send_packet_raw(bot, &pkt);
+    }
+}
+
+pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
+    let mut astar = bot.astar.lock();
+    let position = {
+        let position = bot.position.read();
+        position.clone()
+    };
+    let paths = astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y);
+
+    if let Some(paths) = paths {
+        for i in 0..paths.len() {
+            let node = &paths[i];
+            walk(bot, node.x as i32, node.y as i32, true);
+            thread::sleep(Duration::from_millis(30));
+        }
     }
 }

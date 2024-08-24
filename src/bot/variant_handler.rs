@@ -1,7 +1,7 @@
 use paris::info;
 use std::sync::Arc;
-
-use crate::bot::{disconnect, send_packet};
+use crate::bot;
+use crate::bot::{disconnect, is_inworld, send_packet};
 use crate::types::epacket_type::EPacketType;
 use crate::types::player::Player;
 use crate::types::tank_packet::TankPacket;
@@ -82,7 +82,16 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             );
         }
         "ShowStartFTUEPopup" => {}
-        "OnFtueButtonDataSet" => {}
+        "OnFtueButtonDataSet" => {
+            let unknown_1 = variant.get(1).unwrap().as_int32();
+            let current_progress = variant.get(2).unwrap().as_int32();
+            let total_progress = variant.get(3).unwrap().as_int32();
+            let info = variant.get(4).unwrap().as_string();
+            info!(
+                "Received FTUE button data set: {} {} {} {}",
+                unknown_1, current_progress, total_progress, info
+            );
+        }
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
             let data = utils::textparse::parse_and_store_as_map(&message);
@@ -162,7 +171,10 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let message = variant.get(2).unwrap().as_string();
             info!("Received talk bubble message: {}", message);
         }
-        "OnClearTutorialArrow" => {}
+        "OnClearTutorialArrow" => {
+            let v1 = variant.get(1).unwrap().as_string();
+            info!("Received OnClearTutorialArrow: {} ", v1);
+        }
         "OnRequestWorldSelectMenu" => {
             bot.world.write().reset();
             bot.players.write().clear();

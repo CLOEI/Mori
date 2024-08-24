@@ -7,6 +7,7 @@ use crate::{
     utils, Bot,
 };
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
+use paris::info;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -106,10 +107,17 @@ impl WorldMap {
                                             "Position: {}|{}\nItem name: {}\nCollision type: {}",
                                             x, y, item.name, item.collision_type
                                         ))
-                                        .monospace(),
+                                            .monospace(),
                                     );
                                 },
                             );
+                            if ui.input(|i| i.pointer.any_click()) {
+                                info!("Clicked on tile: {}|{}", x, y);
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot::find_path(&bot_clone, x, y);
+                                });
+                            }
                         }
                     }
                 }
@@ -138,6 +146,12 @@ impl WorldMap {
                             let bot_clone = bot.clone();
                             thread::spawn(move || {
                                 bot::walk(&bot_clone, 1, 0, false);
+                            });
+                        }
+                        if ui.button("Place").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot::place(&bot_clone, 0, -1, 9640);
                             });
                         }
                     });

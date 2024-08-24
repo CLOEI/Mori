@@ -2,12 +2,9 @@ use std::{fs, sync::Arc};
 
 use paris::{error, info, warn};
 
-use crate::{
-    bot::{disconnect, send_packet, variant_handler},
-    types::{
-        epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
-    },
-};
+use crate::{bot, bot::{variant_handler}, types::{
+    epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
+}};
 
 use super::{inventory::InventoryItem, send_packet_raw, Bot};
 
@@ -19,7 +16,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 let message = format!(
                     "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
                     info.login_info.uuid, info.login_info.protocol, info.login_info.fhash, info.login_info.mac, info.login_info.requested_name, info.login_info.hash2, info.login_info.fz, info.login_info.f, info.login_info.player_age, info.login_info.game_version, info.login_info.lmode, info.login_info.cbits, info.login_info.rid, info.login_info.gdpr, info.login_info.hash, info.login_info.category, info.login_info.token, info.login_info.total_playtime, info.login_info.door_id, info.login_info.klv, info.login_info.meta, info.login_info.platform_id, info.login_info.device_version, info.login_info.zf, info.login_info.country, info.login_info.user, info.login_info.wk);
-                send_packet(&bot, EPacketType::NetMessageGenericText, message);
+                bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
             } else {
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
@@ -27,7 +24,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     bot.info.read().token,
                     "0,1,1"
                 );
-                send_packet(&bot, EPacketType::NetMessageGenericText, message);
+                bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
             }
         }
         EPacketType::NetMessageGenericText => {}
@@ -37,7 +34,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
 
             if message.contains("logon_fail") {
                 bot.state.write().is_redirecting = false;
-                disconnect(bot);
+                bot::disconnect(bot);
             }
             if message.contains("currently banned") {
                 {
@@ -45,20 +42,24 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     state.is_running = false;
                     state.is_banned = true;
                 }
-                disconnect(bot);
+                bot::disconnect(bot);
             }
             if message.contains("Advanced Account Protection") {
                 bot.state.write().is_running = false;
-                disconnect(bot);
+                bot::disconnect(bot);
             }
             if message.contains("temporarily suspended") {
                 bot.state.write().is_running = false;
-                disconnect(bot);
+                bot::disconnect(bot);
             }
             if message.contains("has been suspended") {
                 bot.state.write().is_running = false;
                 bot.state.write().is_banned = true;
-                disconnect(bot);
+                bot::disconnect(bot);
+            }
+            if message.contains(" Growtopia is not quite ready for users") {
+                bot.info.write().timeout = 60;
+                bot::sleep(bot);
             }
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {

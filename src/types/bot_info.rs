@@ -26,6 +26,7 @@ pub struct State {
     pub is_ingame: bool,
     pub is_not_allowed_to_warp: bool,
     pub is_banned: bool,
+    pub is_tutorial: bool,
 }
 
 #[derive(Debug, Default)]
