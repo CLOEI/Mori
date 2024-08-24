@@ -1,12 +1,12 @@
 use std::fs;
 
-use bincode::config;
 use eframe::egui::{self};
 
-use crate::{manager::Manager, types::{
-    config::{BotConfig, Config},
-    elogin_method::ELoginMethod,
-}, utils, App, Bot};
+use crate::{
+    manager::Manager,
+    types::{config::BotConfig, elogin_method::ELoginMethod},
+    utils,
+};
 
 #[derive(Default)]
 pub struct AddBotDialog {

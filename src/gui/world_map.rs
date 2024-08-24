@@ -1,4 +1,11 @@
-use crate::{bot::warp, manager::Manager, types::config::BotConfig, utils, Bot};
+use std::thread;
+
+use crate::{
+    bot::{self, warp},
+    manager::Manager,
+    types::config::BotConfig,
+    utils, Bot,
+};
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 
 #[derive(Default)]
@@ -106,6 +113,35 @@ impl WorldMap {
                         }
                     }
                 }
+
+                egui::Window::new("Movement").show(ui.ctx(), |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Up").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot::walk(&bot_clone, 0, -1, false);
+                            });
+                        }
+                        if ui.button("Down").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot::walk(&bot_clone, 0, 1, false);
+                            });
+                        }
+                        if ui.button("Left").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot::walk(&bot_clone, -1, 0, false);
+                            });
+                        }
+                        if ui.button("Right").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot::walk(&bot_clone, 1, 0, false);
+                            });
+                        }
+                    });
+                });
             }
         }
     }
