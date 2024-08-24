@@ -79,9 +79,12 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 ETankPacketType::NetGamePacketPingRequest => {
                     let packet = TankPacket {
                         _type: ETankPacketType::NetGamePacketPingReply,
+                        net_id: 0,
+                        unk2: 0,
                         vector_x: 64.0,
                         vector_y: 64.0,
-                        value: tank_packet.value + 5000,
+                        vector_x2: 1000.0,
+                        vector_y2: 250.0,
                         ..Default::default()
                     };
 

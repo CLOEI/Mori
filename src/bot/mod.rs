@@ -554,9 +554,7 @@ pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
     let enet_packet = Packet::new(enet_packet_data, PacketMode::ReliableSequenced)
         .expect("Failed to create ENet packet");
     let peer_id = bot.peer_id.read().unwrap().clone();
-    info!("Getting host lock");
     let mut host = bot.host.lock();
-    info!("Got host lock");
     let peer = host.peer_mut(peer_id).unwrap();
     peer.send_packet(enet_packet, 0)
         .expect("Failed to send raw packet");
@@ -697,8 +695,13 @@ pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
     if let Some(paths) = paths {
         for i in 0..paths.len() {
             let node = &paths[i];
+            {
+                let mut position = bot.position.write();
+                position.x = node.x as f32 * 32.0;
+                position.y = node.y as f32 * 32.0;
+            }
             walk(bot, node.x as i32, node.y as i32, true);
-            thread::sleep(Duration::from_millis(30));
+            thread::sleep(Duration::from_millis(20));
         }
     }
 }
