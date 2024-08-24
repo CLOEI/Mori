@@ -7,7 +7,7 @@ mod variant_handler;
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
 use enet::{
-    Address, BandwidthLimit, ChannelLimit, Enet, EventKind, Host, Packet, PacketMode, Peer, PeerID,
+    Address, BandwidthLimit, ChannelLimit, Enet, EventKind, Host, Packet, PacketMode, PeerID,
 };
 use gtitem_r::structs::ItemDatabase;
 use inventory::Inventory;

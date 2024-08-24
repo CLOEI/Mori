@@ -1,6 +1,6 @@
 use super::vector::Vector2;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Player {
     pub _type: String,
     pub avatar: String,

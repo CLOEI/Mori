@@ -35,7 +35,7 @@ impl Navbar {
                 ))
                 .clicked()
             {
-                self.current_menu = "world".to_string();
+                self.current_menu = "world_map".to_string();
             }
             if ui
                 .add(egui::Button::image_and_text(

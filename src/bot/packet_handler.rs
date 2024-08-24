@@ -115,7 +115,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         .world
                         .write()
                         .unwrap()
-                        .get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32)
+                        .get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32)
                     {
                         if tank_packet.value == 18 {
                             if tile.foreground_item_id != 0 {

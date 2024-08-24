@@ -7,6 +7,7 @@ use bot::Bot;
 use eframe::egui::ViewportBuilder;
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
+    world_map::WorldMap,
 };
 use manager::Manager;
 use types::config::{BotConfig, Config};
@@ -55,6 +56,7 @@ struct App {
     add_bot_dialog: AddBotDialog,
     manager: Manager,
     bot_menu: BotMenu,
+    world_map: WorldMap,
 }
 
 impl App {
@@ -71,6 +73,7 @@ impl App {
             add_bot_dialog: Default::default(),
             manager: manager,
             bot_menu: Default::default(),
+            world_map: Default::default(),
         }
     }
 }
@@ -79,13 +82,17 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         ctx.request_repaint();
         egui_extras::install_image_loaders(ctx);
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.navbar.render(ui, &mut self.add_bot_dialog);
-            ui.separator();
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
             if self.navbar.current_menu == "bots" {
                 self.bot_menu.render(ui, &self.manager);
             } else if self.navbar.current_menu == "item_database" {
                 self.item_database.render(ui, &mut self.manager, ctx);
+            } else if self.navbar.current_menu == "world_map" {
+                self.world_map.render(ui, &self.manager);
             } else {
                 ui.label("Not implemented yet");
             }
