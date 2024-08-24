@@ -54,7 +54,7 @@ impl Manager {
 
     pub fn get_bot(&self, username: &str) -> Option<&Arc<Bot>> {
         for (bot, _) in &self.bots {
-            if bot.info.read().unwrap().username == username {
+            if bot.info.read().username == username {
                 return Some(bot);
             }
         }

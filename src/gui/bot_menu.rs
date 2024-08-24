@@ -52,8 +52,8 @@ impl BotMenu {
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
                                             let (username, status, ping, world_name, timeout) = {
-                                                let info = bot.info.read().unwrap();
-                                                let world = bot.world.read().unwrap();
+                                                let info = bot.info.read();
+                                                let world = bot.world.read();
                                                 (
                                                     info.login_info.tank_id_name.clone(),
                                                     info.status.clone(),
@@ -131,7 +131,7 @@ impl BotMenu {
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
                                             let (ip, port) = {
-                                                let server = bot.server.read().unwrap();
+                                                let server = bot.server.read();
                                                 (server.ip.clone(), server.port.clone().to_string())
                                             };
                                             ui.label("IP");
@@ -167,7 +167,7 @@ impl BotMenu {
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
                                             let (username, password, code, method) = {
-                                                let info = bot.info.read().unwrap();
+                                                let info = bot.info.read();
                                                 (
                                                     info.username.clone(),
                                                     info.password.clone(),
@@ -214,11 +214,10 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
-                                            let net_id = bot.state.read().unwrap().net_id.clone();
-                                            let token = bot.info.read().unwrap().token.clone();
-                                            let is_banned =
-                                                bot.state.read().unwrap().is_banned.clone();
-                                            let position = bot.position.read().unwrap().clone();
+                                            let net_id = bot.state.read().net_id.clone();
+                                            let token = bot.info.read().token.clone();
+                                            let is_banned = bot.state.read().is_banned.clone();
+                                            let position = bot.position.read().clone();
                                             ui.label("NetID");
                                             ui.label(net_id.to_string());
                                             ui.end_row();

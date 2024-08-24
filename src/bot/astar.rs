@@ -47,7 +47,7 @@ impl AStar {
     }
 
     pub fn update(&mut self, bot: &Arc<Bot>) {
-        let world = bot.world.read().unwrap();
+        let world = bot.world.read();
         self.width = world.width;
         self.height = world.height;
         for i in 0..world.tiles.len() {

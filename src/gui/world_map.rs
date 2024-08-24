@@ -30,7 +30,7 @@ impl WorldMap {
                 let rect = Rect::from_min_max(min, max);
                 draw_list.rect_filled(rect, 0.0, Color32::WHITE);
 
-                let world = bot.world.read().unwrap();
+                let world = bot.world.read();
                 let cell_width = size.x / world.width as f32;
                 let cell_height = size.y / world.height as f32;
 
@@ -72,7 +72,7 @@ impl WorldMap {
                             Color32::from_rgba_unmultiplied(r, g, b, a),
                         );
 
-                        for player in bot.players.read().unwrap().clone() {
+                        for player in bot.players.read().clone() {
                             if player.position.x / 32.0 == (x as f32)
                                 && player.position.y / 32.0 == (y as f32)
                             {
@@ -84,7 +84,7 @@ impl WorldMap {
                             }
                         }
 
-                        let bot_position = bot.position.read().unwrap();
+                        let bot_position = bot.position.read();
                         if bot_position.x / 32.0 == (x as f32)
                             && bot_position.y / 32.0 == (y as f32)
                         {

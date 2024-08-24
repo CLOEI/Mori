@@ -24,9 +24,9 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let server_data = variant.get(4).unwrap().as_string();
             let parsed_server_data = textparse::parse_and_store_as_vec(&server_data);
 
-            let mut state = bot.state.write().unwrap();
-            let mut server = bot.server.write().unwrap();
-            let mut info = bot.info.write().unwrap();
+            let mut state = bot.state.write();
+            let mut server = bot.server.write();
+            let mut info = bot.info.write();
 
             state.is_redirecting = true;
             server.ip = parsed_server_data.get(0).unwrap().to_string();
@@ -43,7 +43,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 EPacketType::NetMessageGenericText,
                 "action|enter_game\n".to_string(),
             );
-            bot.state.write().unwrap().is_redirecting = false;
+            bot.state.write().is_redirecting = false;
         }
         "OnCountryState" => {}
         "OnDialogRequest" => {
@@ -58,7 +58,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnSetBux" => {
             let bux = variant.get(1).unwrap().as_int32();
-            bot.state.write().unwrap().gems = bux;
+            bot.state.write().gems = bux;
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
@@ -67,13 +67,13 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
             info!("Received position: {:?}", pos);
-            let mut position = bot.position.write().unwrap();
+            let mut position = bot.position.write();
             position.x = pos.0;
             position.y = pos.1;
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();
-            let mut info = bot.info.write().unwrap();
+            let mut info = bot.info.write();
             info.login_info.tank_id_name = growid;
             utils::config::save_token_to_bot(
                 info.username.clone(),
@@ -88,7 +88,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let data = utils::textparse::parse_and_store_as_map(&message);
             if data.contains_key("type") {
                 if data.get("type").unwrap() == "local" {
-                    let mut state = bot.state.write().unwrap();
+                    let mut state = bot.state.write();
                     state.is_ingame = true;
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
                     return;
@@ -146,7 +146,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                         }
                     },
                 };
-                let mut players = bot.players.write().unwrap();
+                let mut players = bot.players.write();
                 players.push(player);
             }
         }
@@ -155,7 +155,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let data = utils::textparse::parse_and_store_as_map(&message);
             let net_id: u32 = data.get("netID").unwrap().parse().unwrap();
 
-            let mut players = bot.players.write().unwrap();
+            let mut players = bot.players.write();
             players.retain(|player| player.net_id != net_id);
         }
         "OnTalkBubble" => {
@@ -164,8 +164,8 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnClearTutorialArrow" => {}
         "OnRequestWorldSelectMenu" => {
-            bot.world.write().unwrap().reset();
-            bot.players.write().unwrap().clear();
+            bot.world.write().reset();
+            bot.players.write().clear();
         }
         _ => {}
     }
