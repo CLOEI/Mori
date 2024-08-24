@@ -1,5 +1,5 @@
 use std::thread;
-
+use std::time::Duration;
 use crate::{
     bot::{self, warp},
     manager::Manager,
@@ -8,6 +8,7 @@ use crate::{
 };
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use paris::info;
+use crate::types::epacket_type::EPacketType;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -148,11 +149,8 @@ impl WorldMap {
                                 bot::walk(&bot_clone, 1, 0, false);
                             });
                         }
-                        if ui.button("Place").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot::place(&bot_clone, 0, -1, 9640);
-                            });
+                        if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
+
                         }
                     });
                 });

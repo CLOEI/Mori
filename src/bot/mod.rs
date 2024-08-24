@@ -3,7 +3,7 @@ mod inventory;
 mod login;
 mod packet_handler;
 mod variant_handler;
-mod features;
+pub mod features;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
@@ -36,6 +36,7 @@ use crate::{
         random::{self},
     },
 };
+use crate::types::bot_info::FTUE;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -51,6 +52,7 @@ pub struct Bot {
     pub inventory: Arc<RwLock<Inventory>>,
     pub players: Arc<RwLock<Vec<Player>>>,
     pub astar: Arc<Mutex<AStar>>,
+    pub ftue: Arc<RwLock<FTUE>>,
     pub item_database: Arc<ItemDatabase>,
 }
 
@@ -92,6 +94,7 @@ impl Bot {
             inventory: Arc::new(RwLock::new(Inventory::new())),
             players: Arc::new(RwLock::new(Vec::new())),
             astar: Arc::new(Mutex::new(AStar::new(item_database.clone()))),
+            ftue: Arc::new(RwLock::new(FTUE::default())),
             item_database,
         }
     }

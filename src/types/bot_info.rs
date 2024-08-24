@@ -34,3 +34,10 @@ pub struct Server {
     pub ip: String,
     pub port: u16,
 }
+
+#[derive(Debug, Default)]
+pub struct FTUE { // First Time User Experience
+    pub current_progress: i32,
+    pub total_progress: i32,
+    pub info: String,
+}

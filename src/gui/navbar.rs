@@ -39,6 +39,15 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::image_and_text(
+                    include_image!("../../assets/backpack.png"),
+                    "Inventory",
+                ))
+                .clicked()
+            {
+                self.current_menu = "inventory".to_string();
+            }
+            if ui
+                .add(egui::Button::image_and_text(
                     include_image!("../../assets/database.png"),
                     "Item database",
                 ))

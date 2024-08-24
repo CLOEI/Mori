@@ -91,6 +91,11 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 "Received FTUE button data set: {} {} {} {}",
                 unknown_1, current_progress, total_progress, info
             );
+
+            let mut ftue = bot.ftue.write();
+            ftue.current_progress = current_progress;
+            ftue.total_progress = total_progress;
+            ftue.info = info;
         }
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
