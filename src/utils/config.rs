@@ -1,14 +1,16 @@
 use std::{
     fs::{self, File},
-    io::Write,
+    io::{Read, Write},
 };
 
 use crate::types::config::{BotConfig, Config};
 
 pub fn parse_config() -> Result<Config, ()> {
     if fs::metadata("config.json").is_ok() {
-        let f = File::open("config.json").unwrap();
-        let j: Config = serde_json::from_reader(f).unwrap();
+        let mut f = File::open("config.json").unwrap();
+        let mut contents = String::new();
+        f.read_to_string(&mut contents).unwrap();
+        let j: Config = serde_json::from_str(&contents).unwrap();
         return Ok(j);
     }
     Err(())

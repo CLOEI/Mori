@@ -59,7 +59,7 @@ impl BotMenu {
                                                     info.status.clone(),
                                                     info.ping.clone().to_string(),
                                                     world.name.clone(),
-                                                    info.timeout,
+                                                    info.timeout.clone(),
                                                 )
                                             };
                                             ui.label("GrowID");

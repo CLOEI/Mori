@@ -101,6 +101,7 @@ impl Bot {
 }
 
 pub fn logon(bot: &Arc<Bot>, data: String) {
+    set_status(bot, "Logging in...");
     if data.is_empty() {
         spoof(&bot);
     } else {
@@ -111,26 +112,33 @@ pub fn logon(bot: &Arc<Bot>, data: String) {
     process_events(&bot);
 }
 
+pub fn set_status(bot: &Arc<Bot>, message: &str) {
+    bot.info.write().unwrap().status = message.to_string();
+}
+
 pub fn reconnect(bot: &Arc<Bot>) {
+    set_status(bot, "Reconnecting...");
     to_http(bot);
 
-    let meta = bot
-        .info
-        .read()
-        .unwrap()
-        .server_data
-        .get("meta")
-        .unwrap()
-        .clone();
+    let (meta, login_method, oauth_links_empty) = {
+        let info = bot.info.read().unwrap();
+        (
+            info.server_data.get("meta").unwrap().clone(),
+            info.login_method.clone(),
+            info.oauth_links.is_empty(),
+        )
+    };
 
-    bot.info.write().unwrap().login_info.meta = meta;
-
-    if bot.info.read().unwrap().login_method != ELoginMethod::UBISOFT
-        && bot.info.read().unwrap().oauth_links.is_empty()
     {
+        let mut info = bot.info.write().unwrap();
+        info.login_info.meta = meta;
+    }
+
+    if login_method != ELoginMethod::UBISOFT && oauth_links_empty {
         match get_oauth_links(&bot) {
             Ok(links) => {
-                bot.info.write().unwrap().oauth_links = links;
+                let mut info = bot.info.write().unwrap();
+                info.oauth_links = links;
                 info!("Successfully got OAuth links for: apple, google and legacy");
             }
             Err(err) => {
@@ -141,17 +149,20 @@ pub fn reconnect(bot: &Arc<Bot>) {
     }
 
     get_token(bot);
-    {
+
+    let (server, port) = {
         let info = bot.info.read().unwrap();
-        connect_to_server(
-            bot,
+        (
             info.server_data["server"].clone(),
             info.server_data["port"].clone(),
-        );
-    }
+        )
+    };
+
+    connect_to_server(bot, server, port);
 }
 
 fn update_login_info(bot: &Arc<Bot>, data: String) {
+    set_status(bot, "Updating login info");
     let mut info = bot.info.write().unwrap();
     let parsed_data = utils::textparse::parse_and_store_as_map(&data);
     for (key, value) in parsed_data {
@@ -192,6 +203,7 @@ fn update_login_info(bot: &Arc<Bot>, data: String) {
 
 fn token_still_valid(bot: &Arc<Bot>) -> bool {
     info!("Checking if token is still valid");
+    set_status(bot, "Checking refresh token");
 
     let (token, login_info);
     {
@@ -246,6 +258,7 @@ pub fn poll(bot: &Arc<Bot>) {
         }
         drop(state);
         collect(&bot_clone);
+        set_ping(&bot_clone);
         thread::sleep(Duration::from_millis(20));
     });
 }
@@ -267,6 +280,7 @@ pub fn get_token(bot: &Arc<Bot>) {
     }
 
     info!("Getting token for bot");
+    set_status(bot, "Getting token");
     let (username, password, recovery_code, method, oauth_links) = {
         let info = bot.info.read().unwrap();
         (
@@ -317,6 +331,8 @@ pub fn get_token(bot: &Arc<Bot>) {
 }
 
 pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
+    info!("Getting OAuth links");
+    set_status(bot, "Getting OAuth links");
     loop {
         let res = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
             .set("User-Agent", USER_AGENT)
@@ -351,6 +367,7 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
 
 pub fn spoof(bot: &Arc<Bot>) {
     info!("Spoofing bot data");
+    set_status(bot, "Spoofing bot data");
     let mut info = bot.info.write().unwrap();
     info.login_info.klv = proton::generate_klv(
         &info.login_info.protocol,
@@ -365,6 +382,7 @@ pub fn spoof(bot: &Arc<Bot>) {
 
 pub fn to_http(bot: &Arc<Bot>) {
     info!("Fetching server data");
+    set_status(bot, "Fetching server data");
     loop {
         let req = ureq::post("https://www.growtopia1.com/growtopia/server_data.php").set(
             "User-Agent",
@@ -394,6 +412,7 @@ pub fn to_http(bot: &Arc<Bot>) {
 
 pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
     info!("Parsing server data");
+    set_status(bot, "Parsing server data");
     bot.info.write().unwrap().server_data = data
         .lines()
         .filter_map(|line| {
@@ -408,6 +427,7 @@ pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
 
 fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
     info!("Connecting to the server {}:{}", ip, port);
+    set_status(bot, "Connecting to the server");
     let mut host = bot.host.lock().unwrap();
     host.connect(
         &Address::new(ip.parse().unwrap(), port.parse().unwrap()),
@@ -415,6 +435,20 @@ fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
         0,
     )
     .expect("Failed to connect to the server");
+}
+
+pub fn set_ping(bot: &Arc<Bot>) {
+    if let Ok(mut host) = bot.host.try_lock() {
+        if let Ok(peer_id) = bot.peer_id.try_read() {
+            if let Some(peer_id) = *peer_id {
+                if let Some(peer) = host.peer_mut(peer_id) {
+                    if let Ok(mut info) = bot.info.try_write() {
+                        info.ping = peer.mean_rtt().as_millis() as u32;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn process_events(bot: &Arc<Bot>) {
@@ -469,9 +503,11 @@ fn process_events(bot: &Arc<Bot>) {
                 match event_kind {
                     EventKind::Connect => {
                         info!("Connected to the server");
+                        set_status(bot, "Connected");
                     }
                     EventKind::Disconnect { .. } => {
                         warn!("Disconnected from the server");
+                        set_status(bot, "Disconnected");
                         break;
                     }
                     EventKind::Receive { packet, .. } => {
@@ -576,7 +612,7 @@ pub fn collect(bot: &Arc<Bot>) {
     }
 }
 
-fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
+pub fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
     let mut pkt = TankPacket::default();
     pkt._type = ETankPacketType::NetGamePacketTileChangeRequest;
     let base_x;
