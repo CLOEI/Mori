@@ -11,6 +11,7 @@ use gui::{
 };
 use manager::Manager;
 use types::config::{BotConfig, Config};
+use crate::gui::inventory::Inventory;
 
 mod bot;
 mod gui;
@@ -57,6 +58,7 @@ struct App {
     manager: Manager,
     bot_menu: BotMenu,
     world_map: WorldMap,
+    inventory: Inventory,
 }
 
 impl App {
@@ -74,6 +76,7 @@ impl App {
             manager: manager,
             bot_menu: Default::default(),
             world_map: Default::default(),
+            inventory: Default::default(),
         }
     }
 }
@@ -89,6 +92,8 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.navbar.current_menu == "bots" {
                 self.bot_menu.render(ui, &self.manager);
+            } else if self.navbar.current_menu == "inventory" {
+                self.inventory.render(ui, &mut self.manager, ctx);
             } else if self.navbar.current_menu == "item_database" {
                 self.item_database.render(ui, &mut self.manager, ctx);
             } else if self.navbar.current_menu == "world_map" {

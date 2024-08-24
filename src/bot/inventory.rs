@@ -2,14 +2,14 @@ use std::io::Cursor;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Inventory {
     pub size: u32,
     pub item_count: u16,
     pub items: Vec<InventoryItem>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InventoryItem {
     pub id: u16,
     pub amount: u16,
