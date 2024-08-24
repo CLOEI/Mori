@@ -73,3 +73,16 @@ pub fn get_findpath_delay() -> u32 {
     let config = parse_config().unwrap();
     config.findpath_delay
 }
+
+pub fn get_selected_bot() -> String {
+    let config = parse_config().unwrap();
+    config.selected_bot
+}
+
+pub fn set_selected_bot(username: String) {
+    let mut config = parse_config().unwrap();
+    config.selected_bot = username;
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
+}

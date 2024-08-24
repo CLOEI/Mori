@@ -23,7 +23,8 @@ fn init_config() {
         let config = Config {
             bots: Vec::new(),
             timeout: 5,
-            findpath_delay: 5,
+            findpath_delay: 30,
+            selected_bot: "".to_string(),
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
@@ -53,7 +54,6 @@ struct App {
     item_database: ItemDatabase,
     add_bot_dialog: AddBotDialog,
     manager: Manager,
-    bots: Vec<BotConfig>,
     bot_menu: BotMenu,
 }
 
@@ -70,7 +70,6 @@ impl App {
             item_database: Default::default(),
             add_bot_dialog: Default::default(),
             manager: manager,
-            bots: bots,
             bot_menu: Default::default(),
         }
     }
@@ -79,13 +78,12 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         ctx.request_repaint();
-        // self.bots = utils::config::get_bots();
         egui_extras::install_image_loaders(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
             self.navbar.render(ui, &mut self.add_bot_dialog);
             ui.separator();
             if self.navbar.current_menu == "bots" {
-                self.bot_menu.render(ui, &self.bots, &self.manager);
+                self.bot_menu.render(ui, &self.manager);
             } else if self.navbar.current_menu == "item_database" {
                 self.item_database.render(ui, &mut self.manager, ctx);
             } else {

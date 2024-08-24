@@ -7,6 +7,7 @@ pub struct Config {
     pub bots: Vec<BotConfig>,
     pub timeout: u32,
     pub findpath_delay: u32,
+    pub selected_bot: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

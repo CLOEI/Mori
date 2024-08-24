@@ -2,16 +2,19 @@ use std::thread;
 
 use eframe::egui::{self, Ui};
 
-use crate::{bot::warp, manager::Manager, types::config::BotConfig, Bot};
+use crate::{bot::warp, manager::Manager, types::config::BotConfig, utils, Bot};
 
 #[derive(Default)]
 pub struct BotMenu {
     pub selected_bot: String,
     pub warp_name: String,
+    pub bots: Vec<BotConfig>,
 }
 
 impl BotMenu {
-    pub fn render(&mut self, ui: &mut Ui, bots: &Vec<BotConfig>, manager: &Manager) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Manager) {
+        self.bots = utils::config::get_bots();
+        self.selected_bot = utils::config::get_selected_bot();
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 egui::Grid::new("bots_grid")
@@ -20,12 +23,13 @@ impl BotMenu {
                     .show(ui, |ui| {
                         ui.label("Bots");
                         ui.end_row();
-                        for bot in bots {
+                        for bot in self.bots.clone() {
                             if ui
                                 .add(egui::Button::new(bot.username.clone()).truncate())
                                 .clicked()
                             {
                                 self.selected_bot = bot.username.clone();
+                                utils::config::set_selected_bot(self.selected_bot.clone());
                             }
                             ui.end_row();
                         }
