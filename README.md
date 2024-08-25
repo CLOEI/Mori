@@ -13,3 +13,6 @@ There are many Growtopia companion tools available, but almost all of them are W
 Star this project if you're interested in its journey!
 <br/>
 Any contribution would help alot.
+
+## Note
+This is for educational purposes only. I am not responsible for any misuse of this tool. You also not allowed to sell or re-upload this tool as your own without my permission. use it at your own risk.

@@ -1,14 +1,12 @@
 use std::thread;
-use std::time::Duration;
 use crate::{
-    bot::{self, warp},
+    bot::{self},
     manager::Manager,
     types::config::BotConfig,
-    utils, Bot,
+    utils,
 };
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use paris::info;
-use crate::types::epacket_type::EPacketType;
 
 #[derive(Default)]
 pub struct WorldMap {

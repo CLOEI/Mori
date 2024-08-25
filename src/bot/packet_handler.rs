@@ -105,7 +105,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         for i in 0..inventory.items.len() {
                             if inventory.items[i].id == tank_packet.value as u16 {
                                 inventory.items[i].amount -= 1;
-                                if inventory.items[i].amount > 200 {
+                                if inventory.items[i].amount == 0 || inventory.items[i].amount > 200 {
                                     inventory.items.remove(i);
                                 }
                                 break;
@@ -165,15 +165,16 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             }
                         }
                     } else if tank_packet.net_id > 0 {
-                        for i in 0..world.dropped.items.len() {
-                            let obj = &world.dropped.items[i];
+                        let mut remove_index = None;
+                        for (i, obj) in world.dropped.items.iter().enumerate() {
                             if obj.uid == tank_packet.value {
                                 if tank_packet.net_id == bot.state.read().net_id {
                                     if obj.id == 112 {
                                         bot.state.write().gems += obj.count as i32;
                                     } else {
+                                        let mut inventory = bot.inventory.write();
                                         let mut added = false;
-                                        for item in &mut bot.inventory.write().items {
+                                        for item in &mut inventory.items {
                                             if item.id == obj.id {
                                                 let temp = item.amount + obj.count as u16;
                                                 item.amount = if temp > 200 { 200 } else { temp };
@@ -186,14 +187,17 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                                 id: obj.id,
                                                 amount: obj.count as u16,
                                             };
-                                            bot.inventory.write().items.push(item);
+                                            inventory.items.push(item);
                                         }
                                     }
                                 }
-                                world.dropped.items.remove(i);
-                                world.dropped.items_count -= 1;
+                                remove_index = Some(i);
                                 break;
                             }
+                        }
+                        if let Some(i) = remove_index {
+                            world.dropped.items.remove(i);
+                            world.dropped.items_count -= 1;
                         }
                     }
                 }
@@ -203,6 +207,10 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 error!("Failed to deserialize TankPacket: {:?}", data[0]);
             }
         },
+        EPacketType::NetMessageClientLogRequest => {
+            let message = String::from_utf8_lossy(&data);
+            info!("Message: {}", message);
+        }
         _ => (),
     }
 }

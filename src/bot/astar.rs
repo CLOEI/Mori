@@ -46,7 +46,14 @@ impl AStar {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.width = 0;
+        self.height = 0;
+        self.grid.clear();
+    }
+
     pub fn update(&mut self, bot: &Arc<Bot>) {
+        self.reset();
         let world = bot.world.read();
         self.width = world.width;
         self.height = world.height;
