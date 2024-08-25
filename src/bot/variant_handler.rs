@@ -45,7 +45,18 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             );
             bot.state.write().is_redirecting = false;
         }
-        "OnCountryState" => {}
+        "OnCountryState" => {
+            send_packet(
+                bot,
+                EPacketType::NetMessageGenericText,
+                "action|getDRAnimations\n".to_string(),
+            );
+            send_packet(
+                bot,
+                EPacketType::NetMessageGenericText,
+                "action|getDRAnimations\n".to_string(),
+            );
+        }
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
             if message.contains("Gazette") {

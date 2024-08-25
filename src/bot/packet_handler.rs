@@ -100,10 +100,9 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     bot.astar.lock().update(bot);
                 }
                 ETankPacketType::NetGamePacketTileChangeRequest => {
-                    info!("TileChangeRequest: {:?}", tank_packet);
                     if tank_packet.net_id == bot.state.read().net_id && tank_packet.value != 18 {
-                        for i in 0..bot.inventory.read().items.len() {
-                            let mut inventory = bot.inventory.write();
+                        let mut inventory = bot.inventory.write();
+                        for i in 0..inventory.items.len() {
                             if inventory.items[i].id == tank_packet.value as u16 {
                                 inventory.items[i].amount -= 1;
                                 if inventory.items[i].amount > 200 {
@@ -114,11 +113,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         }
                     }
 
-                    if let Some(tile) = bot
-                        .world
-                        .write()
-                        .get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32)
-                    {
+                    let mut world = bot.world.write();
+                    if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
                         if tank_packet.value == 18 {
                             if tile.foreground_item_id != 0 {
                                 tile.foreground_item_id = 0;
@@ -133,6 +129,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                 {
                                     tile.background_item_id = tank_packet.value as u16;
                                 } else {
+                                    info!("TileChangeRequest: {:?}", tank_packet);
                                     tile.foreground_item_id = tank_packet.value as u16;
                                 }
                             }
