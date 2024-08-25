@@ -150,7 +150,10 @@ impl WorldMap {
                             });
                         }
                         if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
-
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot::place(&bot_clone, 0, -1, 2);
+                            });
                         }
                     });
                 });

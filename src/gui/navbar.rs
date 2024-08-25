@@ -1,5 +1,5 @@
 use eframe::egui::{self, include_image, Ui};
-
+use crate::utils;
 use super::add_bot_dialog::AddBotDialog;
 
 pub struct Navbar {
@@ -15,7 +15,7 @@ impl Default for Navbar {
 }
 
 impl Navbar {
-    pub fn render(&mut self, ui: &mut egui::Ui, add_bot_dialog: &mut AddBotDialog) {
+    pub fn render(&mut self, ui: &mut egui::Ui, add_bot_dialog: &mut AddBotDialog, manager: &mut crate::manager::Manager) {
         ui.horizontal(|ui| {
             ui.heading("Mori");
             ui.separator();
@@ -82,6 +82,16 @@ impl Navbar {
                 .clicked()
             {
                 add_bot_dialog.open = true;
+            }
+            if ui
+                .add(egui::Button::image_and_text(
+                    include_image!("../../assets/minus.png"),
+                    "Remove bot",
+                ))
+                .clicked()
+            {
+                let selected_bot = utils::config::get_selected_bot();
+                manager.remove_bot(&selected_bot);
             }
         });
     }

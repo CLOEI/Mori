@@ -4,7 +4,9 @@ use enet::Enet;
 use gtitem_r::structs::ItemDatabase;
 use paris::{error, info};
 use std::sync::Arc;
+use std::thread;
 use std::thread::{spawn, JoinHandle};
+use crate::utils;
 
 pub struct Manager {
     pub bots: Vec<(Arc<Bot>, JoinHandle<()>)>,
@@ -50,7 +52,25 @@ impl Manager {
         self.bots.push((new_bot, handle));
     }
 
-    pub fn remove_bot(&mut self, username: &str) {}
+    pub fn remove_bot(&mut self, username: &str) {
+        let bot = self.get_bot(username);
+        if let Some(bot) = bot {
+            let bot_clone = Arc::clone(bot);
+            thread::spawn(move || {
+                let is_running = {
+                    let state = bot_clone.state.read();
+                    state.is_running
+                };
+
+                if is_running {
+                    bot_clone.state.write().is_running = false;
+                    bot::disconnect(&bot_clone);
+                }
+            });
+            self.bots.retain(|(b, _)| b.info.read().username != username);
+            utils::config::remove_bot(username.to_string());
+        }
+    }
 
     pub fn get_bot(&self, username: &str) -> Option<&Arc<Bot>> {
         for (bot, _) in &self.bots {

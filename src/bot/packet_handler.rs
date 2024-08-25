@@ -100,6 +100,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     bot.astar.lock().update(bot);
                 }
                 ETankPacketType::NetGamePacketTileChangeRequest => {
+                    info!("TileChangeRequest: {:?}", tank_packet);
                     if tank_packet.net_id == bot.state.read().net_id && tank_packet.value != 18 {
                         for i in 0..bot.inventory.read().items.len() {
                             let mut inventory = bot.inventory.write();

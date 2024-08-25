@@ -86,7 +86,7 @@ impl eframe::App for App {
         ctx.request_repaint();
         egui_extras::install_image_loaders(ctx);
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            self.navbar.render(ui, &mut self.add_bot_dialog);
+            self.navbar.render(ui, &mut self.add_bot_dialog, &mut self.manager);
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
