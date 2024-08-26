@@ -1,10 +1,15 @@
 use std::{fs, sync::Arc};
 
 use paris::{error, info, warn};
+use regex::Regex;
 
-use crate::{bot, bot::{variant_handler}, types::{
-    epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
-}};
+use crate::{
+    bot::{self, variant_handler},
+    types::{
+        epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
+    },
+    utils,
+};
 
 use super::{inventory::InventoryItem, send_packet_raw, Bot};
 
@@ -57,9 +62,18 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 bot.state.write().is_banned = true;
                 bot::disconnect(bot);
             }
-            if message.contains(" Growtopia is not quite ready for users") {
+            if message.contains("Growtopia is not quite ready for users") {
                 bot.info.write().timeout = 60;
                 bot::sleep(bot);
+            }
+            if message.contains("UPDATE REQUIRED") {
+                let re = Regex::new(r"\$V(\d+\.\d+)").unwrap();
+                if let Some(caps) = re.captures(&message) {
+                    let version = caps.get(1).unwrap().as_str();
+                    warn!("Update required: {}, updating...", version);
+                    bot.info.write().login_info.game_version = version.to_string();
+                    utils::config::set_game_version(version.to_string());
+                }
             }
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
@@ -105,7 +119,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         for i in 0..inventory.items.len() {
                             if inventory.items[i].id == tank_packet.value as u16 {
                                 inventory.items[i].amount -= 1;
-                                if inventory.items[i].amount == 0 || inventory.items[i].amount > 200 {
+                                if inventory.items[i].amount == 0 || inventory.items[i].amount > 200
+                                {
                                     inventory.items.remove(i);
                                 }
                                 break;
@@ -114,7 +129,9 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     }
 
                     let mut world = bot.world.write();
-                    if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+                    if let Some(tile) =
+                        world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32)
+                    {
                         if tank_packet.value == 18 {
                             if tile.foreground_item_id != 0 {
                                 tile.foreground_item_id = 0;

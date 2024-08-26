@@ -8,6 +8,7 @@ pub struct Config {
     pub timeout: u32,
     pub findpath_delay: u32,
     pub selected_bot: String,
+    pub game_version: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -3,6 +3,7 @@ use std::{
     io::Write,
 };
 
+use crate::gui::inventory::Inventory;
 use bot::Bot;
 use eframe::egui::ViewportBuilder;
 use gui::{
@@ -11,7 +12,6 @@ use gui::{
 };
 use manager::Manager;
 use types::config::{BotConfig, Config};
-use crate::gui::inventory::Inventory;
 
 mod bot;
 mod gui;
@@ -27,6 +27,7 @@ fn init_config() {
             timeout: 5,
             findpath_delay: 30,
             selected_bot: "".to_string(),
+            game_version: "4.64".to_string(),
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
@@ -86,7 +87,8 @@ impl eframe::App for App {
         ctx.request_repaint();
         egui_extras::install_image_loaders(ctx);
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            self.navbar.render(ui, &mut self.add_bot_dialog, &mut self.manager);
+            self.navbar
+                .render(ui, &mut self.add_bot_dialog, &mut self.manager);
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
