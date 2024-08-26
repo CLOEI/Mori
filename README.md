@@ -21,6 +21,7 @@ Any contribution would help alot.
 - [x] Auto update following the game client
 - [x] Adding multi bot
 - [x] Item database
+- [x] Inventory (There's a bug, item count is not accurate)
 - [x] World map preview
 - [x] Bot movement + findpath
 - [x] Drop, trash item
@@ -29,6 +30,7 @@ Any contribution would help alot.
 - [x] Auto collect item
 - [x] Auto Reconnect
 - [x] Google login ( Currently using API [growtopia-token](https://github.com/CLOEI/growtopia-token))
+- [x] Session refresh
 - [x] Legacy login
 - [ ] Apple login 
 - [ ] Ubisoft-steam login

@@ -11,7 +11,10 @@ use gui::{
     world_map::WorldMap,
 };
 use manager::Manager;
-use types::config::{BotConfig, Config};
+use types::{
+    config::{BotConfig, Config},
+    tank_packet::TankPacket,
+};
 
 mod bot;
 mod gui;
@@ -46,7 +49,8 @@ fn main() {
                     .expect("Failed to load icon"),
             )
             .with_inner_size([800.0, 400.0])
-            .with_resizable(false),
+            .with_resizable(false)
+            .with_fullscreen(false),
         ..Default::default()
     };
     let _ = eframe::run_native("Mori", options, Box::new(|cc| Ok(Box::new(App::new(cc)))));

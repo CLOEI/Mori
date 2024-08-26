@@ -215,38 +215,42 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
         login_info = info.login_info.to_string();
     }
 
-    let response = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
+    loop {
+        let response = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
         .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
         .send_form(&[("refreshToken", token.as_str()), ("clientData", login_info.as_str())]);
 
-    match response {
-        Ok(res) => {
-            if res.status() != 200 {
-                error!("Failed to refresh token");
+        match response {
+            Ok(res) => {
+                if res.status() != 200 {
+                    error!("Failed to refresh token, retrying...");
+                    continue;
+                }
+
+                let response_text = res.into_string().unwrap_or_default();
+                let json_response: serde_json::Value =
+                    serde_json::from_str(&response_text).unwrap();
+
+                if json_response["status"] == "success" {
+                    let token = json_response["token"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string();
+                    info!("Token is still valid | new token: {}", token);
+                    let mut info = bot.info.write();
+                    info.token = token;
+                    return true;
+                } else {
+                    error!("Token is invalid");
+                    return false;
+                }
+            }
+            Err(err) => {
+                error!("Request error: {}", err);
                 return false;
             }
-
-            let response_text = res.into_string().unwrap_or_default();
-            let json_response: serde_json::Value = serde_json::from_str(&response_text).unwrap();
-
-            if json_response["status"] == "success" {
-                let token = json_response["token"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_string();
-                info!("Token is still valid | new token: {}", token);
-                let mut info = bot.info.write();
-                info.token = token;
-                return true;
-            }
-        }
-        Err(err) => {
-            error!("Request error: {}", err);
-            return false;
-        }
-    };
-
-    false
+        };
+    }
 }
 
 pub fn poll(bot: &Arc<Bot>) {

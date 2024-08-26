@@ -1,6 +1,7 @@
 use crate::bot;
 use crate::bot::{disconnect, is_inworld, send_packet};
 use crate::types::epacket_type::EPacketType;
+use crate::types::etank_packet_type::ETankPacketType;
 use crate::types::player::Player;
 use crate::types::tank_packet::TankPacket;
 use crate::types::vector::Vector2;
@@ -45,7 +46,23 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             );
             bot.state.write().is_redirecting = false;
         }
-        "OnCountryState" => {}
+        "OnCountryState" => {
+            // currently i don't know what is vector_y2 is calculated.
+            let position = bot.position.read().clone();
+            let mut pkt = TankPacket {
+                _type: ETankPacketType::NetGamePacketState,
+                flags: 4,
+                vector_x: position.x,
+                vector_y: position.y,
+                ..Default::default()
+            };
+            bot::send_packet_raw(bot, &pkt);
+            pkt.flags = 38;
+            bot::send_packet_raw(bot, &pkt);
+            pkt.flags = 34;
+            bot::send_packet_raw(bot, &pkt);
+            bot::send_packet_raw(bot, &pkt);
+        }
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
             if message.contains("Gazette") {

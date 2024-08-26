@@ -25,6 +25,7 @@ impl Inventory {
     }
 
     pub fn parse(&mut self, data: &[u8]) {
+        self.reset();
         let mut data = Cursor::new(data);
         data.set_position(data.position() + 1);
         self.size = data.read_u32::<LittleEndian>().unwrap();
@@ -34,5 +35,11 @@ impl Inventory {
             let amount = data.read_u16::<LittleEndian>().unwrap();
             self.items.push(InventoryItem { id, amount });
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.size = 0;
+        self.item_count = 0;
+        self.items.clear();
     }
 }
