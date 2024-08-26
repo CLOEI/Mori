@@ -1,9 +1,9 @@
 mod astar;
+pub mod features;
 mod inventory;
 mod login;
 mod packet_handler;
 mod variant_handler;
-pub mod features;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
@@ -18,6 +18,7 @@ use std::sync::Arc;
 use std::{collections::HashMap, thread, time::Duration, vec};
 use urlencoding::encode;
 
+use crate::types::bot_info::FTUE;
 use crate::types::{etank_packet_type::ETankPacketType, player::Player};
 use crate::{
     types::{self, tank_packet::TankPacket},
@@ -36,7 +37,6 @@ use crate::{
         random::{self},
     },
 };
-use crate::types::bot_info::FTUE;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -688,13 +688,13 @@ pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
 }
 
 pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
-    let mut astar = bot.astar.lock();
+    let astar = bot.astar.lock();
     let position = {
         let position = bot.position.read();
         position.clone()
     };
     let paths = astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y);
-
+    let delay = utils::config::get_findpath_delay();
     if let Some(paths) = paths {
         for i in 0..paths.len() {
             let node = &paths[i];
@@ -704,7 +704,39 @@ pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
                 position.y = node.y as f32 * 32.0;
             }
             walk(bot, node.x as i32, node.y as i32, true);
-            thread::sleep(Duration::from_millis(20));
+            thread::sleep(Duration::from_millis(delay as u64));
         }
     }
+}
+
+pub fn drop_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
+    send_packet(
+        bot,
+        EPacketType::NetMessageGenericText,
+        format!("action|drop\n|itemID|{}\n", item_id),
+    );
+    send_packet(
+        bot,
+        EPacketType::NetMessageGenericText,
+        format!(
+            "action|dialog_return.dialog_name|drop_item\nitemID|{}|\ncount|{}",
+            item_id, amount
+        ),
+    );
+}
+
+pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
+    send_packet(
+        bot,
+        EPacketType::NetMessageGenericText,
+        format!("action|trash\n|itemID|{}\n", item_id),
+    );
+    send_packet(
+        bot,
+        EPacketType::NetMessageGenericText,
+        format!(
+            "action|dialog_return.dialog_name|trash_item\nitemID|{}|\ncount|{}",
+            item_id, amount
+        ),
+    );
 }

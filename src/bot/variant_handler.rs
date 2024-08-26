@@ -1,5 +1,3 @@
-use paris::info;
-use std::sync::Arc;
 use crate::bot;
 use crate::bot::{disconnect, is_inworld, send_packet};
 use crate::types::epacket_type::EPacketType;
@@ -8,6 +6,8 @@ use crate::types::tank_packet::TankPacket;
 use crate::types::vector::Vector2;
 use crate::utils::variant::VariantList;
 use crate::utils::{self, textparse};
+use paris::info;
+use std::sync::Arc;
 
 use super::Bot;
 
@@ -45,18 +45,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             );
             bot.state.write().is_redirecting = false;
         }
-        "OnCountryState" => {
-            send_packet(
-                bot,
-                EPacketType::NetMessageGenericText,
-                "action|getDRAnimations\n".to_string(),
-            );
-            send_packet(
-                bot,
-                EPacketType::NetMessageGenericText,
-                "action|getDRAnimations\n".to_string(),
-            );
-        }
+        "OnCountryState" => {}
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
             if message.contains("Gazette") {
@@ -116,6 +105,12 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     let mut state = bot.state.write();
                     state.is_ingame = true;
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
+
+                    send_packet(
+                        bot,
+                        EPacketType::NetMessageGenericText,
+                        "action|getDRAnimations\n".to_string(),
+                    );
                     return;
                 }
             } else {

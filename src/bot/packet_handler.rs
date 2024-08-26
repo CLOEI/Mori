@@ -73,6 +73,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     warn!("Update required: {}, updating...", version);
                     bot.info.write().login_info.game_version = version.to_string();
                     utils::config::set_game_version(version.to_string());
+                    let username = bot.info.read().username.clone();
+                    utils::config::save_token_to_bot(username, "".to_string(), "".to_string());
                 }
             }
         }
@@ -112,6 +114,11 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     fs::write("world.dat", &data[56..]).unwrap();
                     bot.world.write().parse(&data[56..]);
                     bot.astar.lock().update(bot);
+                    bot::send_packet(
+                        bot,
+                        EPacketType::NetMessageGenericText,
+                        "action|getDRAnimations\n".to_string(),
+                    );
                 }
                 ETankPacketType::NetGamePacketTileChangeRequest => {
                     if tank_packet.net_id == bot.state.read().net_id && tank_packet.value != 18 {
