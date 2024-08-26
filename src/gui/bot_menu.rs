@@ -1,15 +1,20 @@
+use std::thread;
+
 use eframe::egui::{self, Ui};
 
-use crate::{bot::warp, Bot};
+use crate::{bot::warp, manager::Manager, types::config::BotConfig, utils, Bot};
 
 #[derive(Default)]
 pub struct BotMenu {
     pub selected_bot: String,
     pub warp_name: String,
+    pub bots: Vec<BotConfig>,
 }
 
 impl BotMenu {
-    pub fn render(&mut self, ui: &mut Ui, bots: &Vec<Bot>, manager: &crate::Manager) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Manager) {
+        self.bots = utils::config::get_bots();
+        self.selected_bot = utils::config::get_selected_bot();
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 egui::Grid::new("bots_grid")
@@ -18,12 +23,13 @@ impl BotMenu {
                     .show(ui, |ui| {
                         ui.label("Bots");
                         ui.end_row();
-                        for bot in bots {
+                        for bot in self.bots.clone() {
                             if ui
                                 .add(egui::Button::new(bot.username.clone()).truncate())
                                 .clicked()
                             {
                                 self.selected_bot = bot.username.clone();
+                                utils::config::set_selected_bot(self.selected_bot.clone());
                             }
                             ui.end_row();
                         }
@@ -45,14 +51,20 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
-                                            let (status, ping, world_name) = {
-                                                let bot_mutex = bot.lock().unwrap();
+                                            let (username, status, ping, world_name, timeout) = {
+                                                let info = bot.info.read();
+                                                let world = bot.world.read();
                                                 (
-                                                    bot_mutex.info.status.clone(),
-                                                    bot_mutex.info.ping.clone().to_string(),
-                                                    bot_mutex.world.name.clone(),
+                                                    info.login_info.tank_id_name.clone(),
+                                                    info.status.clone(),
+                                                    info.ping.clone().to_string(),
+                                                    world.name.clone(),
+                                                    info.timeout.clone(),
                                                 )
                                             };
+                                            ui.label("GrowID");
+                                            ui.add(egui::Label::new(username).truncate());
+                                            ui.end_row();
                                             ui.label("Status");
                                             ui.add(egui::Label::new(status).truncate());
                                             ui.end_row();
@@ -62,7 +74,13 @@ impl BotMenu {
                                             ui.label("World");
                                             ui.label(world_name);
                                             ui.end_row();
+                                            ui.label("Timeout");
+                                            ui.label(timeout.to_string());
+                                            ui.end_row();
                                         } else {
+                                            ui.label("GrowID");
+                                            ui.label("EMPTY");
+                                            ui.end_row();
                                             ui.label("Status");
                                             ui.label("EMPTY");
                                             ui.end_row();
@@ -71,6 +89,9 @@ impl BotMenu {
                                             ui.end_row();
                                             ui.label("World");
                                             ui.label("EXIT");
+                                            ui.end_row();
+                                            ui.label("Timeout");
+                                            ui.label("0");
                                             ui.end_row();
                                         }
                                     });
@@ -90,9 +111,11 @@ impl BotMenu {
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                                 if ui.button("Warp").clicked() {
                                     if let Some(bot) = manager.get_bot(&self.selected_bot) {
-                                        let bot_mutex = bot.lock().unwrap();
-                                        let peer_id = bot_mutex.peer_id.unwrap().clone();
-                                        warp(peer_id, &self.warp_name);
+                                        let bot_clone = bot.clone();
+                                        let world_name = self.warp_name.clone();
+                                        thread::spawn(move || {
+                                            warp(&bot_clone, world_name);
+                                        });
                                     }
                                 }
                             });
@@ -108,11 +131,8 @@ impl BotMenu {
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
                                             let (ip, port) = {
-                                                let bot_mutex = bot.lock().unwrap();
-                                                (
-                                                    bot_mutex.server.ip.clone(),
-                                                    bot_mutex.server.port.clone().to_string(),
-                                                )
+                                                let server = bot.server.read();
+                                                (server.ip.clone(), server.port.clone().to_string())
                                             };
                                             ui.label("IP");
                                             ui.label(ip);
@@ -147,12 +167,12 @@ impl BotMenu {
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
                                             let (username, password, code, method) = {
-                                                let bot_mutex = bot.lock().unwrap();
+                                                let info = bot.info.read();
                                                 (
-                                                    bot_mutex.info.username.clone(),
-                                                    bot_mutex.info.password.clone(),
-                                                    bot_mutex.info.code.clone(),
-                                                    bot_mutex.info.method.clone(),
+                                                    info.username.clone(),
+                                                    info.password.clone(),
+                                                    info.recovery_code.clone(),
+                                                    info.login_method.clone(),
                                                 )
                                             };
                                             ui.label("Username");
@@ -194,15 +214,10 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         if let Some(bot) = manager.get_bot(&self.selected_bot) {
-                                            let (net_id, token, is_banned, position) = {
-                                                let bot_mutex = bot.lock().unwrap();
-                                                (
-                                                    bot_mutex.state.net_id.clone(),
-                                                    bot_mutex.info.token.clone(),
-                                                    bot_mutex.state.is_banned.clone(),
-                                                    bot_mutex.position.clone(),
-                                                )
-                                            };
+                                            let net_id = bot.state.read().net_id.clone();
+                                            let token = bot.info.read().token.clone();
+                                            let is_banned = bot.state.read().is_banned.clone();
+                                            let position = bot.position.read().clone();
                                             ui.label("NetID");
                                             ui.label(net_id.to_string());
                                             ui.end_row();
@@ -214,9 +229,9 @@ impl BotMenu {
                                             ui.end_row();
                                             ui.label("Position");
                                             ui.horizontal(|ui| {
-                                                ui.label(position.x.to_string());
+                                                ui.label((position.x / 32.0).to_string());
                                                 ui.separator();
-                                                ui.label(position.y.to_string());
+                                                ui.label((position.y / 32.0).to_string());
                                             });
                                             ui.end_row();
                                         } else {

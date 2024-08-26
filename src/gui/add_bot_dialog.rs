@@ -2,7 +2,11 @@ use std::fs;
 
 use eframe::egui::{self};
 
-use crate::{manager::Manager, types::e_login_method::ELoginMethod, App, Bot, Data};
+use crate::{
+    manager::Manager,
+    types::{config::BotConfig, elogin_method::ELoginMethod},
+    utils,
+};
 
 #[derive(Default)]
 pub struct AddBotDialog {
@@ -62,22 +66,18 @@ impl AddBotDialog {
                             ui.end_row();
                         });
                     if ui.button("Add").clicked() {
-                        manager.add_bot(
-                            self.username.clone(),
-                            self.password.clone(),
-                            self.code.clone(),
-                            self.method.clone(),
-                        );
-                        let mut data =
-                            serde_json::from_str::<Data>(&fs::read_to_string("data.json").unwrap())
-                                .unwrap();
-                        data.bots.push(Bot {
+                        let config = BotConfig {
                             username: self.username.clone(),
                             password: self.password.clone(),
-                            code: self.code.clone(),
-                            method: self.method.clone(),
-                        });
-                        fs::write("data.json", &serde_json::to_string_pretty(&data).unwrap())
+                            recovery_code: self.code.clone(),
+                            login_method: self.method.clone(),
+                            token: "".to_string(),
+                            data: "".to_string(),
+                        };
+                        manager.add_bot(config.clone());
+                        let mut data = utils::config::parse_config().unwrap();
+                        data.bots.push(config);
+                        fs::write("config.json", &serde_json::to_string_pretty(&data).unwrap())
                             .unwrap();
                         self.username.clear();
                         self.password.clear();

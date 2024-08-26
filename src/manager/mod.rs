@@ -1,63 +1,80 @@
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread::{spawn, JoinHandle};
-
 use crate::bot::{self, Bot};
-use crate::types::e_login_method::ELoginMethod;
+use crate::types::config::BotConfig;
+use enet::Enet;
 use gtitem_r::structs::ItemDatabase;
-use spdlog::prelude::*;
+use paris::{error, info};
+use std::sync::Arc;
+use std::thread;
+use std::thread::{spawn, JoinHandle};
+use crate::utils;
 
 pub struct Manager {
-    pub bots: Vec<(Arc<Mutex<Bot>>, JoinHandle<()>)>,
+    pub bots: Vec<(Arc<Bot>, JoinHandle<()>)>,
     pub items_database: Arc<ItemDatabase>,
+    pub enet: Arc<Enet>,
 }
 
 impl Manager {
-    pub fn new() -> Result<Manager, String> {
-        info!("Loading items database...");
-        let item_database = gtitem_r::load_from_file("items.dat").unwrap();
-        info!("Successfully loaded items database");
-        info!("Initialized Manager");
+    pub fn new() -> Manager {
+        let enet = Enet::new().expect("could not initialize ENet");
+        let item_database = {
+            match gtitem_r::load_from_file("items.dat") {
+                Ok(item_database) => {
+                    info!("Item database loaded successfully");
+                    item_database
+                }
+                Err(e) => {
+                    error!("Failed to load item database: {}", e);
+                    panic!("Failed to load item database: {}", e);
+                }
+            }
+        };
 
-        Ok(Manager {
+        Manager {
             bots: vec![],
             items_database: Arc::new(item_database),
-        })
+            enet: Arc::new(enet),
+        }
     }
 }
 
 impl Manager {
-    pub fn add_bot(
-        &mut self,
-        username: String,
-        password: String,
-        code: String,
-        method: ELoginMethod,
-    ) {
-        if method == ELoginMethod::LEGACY {
-            info!("Adding bot: {}", username);
-        } else {
-            info!("Adding bot with method: {:?}", method);
-        }
+    pub fn add_bot(&mut self, bot: BotConfig) {
         let items_database_clone = Arc::clone(&self.items_database);
-        let new_bot = Arc::new(Mutex::new(Bot::new(
-            username,
-            password,
-            code,
-            method,
-            items_database_clone,
-        )));
+        let enet_clone = Arc::clone(&self.enet);
+
+        let new_bot = Arc::new(Bot::new(bot.clone(), enet_clone, items_database_clone));
         let newbot_clone = Arc::clone(&new_bot);
 
         let handle = spawn(move || {
-            bot::login(newbot_clone);
+            bot::logon(&newbot_clone, bot.data.clone());
         });
         self.bots.push((new_bot, handle));
     }
-    pub fn remove_bot(&mut self, username: &str) {}
-    pub fn get_bot(&self, username: &str) -> Option<&Arc<Mutex<Bot>>> {
+
+    pub fn remove_bot(&mut self, username: &str) {
+        let bot = self.get_bot(username);
+        if let Some(bot) = bot {
+            let bot_clone = Arc::clone(bot);
+            thread::spawn(move || {
+                let is_running = {
+                    let state = bot_clone.state.read();
+                    state.is_running
+                };
+
+                if is_running {
+                    bot_clone.state.write().is_running = false;
+                    bot::disconnect(&bot_clone);
+                }
+            });
+            self.bots.retain(|(b, _)| b.info.read().username != username);
+            utils::config::remove_bot(username.to_string());
+        }
+    }
+
+    pub fn get_bot(&self, username: &str) -> Option<&Arc<Bot>> {
         for (bot, _) in &self.bots {
-            let bot_mutex = bot.lock().unwrap();
-            if bot_mutex.info.username == username {
+            if bot.info.read().username == username {
                 return Some(bot);
             }
         }

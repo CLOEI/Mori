@@ -1,6 +1,6 @@
 use rand::Rng;
 
-pub fn random_hex(length: u32, upper: bool) -> String {
+pub fn hex(length: u32, upper: bool) -> String {
     let chars = if upper {
         "0123456789ABCDEF"
     } else {
@@ -15,10 +15,10 @@ pub fn random_hex(length: u32, upper: bool) -> String {
         .collect()
 }
 
-pub fn random_mac_address() -> String {
-    let mut mac = random_hex(2, false);
+pub fn mac_address() -> String {
+    let mut mac = hex(2, false);
     for _ in 0..5 {
-        mac.push_str(&format!(":{}", random_hex(2, false)));
+        mac.push_str(&format!(":{}", hex(2, false)));
     }
     mac
 }

@@ -4,7 +4,6 @@ use std::{
 };
 
 use gtitem_r::structs::ItemDatabase;
-use gtworld_r::Tile;
 
 use super::Bot;
 
@@ -47,17 +46,24 @@ impl AStar {
         }
     }
 
-    pub fn update(&mut self, bot_mutex: &Arc<Mutex<Bot>>) {
-        let bot = bot_mutex.lock().unwrap();
-        self.width = bot.world.width;
-        self.height = bot.world.height;
-        for i in 0..bot.world.tiles.len() {
+    pub fn reset(&mut self) {
+        self.width = 0;
+        self.height = 0;
+        self.grid.clear();
+    }
+
+    pub fn update(&mut self, bot: &Arc<Bot>) {
+        self.reset();
+        let world = bot.world.read();
+        self.width = world.width;
+        self.height = world.height;
+        for i in 0..world.tiles.len() {
             let mut node = Node::new();
-            node.x = (i as u32) % bot.world.width;
-            node.y = (i as u32) / bot.world.width;
+            node.x = (i as u32) % world.width;
+            node.y = (i as u32) / world.width;
             let item = self
                 .item_database
-                .get_item(&(bot.world.tiles[i].foreground_item_id as u32))
+                .get_item(&(world.tiles[i].foreground_item_id as u32))
                 .unwrap();
             node.collision_type = item.collision_type;
             self.grid.push(node);

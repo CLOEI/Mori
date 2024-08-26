@@ -1,155 +1,240 @@
-use std::sync::{Arc, Mutex};
+use std::{fs, sync::Arc};
 
-use crate::bot::{disconnect, send_packet};
-use crate::types::{
-    e_packet_type::EPacketType, e_tank_packet_type::ETankPacketType,
-    tank_packet_type::TankPacketType,
+use paris::{error, info, warn};
+use regex::Regex;
+
+use crate::{
+    bot::{self, variant_handler},
+    types::{
+        epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
+    },
+    utils,
 };
-use crate::utils::bytes;
 
-use super::Bot;
-use super::{variant_handler, ENET_HOST};
-use enet::{Packet, PacketMode, PeerID};
-use spdlog::info;
+use super::{inventory::InventoryItem, send_packet_raw, Bot};
 
-pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, packet_type: EPacketType, data: &[u8]) {
+pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
-            info!("Received NetMessageServerHello");
-            let bot = bot_mutex.lock().unwrap();
-            if bot.state.is_redirect {
+            if bot.state.read().is_redirecting {
+                let info = bot.info.read();
                 let message = format!(
                     "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
-                    bot.info.login_info.uuid, bot.info.login_info.protocol, bot.info.login_info.fhash, bot.info.login_info.mac, bot.info.login_info.requested_name, bot.info.login_info.hash2, bot.info.login_info.fz, bot.info.login_info.f, bot.info.login_info.player_age, bot.info.login_info.game_version, bot.info.login_info.lmode, bot.info.login_info.cbits, bot.info.login_info.rid, bot.info.login_info.gdpr, bot.info.login_info.hash, bot.info.login_info.category, bot.info.login_info.token, bot.info.login_info.total_playtime, bot.info.login_info.door_id, bot.info.login_info.klv, bot.info.login_info.meta, bot.info.login_info.platform_id, bot.info.login_info.device_version, bot.info.login_info.zf, bot.info.login_info.country, bot.info.login_info.user, bot.info.login_info.wk
-                );
-                let peer_id = bot.peer_id.unwrap().clone();
-                send_packet(peer_id, EPacketType::NetMessageGenericText, message);
+                    info.login_info.uuid, info.login_info.protocol, info.login_info.fhash, info.login_info.mac, info.login_info.requested_name, info.login_info.hash2, info.login_info.fz, info.login_info.f, info.login_info.player_age, info.login_info.game_version, info.login_info.lmode, info.login_info.cbits, info.login_info.rid, info.login_info.gdpr, info.login_info.hash, info.login_info.category, info.login_info.token, info.login_info.total_playtime, info.login_info.door_id, info.login_info.klv, info.login_info.meta, info.login_info.platform_id, info.login_info.device_version, info.login_info.zf, info.login_info.country, info.login_info.user, info.login_info.wk);
+                bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
             } else {
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
-                    209, bot.info.token, "0,1,1"
+                    209,
+                    bot.info.read().token,
+                    "0,1,1"
                 );
-                let peer_id = bot.peer_id.unwrap();
-                send_packet(peer_id, EPacketType::NetMessageGenericText, message);
+                bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
             }
         }
-        EPacketType::NetMessageGenericText => {
-            info!("Received NetMessageGenericText");
-        }
+        EPacketType::NetMessageGenericText => {}
         EPacketType::NetMessageGameMessage => {
-            let mut bot = bot_mutex.lock().unwrap();
-            let message = String::from_utf8_lossy(&data[4..]);
-            info!("Received NetMessageGameMessage");
+            let message = String::from_utf8_lossy(&data);
             info!("Message: {}", message);
 
             if message.contains("logon_fail") {
-                bot.state.is_redirect = false;
-                let peer_id = bot.peer_id.unwrap();
-                disconnect(peer_id);
+                bot.state.write().is_redirecting = false;
+                bot::disconnect(bot);
             }
             if message.contains("currently banned") {
-                bot.state.is_banned = true;
-                bot.state.is_running = false;
-                let peer_id = bot.peer_id.unwrap();
-                disconnect(peer_id);
+                {
+                    let mut state = bot.state.write();
+                    state.is_running = false;
+                    state.is_banned = true;
+                }
+                bot::disconnect(bot);
+            }
+            if message.contains("Advanced Account Protection") {
+                bot.state.write().is_running = false;
+                bot::disconnect(bot);
+            }
+            if message.contains("temporarily suspended") {
+                bot.state.write().is_running = false;
+                bot::disconnect(bot);
+            }
+            if message.contains("has been suspended") {
+                bot.state.write().is_running = false;
+                bot.state.write().is_banned = true;
+                bot::disconnect(bot);
+            }
+            if message.contains("Growtopia is not quite ready for users") {
+                bot.info.write().timeout = 60;
+                bot::sleep(bot);
+            }
+            if message.contains("UPDATE REQUIRED") {
+                let re = Regex::new(r"\$V(\d+\.\d+)").unwrap();
+                if let Some(caps) = re.captures(&message) {
+                    let version = caps.get(1).unwrap().as_str();
+                    warn!("Update required: {}, updating...", version);
+                    bot.info.write().login_info.game_version = version.to_string();
+                    utils::config::set_game_version(version.to_string());
+                    let username = bot.info.read().username.clone();
+                    utils::config::save_token_to_bot(username, "".to_string(), "".to_string());
+                }
             }
         }
-        EPacketType::NetMessageGamePacket => {
-            let tank_packet = map_slice_to_tank_packet_type(data);
-            info!("Received Tank packet type: {:?}", tank_packet.packet_type);
+        EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
+            Ok(tank_packet) => match tank_packet._type {
+                ETankPacketType::NetGamePacketState => {
+                    for player in bot.players.write().iter_mut() {
+                        if player.net_id == tank_packet.net_id {
+                            player.position.x = tank_packet.vector_x;
+                            player.position.y = tank_packet.vector_y;
+                            break;
+                        }
+                    }
+                }
+                ETankPacketType::NetGamePacketCallFunction => {
+                    variant_handler::handle(bot, &tank_packet, &data[56..]);
+                }
+                ETankPacketType::NetGamePacketPingRequest => {
+                    let packet = TankPacket {
+                        _type: ETankPacketType::NetGamePacketPingReply,
+                        net_id: 0,
+                        unk2: 0,
+                        vector_x: 64.0,
+                        vector_y: 64.0,
+                        vector_x2: 1000.0,
+                        vector_y2: 250.0,
+                        ..Default::default()
+                    };
 
-            if tank_packet.packet_type == ETankPacketType::NetGamePacketCallFunction {
-                variant_handler::handle(&bot_mutex, &tank_packet, &data[56..]);
-            }
-            if tank_packet.packet_type == ETankPacketType::NetGamePacketSendMapData {
-                let mut bot = bot_mutex.lock().unwrap();
-                // bot.world.parse(&data[56..]);
-                // bot.astar.update(&bot_mutex);
-            }
-            if tank_packet.packet_type == ETankPacketType::NetGamePacketSendInventoryState {
-                let mut bot = bot_mutex.lock().unwrap();
-                bot.inventory.parse(&data[56..]);
-            }
-            if tank_packet.packet_type == ETankPacketType::NetGamePacketPingRequest {
-                let mut pkt = TankPacketType::new();
-                pkt.packet_type = ETankPacketType::NetGamePacketPingReply;
-                pkt.net_id = 0; // I'm not sure why it must be 0 instead of bot.net_id
-                pkt.unk2 = 0;
-                pkt.vector_x = 64.0;
-                pkt.vector_y = 64.0;
-                pkt.vector_x2 = 1000.0;
-                pkt.vector_y2 = 250.0;
+                    send_packet_raw(&bot, &packet);
+                }
+                ETankPacketType::NetGamePacketSendInventoryState => {
+                    bot.inventory.write().parse(&data[56..]);
+                }
+                ETankPacketType::NetGamePacketSendMapData => {
+                    warn!("Writing world.dat");
+                    fs::write("world.dat", &data[56..]).unwrap();
+                    bot.world.write().parse(&data[56..]);
+                    bot.astar.lock().update(bot);
+                    bot::send_packet(
+                        bot,
+                        EPacketType::NetMessageGenericText,
+                        "action|getDRAnimations\n".to_string(),
+                    );
+                }
+                ETankPacketType::NetGamePacketTileChangeRequest => {
+                    if tank_packet.net_id == bot.state.read().net_id && tank_packet.value != 18 {
+                        let mut inventory = bot.inventory.write();
+                        for i in 0..inventory.items.len() {
+                            if inventory.items[i].id == tank_packet.value as u16 {
+                                inventory.items[i].amount -= 1;
+                                if inventory.items[i].amount == 0 || inventory.items[i].amount > 200
+                                {
+                                    inventory.items.remove(i);
+                                }
+                                break;
+                            }
+                        }
+                    }
 
-                let mut packet_data = Vec::new();
-                packet_data
-                    .extend_from_slice(&(EPacketType::NetMessageGamePacket as u32).to_le_bytes());
-                packet_data.extend_from_slice(&(pkt.packet_type as u8).to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk1.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk2.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk3.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.net_id.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk4.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.flags.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk6.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.value.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.vector_x.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.vector_y.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.vector_x2.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.vector_y2.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.unk12.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.int_x.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.int_y.to_le_bytes());
-                packet_data.extend_from_slice(&pkt.extended_data_length.to_le_bytes());
-                packet_data.extend_from_slice(&data[56..]);
+                    let mut world = bot.world.write();
+                    if let Some(tile) =
+                        world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32)
+                    {
+                        if tank_packet.value == 18 {
+                            if tile.foreground_item_id != 0 {
+                                tile.foreground_item_id = 0;
+                            } else {
+                                tile.background_item_id = 0;
+                            }
+                        } else {
+                            if let Some(item) = bot.item_database.items.get(&tank_packet.value) {
+                                if item.action_type == 22
+                                    || item.action_type == 28
+                                    || item.action_type == 18
+                                {
+                                    tile.background_item_id = tank_packet.value as u16;
+                                } else {
+                                    info!("TileChangeRequest: {:?}", tank_packet);
+                                    tile.foreground_item_id = tank_packet.value as u16;
+                                }
+                            }
+                        }
+                    }
+                }
+                ETankPacketType::NetGamePacketItemChangeObject => {
+                    let mut world = bot.world.write();
+                    info!("ItemChangeObject: {:?}", tank_packet);
 
-                let pkt = Packet::new(packet_data, PacketMode::ReliableSequenced).unwrap();
-                ENET_HOST.with_borrow_mut(|enet_host| {
-                    let enet_host = enet_host.as_mut().unwrap();
-                    let peer_id = bot_mutex.lock().unwrap().peer_id.unwrap();
-                    let peer = enet_host.peer_mut(peer_id).unwrap();
-                    peer.send_packet(pkt, 0).unwrap();
-                });
+                    if tank_packet.net_id == u32::MAX {
+                        let item = gtworld_r::DroppedItem {
+                            id: tank_packet.value as u16,
+                            x: tank_packet.vector_x.ceil(),
+                            y: tank_packet.vector_y.ceil(),
+                            count: tank_packet.unk6 as u8,
+                            flags: tank_packet.unk1,
+                            uid: world.dropped.last_dropped_item_uid + 1,
+                        };
+
+                        world.dropped.items.push(item);
+                        world.dropped.last_dropped_item_uid += 1;
+                        world.dropped.items_count += 1;
+                        return;
+                    } else if tank_packet.net_id == u32::MAX - 3 {
+                        for obj in &mut world.dropped.items {
+                            if obj.id == tank_packet.value as u16
+                                && obj.x == tank_packet.vector_x.ceil()
+                                && obj.y == tank_packet.vector_y.ceil()
+                            {
+                                obj.count = tank_packet.unk6 as u8;
+                                break;
+                            }
+                        }
+                    } else if tank_packet.net_id > 0 {
+                        let mut remove_index = None;
+                        for (i, obj) in world.dropped.items.iter().enumerate() {
+                            if obj.uid == tank_packet.value {
+                                if tank_packet.net_id == bot.state.read().net_id {
+                                    if obj.id == 112 {
+                                        bot.state.write().gems += obj.count as i32;
+                                    } else {
+                                        let mut inventory = bot.inventory.write();
+                                        let mut added = false;
+                                        for item in &mut inventory.items {
+                                            if item.id == obj.id {
+                                                let temp = item.amount + obj.count as u16;
+                                                item.amount = if temp > 200 { 200 } else { temp };
+                                                added = true;
+                                                break;
+                                            }
+                                        }
+                                        if !added {
+                                            let item = InventoryItem {
+                                                id: obj.id,
+                                                amount: obj.count as u16,
+                                            };
+                                            inventory.items.push(item);
+                                        }
+                                    }
+                                }
+                                remove_index = Some(i);
+                                break;
+                            }
+                        }
+                        if let Some(i) = remove_index {
+                            world.dropped.items.remove(i);
+                            world.dropped.items_count -= 1;
+                        }
+                    }
+                }
+                _ => {}
+            },
+            Err(..) => {
+                error!("Failed to deserialize TankPacket: {:?}", data[0]);
             }
-        }
-        EPacketType::NetMessageError => {
-            info!("Received NetMessageError");
-        }
-        EPacketType::NetMessageTrack => {
-            info!("Received NetMessageTrack");
-        }
+        },
         EPacketType::NetMessageClientLogRequest => {
-            info!("Received NetMessageClientLogRequest");
-            let message = String::from_utf8_lossy(data);
+            let message = String::from_utf8_lossy(&data);
             info!("Message: {}", message);
         }
-        EPacketType::NetMessageClientLogResponse => {
-            info!("Received NetMessageClientLogResponse");
-        }
-        EPacketType::NetMessageMax => {
-            info!("Received NetMessageMax");
-        }
         _ => (),
-    }
-}
-
-fn map_slice_to_tank_packet_type(data: &[u8]) -> TankPacketType {
-    TankPacketType {
-        packet_type: ETankPacketType::from(data[0]),
-        unk1: data[1],
-        unk2: data[2],
-        unk3: data[3],
-        net_id: bytes::bytes_to_u32(&data[4..8]),
-        unk4: bytes::bytes_to_u32(&data[8..12]),
-        flags: bytes::bytes_to_u32(&data[12..16]),
-        unk6: bytes::bytes_to_u32(&data[16..20]),
-        value: bytes::bytes_to_u32(&data[20..24]),
-        vector_x: bytes::bytes_to_f32(&data[24..28]),
-        vector_y: bytes::bytes_to_f32(&data[28..32]),
-        vector_x2: bytes::bytes_to_f32(&data[32..36]),
-        vector_y2: bytes::bytes_to_f32(&data[36..40]),
-        unk12: bytes::bytes_to_f32(&data[40..44]),
-        int_x: bytes::bytes_to_i32(&data[44..48]),
-        int_y: bytes::bytes_to_i32(&data[48..52]),
-        extended_data_length: bytes::bytes_to_u32(&data[52..56]),
     }
 }

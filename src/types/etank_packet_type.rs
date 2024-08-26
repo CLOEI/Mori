@@ -1,4 +1,6 @@
-#[derive(Debug, PartialEq)]
+use serde_repr::*;
+
+#[derive(Serialize_repr, Deserialize_repr, Debug)]
 #[repr(u8)]
 pub enum ETankPacketType {
     NetGamePacketState,
@@ -41,6 +43,12 @@ pub enum ETankPacketType {
     NetGamePacketActiveArrowToItem,
     NetGamePacketSelectTileIndex,
     NetGamePacketSendPlayerTributeData,
+}
+
+impl Default for ETankPacketType {
+    fn default() -> Self {
+        ETankPacketType::NetGamePacketState
+    }
 }
 
 impl From<u8> for ETankPacketType {

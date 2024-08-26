@@ -1,18 +1,17 @@
-use std::sync::{Arc, Mutex};
-
-use enet::{Peer, PeerID};
-use spdlog::{info, warn};
-
-use crate::bot::{disconnect, find_path, place, punch, send_packet, talk, walk};
-use crate::types::e_packet_type::EPacketType;
-use crate::types::tank_packet_type::TankPacketType;
-use crate::utils::text_parse;
+use crate::bot;
+use crate::bot::{disconnect, is_inworld, send_packet};
+use crate::types::epacket_type::EPacketType;
+use crate::types::player::Player;
+use crate::types::tank_packet::TankPacket;
+use crate::types::vector::Vector2;
 use crate::utils::variant::VariantList;
+use crate::utils::{self, textparse};
+use paris::info;
+use std::sync::Arc;
 
 use super::Bot;
 
-pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, pkt: &TankPacketType, data: &[u8]) {
-    let mut bot = bot_mutex.lock().unwrap();
+pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
     let variant = VariantList::deserialize(&data).unwrap();
     let function_call: String = variant.get(0).unwrap().as_string();
     info!("Received function call: {}", function_call);
@@ -23,52 +22,35 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, pkt: &TankPacketType, data: &[u8]) {
             let token = variant.get(2).unwrap().as_int32();
             let user_id = variant.get(3).unwrap().as_int32();
             let server_data = variant.get(4).unwrap().as_string();
-            let parsed_server_data = text_parse::parse_and_store_as_vec(&server_data);
+            let parsed_server_data = textparse::parse_and_store_as_vec(&server_data);
 
-            // if bot.display_name.is_empty() {
-            //     bot.username = variant.get(6).unwrap().as_string();
-            //     error!("Username: {}", bot.username);
-            // }
+            let mut state = bot.state.write();
+            let mut server = bot.server.write();
+            let mut info = bot.info.write();
 
-            bot.state.is_redirect = true;
-            bot.server.ip = parsed_server_data.get(0).unwrap().to_string();
-            bot.server.port = port.to_string();
-            bot.info.login_info.token = token.to_string();
-            bot.info.login_info.user = user_id.to_string();
-            bot.info.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
-            bot.info.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
-            let peer_id = bot.peer_id.unwrap();
-            disconnect(peer_id);
+            state.is_redirecting = true;
+            server.ip = parsed_server_data.get(0).unwrap().to_string();
+            server.port = port as u16;
+            info.login_info.token = token.to_string();
+            info.login_info.user = user_id.to_string();
+            info.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
+            info.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
+            disconnect(bot);
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
-            let peer_id = bot.peer_id.unwrap();
             send_packet(
-                peer_id,
+                bot,
                 EPacketType::NetMessageGenericText,
                 "action|enter_game\n".to_string(),
             );
-            bot.state.is_redirect = false;
+            bot.state.write().is_redirecting = false;
         }
-        "OnCountryState" => {
-            // I'm not sure why this is sent twice, but it is.
-            let peer_id = bot.peer_id.unwrap();
-            send_packet(
-                peer_id,
-                EPacketType::NetMessageGenericText,
-                "action|getDRAnimations\n".to_string(),
-            );
-            send_packet(
-                peer_id,
-                EPacketType::NetMessageGenericText,
-                "action|getDRAnimations\n".to_string(),
-            );
-        }
+        "OnCountryState" => {}
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
             if message.contains("Gazette") {
-                let peer_id = bot.peer_id.unwrap();
                 send_packet(
-                    peer_id,
+                    bot,
                     EPacketType::NetMessageGenericText,
                     "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string(),
                 );
@@ -76,7 +58,7 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, pkt: &TankPacketType, data: &[u8]) {
         }
         "OnSetBux" => {
             let bux = variant.get(1).unwrap().as_int32();
-            bot.state.gems = bux;
+            bot.state.write().gems = bux;
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
@@ -85,16 +67,21 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, pkt: &TankPacketType, data: &[u8]) {
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
             info!("Received position: {:?}", pos);
-            bot.position.x = pos.0;
-            bot.position.y = pos.1;
-            if bot.state.is_ingame {
-                let peer_id = bot.peer_id.unwrap();
-                place(&bot_mutex, peer_id, 0, -1, 9640);
-            }
+            let mut position = bot.position.write();
+            position.x = pos.0;
+            position.y = pos.1;
         }
-        "ShowStartFTUEPopup" => {
-            return;
+        "SetHasGrowID" => {
+            let growid = variant.get(2).unwrap().as_string();
+            let mut info = bot.info.write();
+            info.login_info.tank_id_name = growid;
+            utils::config::save_token_to_bot(
+                info.username.clone(),
+                info.token.clone(),
+                info.login_info.to_string(),
+            );
         }
+        "ShowStartFTUEPopup" => {}
         "OnFtueButtonDataSet" => {
             let unknown_1 = variant.get(1).unwrap().as_int32();
             let current_progress = variant.get(2).unwrap().as_int32();
@@ -104,52 +91,104 @@ pub fn handle(bot_mutex: &Arc<Mutex<Bot>>, pkt: &TankPacketType, data: &[u8]) {
                 "Received FTUE button data set: {} {} {} {}",
                 unknown_1, current_progress, total_progress, info
             );
-        }
-        "OnHideMenusRequest" => {
-            warn!("Received OnHideMenusRequest");
+
+            let mut ftue = bot.ftue.write();
+            ftue.current_progress = current_progress;
+            ftue.total_progress = total_progress;
+            ftue.info = info;
         }
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
-            let data = text_parse::parse_and_store_as_map(&message);
-            bot.state.is_ingame = true;
-            bot.state.net_id = data.get("netID").unwrap().parse().unwrap();
+            let data = utils::textparse::parse_and_store_as_map(&message);
+            if data.contains_key("type") {
+                if data.get("type").unwrap() == "local" {
+                    let mut state = bot.state.write();
+                    state.is_ingame = true;
+                    state.net_id = data.get("netID").unwrap().parse().unwrap();
+
+                    send_packet(
+                        bot,
+                        EPacketType::NetMessageGenericText,
+                        "action|getDRAnimations\n".to_string(),
+                    );
+                    return;
+                }
+            } else {
+                let player = Player {
+                    _type: data.get("type").unwrap_or(&"".to_string()).to_string(),
+                    avatar: data.get("avatar").unwrap_or(&"".to_string()).to_string(),
+                    net_id: data
+                        .get("netID")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(0),
+                    online_id: data
+                        .get("onlineID")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or("".to_string()),
+                    e_id: data
+                        .get("eid")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or("".to_string()),
+                    ip: data.get("ip").unwrap_or(&"".to_string()).to_string(),
+                    colrect: data.get("colrect").unwrap_or(&"".to_string()).to_string(),
+                    title_icon: data.get("titleIcon").unwrap_or(&"".to_string()).to_string(),
+                    mstate: data
+                        .get("mstate")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(0),
+                    user_id: data
+                        .get("userID")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(0),
+                    invis: data
+                        .get("invis")
+                        .unwrap_or(&"0".to_string())
+                        .parse()
+                        .unwrap_or(false),
+                    name: data.get("name").unwrap_or(&"".to_string()).to_string(),
+                    country: data.get("country").unwrap_or(&"".to_string()).to_string(),
+                    position: {
+                        if data.contains_key("posXY") {
+                            let pos_xy = data.get("posXY").unwrap();
+                            Vector2 {
+                                x: pos_xy[..pos_xy.find("|").unwrap()].parse().unwrap_or(0.0),
+                                y: pos_xy[pos_xy.find("|").unwrap() + 1..]
+                                    .parse()
+                                    .unwrap_or(0.0),
+                            }
+                        } else {
+                            Vector2 { x: 0.0, y: 0.0 }
+                        }
+                    },
+                };
+                let mut players = bot.players.write();
+                players.push(player);
+            }
+        }
+        "OnRemove" => {
+            let message = variant.get(1).unwrap().as_string();
+            let data = utils::textparse::parse_and_store_as_map(&message);
+            let net_id: u32 = data.get("netID").unwrap().parse().unwrap();
+
+            let mut players = bot.players.write();
+            players.retain(|player| player.net_id != net_id);
         }
         "OnTalkBubble" => {
             let message = variant.get(2).unwrap().as_string();
-            print!("Received talk bubble: {}", message);
-            if message.contains("mate right") {
-                let peer_id = bot.peer_id.unwrap();
-                walk(&bot_mutex, peer_id, 1.0, 0.0, false);
-            }
-            if message.contains("mate left") {
-                let peer_id = bot.peer_id.unwrap();
-                walk(&bot_mutex, peer_id, -1.0, 0.0, false);
-            }
-            if message.contains("mate up") {
-                let peer_id = bot.peer_id.unwrap();
-                walk(&bot_mutex, peer_id, 0.0, -1.0, false);
-            }
-            if message.contains("mate down") {
-                let peer_id = bot.peer_id.unwrap();
-                walk(&bot_mutex, peer_id, 0.0, 1.0, false);
-            }
-            if message.contains("mate say") {
-                let peer_id = bot.peer_id.unwrap();
-                talk(peer_id, "Hello, world!");
-            }
-            if message.contains("mate punch") {
-                let peer_id = bot.peer_id.unwrap();
-                punch(&bot_mutex, peer_id, 0, 1);
-            }
-            if message.contains("mate findp") {
-                let peer_id = bot.peer_id.unwrap();
-                find_path(&bot_mutex, peer_id, 30, 5);
-            }
+            info!("Received talk bubble message: {}", message);
         }
         "OnClearTutorialArrow" => {
             let v1 = variant.get(1).unwrap().as_string();
-
-            println!("Received OnClearTutorialArrow: {} ", v1);
+            info!("Received OnClearTutorialArrow: {} ", v1);
+        }
+        "OnRequestWorldSelectMenu" => {
+            bot.world.write().reset();
+            bot.players.write().clear();
         }
         _ => {}
     }

@@ -1,7 +1,7 @@
-#[derive(PartialEq)]
 #[repr(u32)]
+#[derive(Debug)]
 pub enum EPacketType {
-    NetMessageUnknown = 0,
+    NetMessageUnknown,
     NetMessageServerHello,
     NetMessageGenericText,
     NetMessageGameMessage,
