@@ -17,7 +17,7 @@ Any contribution would help alot.
 ## Features
 
 - [x] GUI (If you prefer to use a GUI)
-- [] Web GUI
+- [ ] Web GUI
 - [x] Auto update following the game client
 - [x] Adding multi bot
 - [x] Item database
@@ -30,17 +30,17 @@ Any contribution would help alot.
 - [x] Auto Reconnect
 - [x] Google login ( Currently using API [growtopia-token](https://github.com/CLOEI/growtopia-token))
 - [x] Legacy login
-- [] Apple login 
-- [] Ubisoft-steam login
+- [ ] Apple login 
+- [ ] Ubisoft-steam login
 - [x] Configureable delay
-- [] Embedded scripting
-- [] Bot terminal view
-- [] Better world map preview with texture
-- [] NPC
-- [] Auto rotation
-- [] Auto dirt farm
-- [] Auto tutorial
-- [] Spam
+- [ ] Embedded scripting
+- [ ] Bot terminal view
+- [ ] Better world map preview with texture
+- [ ] NPC
+- [ ] Auto rotation
+- [ ] Auto dirt farm
+- [ ] Auto tutorial
+- [ ] Spam
 
 ## Note
 This is for educational purposes only. I am not responsible for any misuse of this tool. You also not allowed to sell or re-upload this tool as your own without my permission. use it at your own risk.
