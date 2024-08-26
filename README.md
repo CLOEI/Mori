@@ -43,6 +43,7 @@ Any contribution would help alot.
 - [ ] Auto dirt farm
 - [ ] Auto tutorial
 - [ ] Spam
+- [ ] Socks5 support ( I'm not really sure why the current implementation doesnt work [enet-rs](https://github.com/CLOEI/enet-rs))
 
 ## Note
 This is for educational purposes only. I am not responsible for any misuse of this tool. You also not allowed to sell or re-upload this tool as your own without my permission. use it at your own risk.

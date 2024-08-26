@@ -62,7 +62,7 @@ impl Bot {
         enet: Arc<Enet>,
         item_database: Arc<ItemDatabase>,
     ) -> Self {
-        let host = enet
+        let mut host = enet
             .create_host::<()>(
                 None,
                 1,
@@ -70,9 +70,15 @@ impl Bot {
                 BandwidthLimit::Unlimited,
                 BandwidthLimit::Unlimited,
                 1,
-                0,
             )
             .expect("could not create host");
+
+        // host.use_socks5(
+        //     &Address::new("".parse().unwrap(), "".parse().unwrap()),
+        //     "".to_string(),
+        //     "".to_string(),
+        // )
+        // .expect("Failed to use SOCKS5");
 
         Self {
             info: Arc::new(RwLock::new(Info {
