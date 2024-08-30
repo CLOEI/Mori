@@ -7,15 +7,15 @@ mod variant_handler;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
-use enet::{
-    Address, BandwidthLimit, ChannelLimit, Enet, EventKind, Host, Packet, PacketMode, PeerID,
-};
+use rusty_enet as enet;
 use gtitem_r::structs::ItemDatabase;
 use inventory::Inventory;
 use paris::{error, info, warn};
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 use std::{collections::HashMap, thread, time::Duration, vec};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
+use std::str::{self, FromStr};
 use urlencoding::encode;
 
 use crate::types::bot_info::FTUE;
@@ -46,8 +46,8 @@ pub struct Bot {
     pub state: Arc<RwLock<State>>,
     pub server: Arc<RwLock<Server>>,
     pub position: Arc<RwLock<Vector2>>,
-    pub host: Arc<Mutex<Host<()>>>,
-    pub peer_id: Arc<RwLock<Option<PeerID>>>,
+    pub host: Arc<Mutex<enet::Host<UdpSocket>>>,
+    pub peer_id: Arc<RwLock<Option<enet::PeerID>>>,
     pub world: Arc<RwLock<gtworld_r::World>>,
     pub inventory: Arc<RwLock<Inventory>>,
     pub players: Arc<RwLock<Vec<Player>>>,
@@ -59,26 +59,22 @@ pub struct Bot {
 impl Bot {
     pub fn new(
         bot_config: types::config::BotConfig,
-        enet: Arc<Enet>,
         item_database: Arc<ItemDatabase>,
     ) -> Self {
-        let mut host = enet
-            .create_host::<()>(
-                None,
-                1,
-                ChannelLimit::Limited(2),
-                BandwidthLimit::Unlimited,
-                BandwidthLimit::Unlimited,
-                1,
-            )
-            .expect("could not create host");
-
-        // host.use_socks5(
-        //     &Address::new("".parse().unwrap(), "".parse().unwrap()),
-        //     "".to_string(),
-        //     "".to_string(),
-        // )
-        // .expect("Failed to use SOCKS5");
+        let socket =
+            UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
+        let host = enet::Host::<UdpSocket>::new(
+            socket,
+            enet::HostSettings {
+                peer_limit: 1,
+                channel_limit: 2,
+                compressor: Some(Box::new(enet::RangeCoder::new())),
+                checksum: Some(Box::new(enet::crc32)),
+                using_new_packet: true,
+                ..Default::default()
+            },
+        )
+            .expect("Failed to create host");
 
         Self {
             info: Arc::new(RwLock::new(Info {
@@ -223,8 +219,8 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
 
     loop {
         let response = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
-        .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
-        .send_form(&[("refreshToken", token.as_str()), ("clientData", login_info.as_str())]);
+            .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
+            .send_form(&[("refreshToken", token.as_str()), ("clientData", login_info.as_str())]);
 
         match response {
             Ok(res) => {
@@ -435,28 +431,28 @@ pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
 
 fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
     info!("Connecting to the server {}:{}", ip, port);
-    set_status(bot, "Connecting to the server");
+    set_status(&bot, "Connecting to the server");
     let mut host = bot.host.lock();
-    host.connect(
-        &Address::new(ip.parse().unwrap(), port.parse().unwrap()),
+    let peer = host.connect(
+        SocketAddr::from_str(format!("{}:{}", ip, port).as_str()).unwrap(),
         2,
         0,
     )
-    .expect("Failed to connect to the server");
+        .expect("Failed to connect to the server");
+    peer.set_ping_interval(100);
 }
 
 pub fn set_ping(bot: &Arc<Bot>) {
-    if let Some(mut host) = bot.host.try_lock() {
-        if let Some(peer_id) = bot.peer_id.try_read() {
-            if let Some(peer_id) = *peer_id {
-                if let Some(peer) = host.peer_mut(peer_id) {
-                    if let Some(mut info) = bot.info.try_write() {
-                        info.ping = peer.mean_rtt().as_millis() as u32;
-                    }
-                }
-            }
-        }
-    }
+    // if let Some(mut host) = bot.host.try_lock() {
+    //     if let Some(peer_id) = bot.peer_id.try_read() {
+    //         if let Some(peer_id) = *peer_id {
+    //             let peer = host.peer_mut(peer_id);
+    //             if let Some(mut info) = bot.info.try_write() {
+    //                 // info.ping = peer.mean_rtt().as_millis() as u32;
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 fn process_events(bot: &Arc<Bot>) {
@@ -487,38 +483,33 @@ fn process_events(bot: &Arc<Bot>) {
         }
 
         loop {
-            let (event_kind, new_peer_id) = {
+            let (event) = {
                 let mut host = bot.host.lock();
-                let e = host
-                    .service(Duration::from_millis(100))
-                    .expect("Service failed");
+                let e = host.service().unwrap();
 
                 if let Some(event) = e {
-                    let peer_id = event.peer_id().clone();
-                    let event_kind = event.take_kind();
-                    (Some(event_kind), Some(peer_id))
+                    Some(event.no_ref())
                 } else {
-                    (None, None)
+                    None
                 }
             };
 
-            if let Some(peer_id) = new_peer_id {
-                let mut x = bot.peer_id.write();
-                *x = Some(peer_id);
-            }
-
-            if let Some(event_kind) = event_kind {
-                match event_kind {
-                    EventKind::Connect => {
+            if let Some(event) = event.clone() {
+                match event {
+                    enet::EventNoRef::Connect { peer, .. } => {
                         info!("Connected to the server");
                         set_status(bot, "Connected");
+                        {
+                            let mut peer_id = bot.peer_id.write();
+                            *peer_id = Some(peer);
+                        }
                     }
-                    EventKind::Disconnect { .. } => {
+                    enet::EventNoRef::Disconnect { .. } => {
                         warn!("Disconnected from the server");
                         set_status(bot, "Disconnected");
                         break;
                     }
-                    EventKind::Receive { packet, .. } => {
+                    enet::EventNoRef::Receive { packet, .. } => {
                         let data = packet.data();
                         if data.len() < 4 {
                             continue;
@@ -530,223 +521,223 @@ fn process_events(bot: &Arc<Bot>) {
                     }
                 }
             }
+            std::thread::sleep(Duration::from_millis(100));
+        }
         }
     }
-}
 
-pub fn disconnect(bot: &Arc<Bot>) {
-    let peer_id = bot.peer_id.read().unwrap().clone();
-    bot.host.lock().peer_mut(peer_id).unwrap().disconnect(0);
-}
-
-pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
-    let mut packet_data = Vec::new();
-    packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
-    packet_data.extend_from_slice(&message.as_bytes());
-    let pkt = Packet::new(packet_data, PacketMode::ReliableSequenced).unwrap();
-    let peer_id = bot.peer_id.read().unwrap().clone();
-    let mut host = bot.host.lock();
-    let peer = host.peer_mut(peer_id).unwrap();
-    peer.send_packet(pkt, 0).expect("Failed to send packet");
-}
-
-pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
-    let packet_size = std::mem::size_of::<EPacketType>()
-        + std::mem::size_of::<TankPacket>()
-        + packet.extended_data_length as usize;
-    let mut enet_packet_data = vec![0u8; packet_size];
-
-    let packet_type = EPacketType::NetMessageGamePacket as u32;
-    enet_packet_data[..std::mem::size_of::<u32>()].copy_from_slice(&packet_type.to_le_bytes());
-
-    let tank_packet_bytes = bincode::serialize(packet).expect("Failed to serialize TankPacket");
-    enet_packet_data
-        [std::mem::size_of::<u32>()..std::mem::size_of::<u32>() + tank_packet_bytes.len()]
-        .copy_from_slice(&tank_packet_bytes);
-
-    let enet_packet = Packet::new(enet_packet_data, PacketMode::ReliableSequenced)
-        .expect("Failed to create ENet packet");
-    let peer_id = bot.peer_id.read().unwrap().clone();
-    let mut host = bot.host.lock();
-    let peer = host.peer_mut(peer_id).unwrap();
-    peer.send_packet(enet_packet, 0)
-        .expect("Failed to send raw packet");
-}
-
-pub fn is_inworld(bot: &Arc<Bot>) -> bool {
-    bot.world.read().name != "EXIT"
-}
-
-pub fn collect(bot: &Arc<Bot>) {
-    if !is_inworld(bot) {
-        return;
+    pub fn disconnect(bot: &Arc<Bot>) {
+        let peer_id = bot.peer_id.read().unwrap().clone();
+        bot.host.lock().peer_mut(peer_id).disconnect(0);
     }
 
-    let world = bot.world.read();
-    for obj in &world.dropped.items {
-        let distance;
-        {
-            let position = bot.position.read();
-            distance = ((position.x - obj.x).powi(2) + (position.y - obj.y).powi(2)).sqrt() / 32.0;
-        }
-        if distance <= 5.0 {
-            let can_collect = true;
+    pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
+        let mut packet_data = Vec::new();
+        packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
+        packet_data.extend_from_slice(&message.as_bytes());
+        let pkt = enet::Packet::reliable(packet_data.as_slice());
+        let peer_id = bot.peer_id.read().unwrap().clone();
+        let mut host = bot.host.lock();
+        let peer = host.peer_mut(peer_id);
+        peer.send(0, &pkt).expect("Failed to send packet");
+    }
 
-            if bot
-                .inventory
-                .read()
-                .items
-                .get(obj.id as usize)
-                .map_or(0, |item| item.amount)
-                < 200
+    pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
+        let packet_size = std::mem::size_of::<EPacketType>()
+            + std::mem::size_of::<TankPacket>()
+            + packet.extended_data_length as usize;
+        let mut enet_packet_data = vec![0u8; packet_size];
+
+        let packet_type = EPacketType::NetMessageGamePacket as u32;
+        enet_packet_data[..std::mem::size_of::<u32>()].copy_from_slice(&packet_type.to_le_bytes());
+
+        let tank_packet_bytes = bincode::serialize(packet).expect("Failed to serialize TankPacket");
+        enet_packet_data
+            [std::mem::size_of::<u32>()..std::mem::size_of::<u32>() + tank_packet_bytes.len()]
+            .copy_from_slice(&tank_packet_bytes);
+
+        let enet_packet = enet::Packet::reliable(enet_packet_data.as_slice());
+        let peer_id = bot.peer_id.read().unwrap().clone();
+        let mut host = bot.host.lock();
+        let peer = host.peer_mut(peer_id);
+        peer.send(0, &enet_packet)
+            .expect("Failed to send raw packet");
+    }
+
+    pub fn is_inworld(bot: &Arc<Bot>) -> bool {
+        bot.world.read().name != "EXIT"
+    }
+
+    pub fn collect(bot: &Arc<Bot>) {
+        if !is_inworld(bot) {
+            return;
+        }
+
+        let world = bot.world.read();
+        for obj in &world.dropped.items {
+            let distance;
             {
-                if can_collect {
-                    let mut pkt = TankPacket::default();
-                    pkt._type = ETankPacketType::NetGamePacketItemActivateObjectRequest;
-                    pkt.vector_x = obj.x;
-                    pkt.vector_y = obj.y;
-                    pkt.value = obj.uid;
-                    send_packet_raw(bot, &pkt);
-                    info!("Collect packet sent");
+                let position = bot.position.read();
+                distance = ((position.x - obj.x).powi(2) + (position.y - obj.y).powi(2)).sqrt() / 32.0;
+            }
+            if distance <= 5.0 {
+                let can_collect = true;
+
+                if bot
+                    .inventory
+                    .read()
+                    .items
+                    .get(obj.id as usize)
+                    .map_or(0, |item| item.amount)
+                    < 200
+                {
+                    if can_collect {
+                        let mut pkt = TankPacket::default();
+                        pkt._type = ETankPacketType::NetGamePacketItemActivateObjectRequest;
+                        pkt.vector_x = obj.x;
+                        pkt.vector_y = obj.y;
+                        pkt.value = obj.uid;
+                        send_packet_raw(bot, &pkt);
+                        info!("Collect packet sent");
+                    }
                 }
             }
         }
     }
-}
 
-pub fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
-    let mut pkt = TankPacket::default();
-    pkt._type = ETankPacketType::NetGamePacketTileChangeRequest;
-    let base_x;
-    let base_y;
-    {
-        let position = bot.position.read();
-        pkt.vector_x = position.x;
-        pkt.vector_y = position.y;
-        pkt.int_x = (position.x / 32.0).floor() as i32 + offset_x;
-        pkt.int_y = (position.y / 32.0).floor() as i32 + offset_y;
-        pkt.value = item_id;
+    pub fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
+        let mut pkt = TankPacket::default();
+        pkt._type = ETankPacketType::NetGamePacketTileChangeRequest;
+        let base_x;
+        let base_y;
+        {
+            let position = bot.position.read();
+            pkt.vector_x = position.x;
+            pkt.vector_y = position.y;
+            pkt.int_x = (position.x / 32.0).floor() as i32 + offset_x;
+            pkt.int_y = (position.y / 32.0).floor() as i32 + offset_y;
+            pkt.value = item_id;
 
-        base_x = (position.x / 32.0).floor() as i32;
-        base_y = (position.y / 32.0).floor() as i32;
+            base_x = (position.x / 32.0).floor() as i32;
+            base_y = (position.y / 32.0).floor() as i32;
+        }
+
+        if pkt.int_x <= base_x + 4
+            && pkt.int_x >= base_x - 4
+            && pkt.int_y <= base_y + 4
+            && pkt.int_y >= base_y - 4
+        {
+            send_packet_raw(bot, &pkt);
+        }
     }
 
-    if pkt.int_x <= base_x + 4
-        && pkt.int_x >= base_x - 4
-        && pkt.int_y <= base_y + 4
-        && pkt.int_y >= base_y - 4
-    {
-        send_packet_raw(bot, &pkt);
+    pub fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
+        place(bot, offset_x, offset_y, 18);
     }
-}
 
-pub fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
-    place(bot, offset_x, offset_y, 18);
-}
-
-pub fn warp(bot: &Arc<Bot>, world_name: String) {
-    if bot.state.read().is_not_allowed_to_warp {
-        return;
-    }
-    info!("Warping to world: {}", world_name);
-    send_packet(
-        bot,
-        EPacketType::NetMessageGameMessage,
-        format!("action|join_request\nname|{}\ninvitedWorld|0\n", world_name),
-    );
-}
-
-pub fn talk(bot: &Arc<Bot>, message: String) {
-    send_packet(
-        bot,
-        EPacketType::NetMessageGameMessage,
-        format!("action|input\n|text|{}\n", message),
-    );
-}
-
-pub fn leave(bot: &Arc<Bot>) {
-    if is_inworld(bot) {
+    pub fn warp(bot: &Arc<Bot>, world_name: String) {
+        if bot.state.read().is_not_allowed_to_warp {
+            return;
+        }
+        info!("Warping to world: {}", world_name);
         send_packet(
             bot,
             EPacketType::NetMessageGameMessage,
-            "action|quit_to_exit\n".to_string(),
+            format!("action|join_request\nname|{}\ninvitedWorld|0\n", world_name),
         );
     }
-}
 
-pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
-    if !ap {
-        let mut position = bot.position.write();
-        position.x += (x * 32) as f32;
-        position.y += (y * 32) as f32;
+    pub fn talk(bot: &Arc<Bot>, message: String) {
+        send_packet(
+            bot,
+            EPacketType::NetMessageGameMessage,
+            format!("action|input\n|text|{}\n", message),
+        );
     }
 
-    let mut pkt = TankPacket::default();
-    {
-        let position = bot.position.read();
-        pkt._type = ETankPacketType::NetGamePacketState;
-        pkt.vector_x = position.x;
-        pkt.vector_y = position.y;
-        pkt.int_x = -1;
-        pkt.int_y = -1;
-        pkt.flags |= (1 << 1) | (1 << 5);
-    }
-
-    if bot.state.read().is_running && is_inworld(bot) {
-        send_packet_raw(bot, &pkt);
-    }
-}
-
-pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
-    let astar = bot.astar.lock();
-    let position = {
-        let position = bot.position.read();
-        position.clone()
-    };
-    let paths = astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y);
-    let delay = utils::config::get_findpath_delay();
-    if let Some(paths) = paths {
-        for i in 0..paths.len() {
-            let node = &paths[i];
-            {
-                let mut position = bot.position.write();
-                position.x = node.x as f32 * 32.0;
-                position.y = node.y as f32 * 32.0;
-            }
-            walk(bot, node.x as i32, node.y as i32, true);
-            thread::sleep(Duration::from_millis(delay as u64));
+    pub fn leave(bot: &Arc<Bot>) {
+        if is_inworld(bot) {
+            send_packet(
+                bot,
+                EPacketType::NetMessageGameMessage,
+                "action|quit_to_exit\n".to_string(),
+            );
         }
     }
-}
 
-pub fn drop_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
-    send_packet(
-        bot,
-        EPacketType::NetMessageGenericText,
-        format!("action|drop\n|itemID|{}\n", item_id),
-    );
-    send_packet(
-        bot,
-        EPacketType::NetMessageGenericText,
-        format!(
-            "action|dialog_return.dialog_name|drop_item\nitemID|{}|\ncount|{}",
-            item_id, amount
-        ),
-    );
-}
+    pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
+        if !ap {
+            let mut position = bot.position.write();
+            position.x += (x * 32) as f32;
+            position.y += (y * 32) as f32;
+        }
 
-pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
-    send_packet(
-        bot,
-        EPacketType::NetMessageGenericText,
-        format!("action|trash\n|itemID|{}\n", item_id),
-    );
-    send_packet(
-        bot,
-        EPacketType::NetMessageGenericText,
-        format!(
-            "action|dialog_return.dialog_name|trash_item\nitemID|{}|\ncount|{}",
-            item_id, amount
-        ),
-    );
-}
+        let mut pkt = TankPacket::default();
+        {
+            let position = bot.position.read();
+            pkt._type = ETankPacketType::NetGamePacketState;
+            pkt.vector_x = position.x;
+            pkt.vector_y = position.y;
+            pkt.int_x = -1;
+            pkt.int_y = -1;
+            pkt.flags |= (1 << 1) | (1 << 5);
+        }
+
+        if bot.state.read().is_running && is_inworld(bot) {
+            send_packet_raw(bot, &pkt);
+        }
+    }
+
+    pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
+        let astar = bot.astar.lock();
+        let position = {
+            let position = bot.position.read();
+            position.clone()
+        };
+        let paths = astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y);
+        let delay = utils::config::get_findpath_delay();
+        if let Some(paths) = paths {
+            for i in 0..paths.len() {
+                let node = &paths[i];
+                {
+                    let mut position = bot.position.write();
+                    position.x = node.x as f32 * 32.0;
+                    position.y = node.y as f32 * 32.0;
+                }
+                walk(bot, node.x as i32, node.y as i32, true);
+                thread::sleep(Duration::from_millis(delay as u64));
+            }
+        }
+    }
+
+    pub fn drop_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
+        send_packet(
+            bot,
+            EPacketType::NetMessageGenericText,
+            format!("action|drop\n|itemID|{}\n", item_id),
+        );
+        send_packet(
+            bot,
+            EPacketType::NetMessageGenericText,
+            format!(
+                "action|dialog_return.dialog_name|drop_item\nitemID|{}|\ncount|{}",
+                item_id, amount
+            ),
+        );
+    }
+
+    pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
+        send_packet(
+            bot,
+            EPacketType::NetMessageGenericText,
+            format!("action|trash\n|itemID|{}\n", item_id),
+        );
+        send_packet(
+            bot,
+            EPacketType::NetMessageGenericText,
+            format!(
+                "action|dialog_return.dialog_name|trash_item\nitemID|{}|\ncount|{}",
+                item_id, amount
+            ),
+        );
+    }
