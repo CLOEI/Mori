@@ -249,7 +249,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
             }
             Err(err) => {
                 error!("Request error: {}", err);
-                return false;
+                continue;
             }
         };
     }
@@ -263,7 +263,7 @@ pub fn poll(bot: &Arc<Bot>) {
             break;
         }
         drop(state);
-        collect(&bot_clone);
+        // collect(&bot_clone); disabled for now
         set_ping(&bot_clone);
         thread::sleep(Duration::from_millis(20));
     });
@@ -520,7 +520,7 @@ fn process_events(bot: &Arc<Bot>) {
                     }
                 }
             }
-            std::thread::sleep(Duration::from_millis(200));
+            std::thread::sleep(Duration::from_millis(100));
         }
         }
     }

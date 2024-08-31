@@ -27,6 +27,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "sha2",
+ "socks",
  "ureq",
  "urlencoding",
 ]
@@ -3472,6 +3473,17 @@ version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7916fc008ca5542385b89a3d3ce689953c143e9304a9bf8beec1de48994c0d"
 dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
+name = "socks"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0c3dbbd9ae980613c6dd8e28a9407b50509d3803b57624d5dfe8315218cd58b"
+dependencies = [
+ "byteorder",
  "libc",
  "winapi",
 ]

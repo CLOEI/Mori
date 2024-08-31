@@ -3,6 +3,7 @@ use std::thread;
 use eframe::egui::{self, Ui};
 
 use crate::{bot::warp, manager::Manager, types::config::BotConfig, utils, Bot};
+use crate::bot::leave;
 
 #[derive(Default)]
 pub struct BotMenu {
@@ -109,6 +110,14 @@ impl BotMenu {
                                 );
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                                if ui.button("Leave").clicked() {
+                                    if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                        let bot_clone = bot.clone();
+                                        thread::spawn(move || {
+                                            leave(&bot_clone);
+                                        });
+                                    }
+                                }
                                 if ui.button("Warp").clicked() {
                                     if let Some(bot) = manager.get_bot(&self.selected_bot) {
                                         let bot_clone = bot.clone();
