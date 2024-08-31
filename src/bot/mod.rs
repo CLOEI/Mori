@@ -439,20 +439,19 @@ fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
         0,
     )
         .expect("Failed to connect to the server");
-    peer.set_ping_interval(100);
 }
 
 pub fn set_ping(bot: &Arc<Bot>) {
-    // if let Some(mut host) = bot.host.try_lock() {
-    //     if let Some(peer_id) = bot.peer_id.try_read() {
-    //         if let Some(peer_id) = *peer_id {
-    //             let peer = host.peer_mut(peer_id);
-    //             if let Some(mut info) = bot.info.try_write() {
-    //                 // info.ping = peer.mean_rtt().as_millis() as u32;
-    //             }
-    //         }
-    //     }
-    // }
+    if let Some(mut host) = bot.host.try_lock() {
+        if let Some(peer_id) = bot.peer_id.try_read() {
+            if let Some(peer_id) = *peer_id {
+                let peer = host.peer_mut(peer_id);
+                if let Some(mut info) = bot.info.try_write() {
+                    info.ping = peer.round_trip_time().as_millis() as u32;
+                }
+            }
+        }
+    }
 }
 
 fn process_events(bot: &Arc<Bot>) {
@@ -521,7 +520,7 @@ fn process_events(bot: &Arc<Bot>) {
                     }
                 }
             }
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(200));
         }
         }
     }
