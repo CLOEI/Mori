@@ -433,7 +433,7 @@ fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
     info!("Connecting to the server {}:{}", ip, port);
     set_status(&bot, "Connecting to the server");
     let mut host = bot.host.lock();
-    let peer = host.connect(
+    host.connect(
         SocketAddr::from_str(format!("{}:{}", ip, port).as_str()).unwrap(),
         2,
         0,
@@ -456,9 +456,8 @@ pub fn set_ping(bot: &Arc<Bot>) {
 
 fn process_events(bot: &Arc<Bot>) {
     loop {
-        let (is_running, is_redirecting, ip, port, server_data) = {
+        let (is_running, is_redirecting, ip, port) = {
             let state = bot.state.read();
-            let info = bot.info.read();
             let server = bot.server.read();
 
             (
@@ -466,7 +465,6 @@ fn process_events(bot: &Arc<Bot>) {
                 state.is_redirecting,
                 server.ip.clone(),
                 server.port.to_string().clone(),
-                info.server_data.clone(),
             )
         };
 
@@ -520,7 +518,7 @@ fn process_events(bot: &Arc<Bot>) {
                     }
                 }
             }
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(10));
         }
         }
     }
