@@ -305,6 +305,8 @@ pub fn get_token(bot: &Arc<Bot>) {
                 Err(err) => {
                     if err.to_string().contains("too many people") {
                         error!("Too many people trying to login");
+                    } else {
+                        error!("Failed to get Google token: {}", err);
                     }
                     return;
                 }
@@ -319,6 +321,15 @@ pub fn get_token(bot: &Arc<Bot>) {
                 Ok(res) => res,
                 Err(err) => {
                     error!("Failed to get legacy token: {}", err);
+                    return;
+                }
+            }
+        }
+        ELoginMethod::UBISOFT => {
+            match login::get_ubisoft_token(&username, &password) {
+                Ok(res) => res,
+                Err(err) => {
+                    error!("Failed to get Ubisoft token: {}", err);
                     return;
                 }
             }

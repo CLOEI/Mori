@@ -2,9 +2,75 @@ use paris::{error, info};
 use regex::Regex;
 use serde_json::Value;
 use std::{io, process::Command, time::Duration};
+use std::sync::Arc;
+use base64::Engine;
+use base64::engine::general_purpose;
+use ureq::Agent;
+use crate::bot::Bot;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+pub fn get_ubisoft_game_token(agent: &Agent, token: &str) -> Result<String, ureq::Error> {
+    let body = agent
+        .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
+        .set("User-Agent", USER_AGENT)
+        .set("Authorization", &format!("Ubi_v1 t={}", token))
+        .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
+        .set("Ubi-RequestedPlatformType", "uplay")
+        .set("Content-Type", "application/json")
+        .send_json(
+            ureq::json!({
+                "rememberMe": true,
+            }),
+        )?;
+
+    let json: Value = body.into_json()?;
+    Ok(json["ticket"].as_str().unwrap().to_string())
+}
+
+pub fn get_ubisoft_session(
+    agent: &Agent,
+    email: &str,
+    password: &str,
+) -> Result<String, ureq::Error> {
+    let encoded = general_purpose::STANDARD.encode(format!("{}:{}", email, password));
+    let body = agent
+        .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
+        .set("User-Agent", USER_AGENT)
+        .set("Authorization", &format!("Basic {}", encoded))
+        .set("Ubi-AppId", "afb4b43c-f1f7-41b7-bcef-a635d8c83822")
+        .set("Ubi-RequestedPlatformType", "uplay")
+        .set("Content-Type", "application/json")
+        .send_json(
+           ureq::json!({
+               "rememberMe": true,
+           }),
+        )?;
+
+    let json: Value = body.into_json()?;
+    let game_token = get_ubisoft_game_token(agent, json["ticket"].as_str().unwrap().to_string().as_str())?;
+    Ok(game_token)
+}
+
+pub fn get_ubisoft_token(email: &str, password: &str) -> Result<String, ureq::Error> {
+    let agent = ureq::AgentBuilder::new().redirects(5).build();
+    let session = match get_ubisoft_session(&agent, email, password) {
+        Ok(res) => res,
+        Err(err) => {
+            return Err(err);
+        }
+    };
+
+    let formated = format!("UbiTicket|{}", session);
+    let body = agent
+        .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
+        .set("user-agent", USER_AGENT)
+        .send_string(&formated)?;
+
+    let json: Value = body.into_json()?;
+    Ok(json["token"].to_string())
+}
 
 pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
     println!("Getting apple token");
@@ -31,7 +97,7 @@ pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
 
 pub fn get_google_token(url: &str, username: &str, password: &str) -> Result<String, ureq::Error> {
     loop {
-        let response = ureq::post("http://localhost:5000/token")
+        let response = ureq::post("http://localhost:5123/token")
             .timeout(Duration::from_secs(60))
             .send_form(&[("url", url), ("email", username), ("password", password)]);
 
