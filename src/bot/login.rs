@@ -6,6 +6,7 @@ use std::sync::Arc;
 use base64::Engine;
 use base64::engine::general_purpose;
 use ureq::Agent;
+use urlencoding::encode;
 use crate::bot::Bot;
 
 static USER_AGENT: &str =
@@ -62,7 +63,7 @@ pub fn get_ubisoft_token(email: &str, password: &str) -> Result<String, ureq::Er
         }
     };
 
-    let formated = format!("UbiTicket|{}", session);
+    let formated = encode(format!("UbiTicket|{}", session).as_str()).to_string();
     let body = agent
         .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
         .set("user-agent", USER_AGENT)
