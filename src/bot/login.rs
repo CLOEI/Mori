@@ -5,6 +5,7 @@ use std::{io, process::Command, time::Duration};
 use std::sync::Arc;
 use base64::Engine;
 use base64::engine::general_purpose;
+use steamworks::{Client, User};
 use ureq::Agent;
 use urlencoding::encode;
 use crate::bot::Bot;
