@@ -54,7 +54,7 @@ pub fn get_ubisoft_session(
     Ok(game_token)
 }
 
-pub fn get_ubisoft_token(email: &str, password: &str) -> Result<String, ureq::Error> {
+pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str) -> Result<String, ureq::Error> {
     let agent = ureq::AgentBuilder::new().redirects(5).build();
     let session = match get_ubisoft_session(&agent, email, password) {
         Ok(res) => res,
@@ -63,7 +63,7 @@ pub fn get_ubisoft_token(email: &str, password: &str) -> Result<String, ureq::Er
         }
     };
 
-    let formated = encode(format!("UbiTicket|{}", session).as_str()).to_string();
+    let formated = encode(format!("UbiTicket|{}{}\nsteamToken|{}", session, bot_info, "").as_str()).to_string();
     let body = agent
         .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
         .set("user-agent", USER_AGENT)

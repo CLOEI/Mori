@@ -326,7 +326,11 @@ pub fn get_token(bot: &Arc<Bot>) {
             }
         }
         ELoginMethod::UBISOFT => {
-            match login::get_ubisoft_token(&username, &password) {
+            {
+                bot.info.write().login_info.platform_id = "15,1,0".to_string();
+            }
+            let info = bot.info.read().login_info.to_string().clone();
+            match login::get_ubisoft_token(&info, &username, &password) {
                 Ok(res) => res,
                 Err(err) => {
                     error!("Failed to get Ubisoft token: {}", err);
