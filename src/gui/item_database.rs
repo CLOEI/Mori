@@ -1,5 +1,7 @@
+use std::sync::Arc;
 use crate::manager::Manager;
 use eframe::egui::{self, Ui};
+use parking_lot::RwLock;
 
 #[derive(Default)]
 pub struct ItemDatabase {
@@ -8,27 +10,34 @@ pub struct ItemDatabase {
 }
 
 impl ItemDatabase {
-    pub fn render(&mut self, ui: &mut Ui, manager: &mut Manager, _ctx: &egui::Context) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>, _ctx: &egui::Context) {
         ui.horizontal(|ui| {
+            let (item_database_version, item_database_item_count) = {
+                let manager = manager.read();
+                (manager.items_database.version.clone(), manager.items_database.item_count)
+            };
+
             ui.label("Database version:");
-            ui.label(manager.items_database.version.to_string());
+            ui.label(item_database_version.to_string());
             ui.separator();
             ui.label("Items count:");
-            ui.label(manager.items_database.item_count.to_string());
+            ui.label(item_database_item_count.to_string());
             ui.separator();
             ui.text_edit_singleline(&mut self.search_query);
         });
         ui.separator();
 
-        let mut filtered_items: Vec<u32> = manager.items_database.items.iter()
-            .filter_map(|(&id, item)| {
-                if item.name.to_lowercase().contains(&self.search_query.to_lowercase()) {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let mut filtered_items: Vec<u32> = {
+            manager.read().items_database.items.iter()
+                .filter_map(|(&id, item)| {
+                    if item.name.to_lowercase().contains(&self.search_query.to_lowercase()) {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
 
         filtered_items.sort();
 
@@ -50,7 +59,10 @@ impl ItemDatabase {
                                 .show(ui, |ui| {
                                     for i in row_range {
                                         let item_id = filtered_items[i];
-                                        let item = &manager.items_database.items[&item_id];
+                                        let item = {
+                                            let manager = manager.read();
+                                            manager.items_database.get_item(&item_id).unwrap()
+                                        };
                                         if ui
                                             .selectable_label(
                                                 self.selected_item_index == Some(item_id),
@@ -75,7 +87,10 @@ impl ItemDatabase {
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
                         if let Some(selected_index) = self.selected_item_index {
-                            let selected_item = &manager.items_database.items[&selected_index];
+                            let selected_item = {
+                                let manager = manager.read();
+                                manager.items_database.get_item(&selected_index).unwrap().clone()
+                            };
                             ui.label(format!("Name: {}", selected_item.name));
 
                             if selected_item.id != 0 {

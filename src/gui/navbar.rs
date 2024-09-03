@@ -1,4 +1,7 @@
+use std::sync::Arc;
 use eframe::egui::{self, include_image, Ui};
+use parking_lot::RwLock;
+use crate::manager::Manager;
 use crate::utils;
 use super::add_bot_dialog::AddBotDialog;
 
@@ -15,7 +18,7 @@ impl Default for Navbar {
 }
 
 impl Navbar {
-    pub fn render(&mut self, ui: &mut egui::Ui, add_bot_dialog: &mut AddBotDialog, manager: &mut crate::manager::Manager) {
+    pub fn render(&mut self, ui: &mut egui::Ui, add_bot_dialog: &mut AddBotDialog, manager: &Arc<RwLock<Manager>>) {
         ui.horizontal(|ui| {
             ui.heading("Mori");
             ui.separator();
@@ -91,7 +94,7 @@ impl Navbar {
                 .clicked()
             {
                 let selected_bot = utils::config::get_selected_bot();
-                manager.remove_bot(&selected_bot);
+                manager.write().remove_bot(&selected_bot);
             }
         });
     }

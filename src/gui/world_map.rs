@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::thread;
 use crate::{
     bot::{self},
@@ -7,6 +8,7 @@ use crate::{
 };
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use paris::info;
+use parking_lot::RwLock;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -16,12 +18,20 @@ pub struct WorldMap {
 }
 
 impl WorldMap {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Manager) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
 
         if !self.selected_bot.is_empty() {
-            if let Some(bot) = manager.get_bot(&self.selected_bot) {
+            let bot = {
+                let manager = manager.read();
+
+                match manager.get_bot(&self.selected_bot) {
+                    Some(bot) => Some(bot.clone()),
+                    None => None,
+                }
+            };
+            if let Some(bot) = bot {
                 let draw_list = ui.painter();
                 let p = ui.min_rect().min;
                 let size = ui.available_size();

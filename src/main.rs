@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::Write,
 };
-
+use std::sync::Arc;
 use crate::gui::inventory::Inventory;
 use bot::Bot;
 use eframe::egui::ViewportBuilder;
@@ -12,15 +12,17 @@ use gui::{
 };
 use manager::Manager;
 use types::{
-    config::{BotConfig, Config},
-    tank_packet::TankPacket,
+    config::{Config},
 };
+use mlua::prelude::*;
+use parking_lot::RwLock;
 
 mod bot;
 mod gui;
 mod manager;
 mod types;
 mod utils;
+mod lua_register;
 
 fn init_config() {
     if !fs::metadata("config.json").is_ok() {
@@ -60,28 +62,33 @@ struct App {
     navbar: Navbar,
     item_database: ItemDatabase,
     add_bot_dialog: AddBotDialog,
-    manager: Manager,
+    manager: Arc<RwLock<Manager>>,
     bot_menu: BotMenu,
     world_map: WorldMap,
     inventory: Inventory,
+    lua: Lua,
 }
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut manager = Manager::new();
+        let mut manager = Arc::new(RwLock::new(Manager::new()));
+        let lua = Lua::new();
         let bots = utils::config::get_bots();
         for bot in bots.clone() {
-            manager.add_bot(bot);
+            manager.write().add_bot(bot);
         }
+
+        lua_register::register(&lua, &manager);
 
         Self {
             navbar: Default::default(),
             item_database: Default::default(),
             add_bot_dialog: Default::default(),
-            manager: manager,
             bot_menu: Default::default(),
             world_map: Default::default(),
             inventory: Default::default(),
+            manager,
+            lua,
         }
     }
 }
@@ -92,16 +99,16 @@ impl eframe::App for App {
         egui_extras::install_image_loaders(ctx);
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.navbar
-                .render(ui, &mut self.add_bot_dialog, &mut self.manager);
+                .render(ui, &mut self.add_bot_dialog, &self.manager);
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.navbar.current_menu == "bots" {
                 self.bot_menu.render(ui, &self.manager);
             } else if self.navbar.current_menu == "inventory" {
-                self.inventory.render(ui, &mut self.manager, ctx);
+                self.inventory.render(ui, &self.manager, ctx);
             } else if self.navbar.current_menu == "item_database" {
-                self.item_database.render(ui, &mut self.manager, ctx);
+                self.item_database.render(ui, &self.manager, ctx);
             } else if self.navbar.current_menu == "world_map" {
                 self.world_map.render(ui, &self.manager);
             } else {

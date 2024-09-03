@@ -1,7 +1,8 @@
+use std::sync::Arc;
 use std::thread;
 
 use eframe::egui::{self, Ui};
-
+use parking_lot::RwLock;
 use crate::{bot::warp, manager::Manager, types::config::BotConfig, utils, Bot};
 use crate::bot::leave;
 
@@ -13,7 +14,7 @@ pub struct BotMenu {
 }
 
 impl BotMenu {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Manager) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
@@ -51,7 +52,15 @@ impl BotMenu {
                                     .min_col_width(120.0)
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
-                                        if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                        let bot = {
+                                            let manager = manager.read();
+
+                                            match manager.get_bot(&self.selected_bot) {
+                                                Some(bot) => Some(bot.clone()),
+                                                None => None,
+                                            }
+                                        };
+                                        if let Some(bot) = bot {
                                             let (username, status, ping, world_name, timeout) = {
                                                 let info = bot.info.read();
                                                 let world = bot.world.read();
@@ -111,7 +120,7 @@ impl BotMenu {
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                                 if ui.button("Leave").clicked() {
-                                    if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                    if let Some(bot) = manager.read().get_bot(&self.selected_bot) {
                                         let bot_clone = bot.clone();
                                         thread::spawn(move || {
                                             leave(&bot_clone);
@@ -119,7 +128,7 @@ impl BotMenu {
                                     }
                                 }
                                 if ui.button("Warp").clicked() {
-                                    if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                    if let Some(bot) = manager.read().get_bot(&self.selected_bot) {
                                         let bot_clone = bot.clone();
                                         let world_name = self.warp_name.clone();
                                         thread::spawn(move || {
@@ -138,7 +147,15 @@ impl BotMenu {
                                     .min_col_width(120.0)
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
-                                        if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                        let bot = {
+                                            let manager = manager.read();
+
+                                            match manager.get_bot(&self.selected_bot) {
+                                                Some(bot) => Some(bot.clone()),
+                                                None => None,
+                                            }
+                                        };
+                                        if let Some(bot) = bot {
                                             let (ip, port) = {
                                                 let server = bot.server.read();
                                                 (server.ip.clone(), server.port.clone().to_string())
@@ -174,7 +191,15 @@ impl BotMenu {
                                     .min_col_width(120.0)
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
-                                        if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                        let bot = {
+                                            let manager = manager.read();
+
+                                            match manager.get_bot(&self.selected_bot) {
+                                                Some(bot) => Some(bot.clone()),
+                                                None => None,
+                                            }
+                                        };
+                                        if let Some(bot) = bot {
                                             let (username, password, code, method) = {
                                                 let info = bot.info.read();
                                                 (
@@ -222,7 +247,15 @@ impl BotMenu {
                                     .min_col_width(120.0)
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
-                                        if let Some(bot) = manager.get_bot(&self.selected_bot) {
+                                        let bot = {
+                                            let manager = manager.read();
+
+                                            match manager.get_bot(&self.selected_bot) {
+                                                Some(bot) => Some(bot.clone()),
+                                                None => None,
+                                            }
+                                        };
+                                        if let Some(bot) = bot {
                                             let net_id = bot.state.read().net_id.clone();
                                             let token = bot.info.read().token.clone();
                                             let is_banned = bot.state.read().is_banned.clone();

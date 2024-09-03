@@ -1,7 +1,7 @@
 use std::fs;
-
+use std::sync::Arc;
 use eframe::egui::{self};
-
+use parking_lot::RwLock;
 use crate::{
     manager::Manager,
     types::{config::BotConfig, elogin_method::ELoginMethod},
@@ -18,7 +18,7 @@ pub struct AddBotDialog {
 }
 
 impl AddBotDialog {
-    pub fn render(&mut self, manager: &mut Manager, ctx: &egui::Context) {
+    pub fn render(&mut self, manager: &Arc<RwLock<Manager>>, ctx: &egui::Context) {
         if self.open {
             let mut close_dialog = false;
             egui::Window::new("Add bot")
@@ -74,7 +74,9 @@ impl AddBotDialog {
                             token: "".to_string(),
                             data: "".to_string(),
                         };
-                        manager.add_bot(config.clone());
+                        {
+                            manager.write().add_bot(config.clone());
+                        }
                         let mut data = utils::config::parse_config().unwrap();
                         data.bots.push(config);
                         fs::write("config.json", &serde_json::to_string_pretty(&data).unwrap())
