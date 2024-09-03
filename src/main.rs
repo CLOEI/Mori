@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::{
     fs::{self, File},
     io::Write,
@@ -52,7 +54,8 @@ fn main() {
             )
             .with_inner_size([800.0, 400.0])
             .with_resizable(false)
-            .with_fullscreen(false),
+            .with_fullscreen(false)
+            .with_maximize_button(false),
         ..Default::default()
     };
     let _ = eframe::run_native("Mori", options, Box::new(|cc| Ok(Box::new(App::new(cc)))));
