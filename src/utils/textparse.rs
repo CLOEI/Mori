@@ -16,3 +16,11 @@ pub fn parse_and_store_as_map(input: &str) -> HashMap<String, String> {
     }
     map
 }
+
+pub fn format_byte_as_steam_token(data: Vec<u8>) -> String {
+    data
+        .iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<Vec<String>>()
+        .join("+")
+}

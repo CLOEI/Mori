@@ -136,7 +136,7 @@ pub fn reconnect(bot: &Arc<Bot>) {
         info.login_info.meta = meta;
     }
 
-    if login_method != ELoginMethod::UBISOFT && oauth_links_empty {
+    if login_method != ELoginMethod::STEAM && oauth_links_empty {
         match get_oauth_links(&bot) {
             Ok(links) => {
                 let mut info = bot.info.write();
@@ -325,7 +325,7 @@ pub fn get_token(bot: &Arc<Bot>) {
                 }
             }
         }
-        ELoginMethod::UBISOFT => {
+        ELoginMethod::STEAM => {
             {
                 bot.info.write().login_info.platform_id = "15,1,0".to_string();
             }

@@ -59,8 +59,8 @@ impl AddBotDialog {
                                     );
                                     ui.selectable_value(
                                         &mut self.method,
-                                        ELoginMethod::UBISOFT,
-                                        "UBISOFT",
+                                        ELoginMethod::STEAM,
+                                        "STEAM",
                                     );
                                 });
                             ui.end_row();

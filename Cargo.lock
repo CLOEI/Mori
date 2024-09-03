@@ -29,6 +29,7 @@ dependencies = [
  "sha2",
  "socks",
  "steamworks",
+ "thiserror",
  "ureq",
  "urlencoding",
 ]

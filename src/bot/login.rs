@@ -2,13 +2,14 @@ use paris::{error, info};
 use regex::Regex;
 use serde_json::Value;
 use std::{io, process::Command, time::Duration};
-use std::sync::Arc;
 use base64::Engine;
 use base64::engine::general_purpose;
-use steamworks::{Client, User};
+use steamworks::{AppId, Client};
+use steamworks::networking_types::NetworkingIdentity;
 use ureq::Agent;
 use urlencoding::encode;
-use crate::bot::Bot;
+use crate::utils::error;
+use crate::utils::textparse::format_byte_as_steam_token;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -45,7 +46,7 @@ pub fn get_ubisoft_session(
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Content-Type", "application/json")
         .send_json(
-           ureq::json!({
+            ureq::json!({
                "rememberMe": true,
            }),
         )?;
@@ -55,22 +56,41 @@ pub fn get_ubisoft_session(
     Ok(game_token)
 }
 
-pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str) -> Result<String, ureq::Error> {
+pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str) -> Result<String, error::CustomError> {
     let agent = ureq::AgentBuilder::new().redirects(5).build();
     let session = match get_ubisoft_session(&agent, email, password) {
         Ok(res) => res,
         Err(err) => {
-            return Err(err);
+            return Err(error::CustomError::Other(format!("Failed to get ubisoft session: {}", err)));
         }
     };
 
-    let formated = encode(format!("UbiTicket|{}{}\nsteamToken|{}", session, bot_info, "").as_str()).to_string();
+    let steam = Client::init_app(AppId(866020));
+    let mut steam_token: String;
+    match steam {
+        Ok((client, single)) => {
+            info!("Steam initialized");
+            let (.., vec) = client.user().authentication_session_ticket(NetworkingIdentity::new());
+            steam_token = format!("{}.240", format_byte_as_steam_token(vec));
+        }
+        Err(err) => {
+            error!("Failed to initialize steam: {}", err);
+            return Err(error::CustomError::SteamError(format!("Failed to initialize steam: {}", err)));
+        }
+    }
+
+    let formated = encode(format!("UbiTicket|{}{}\n", session, bot_info).as_str()).to_string();
     let body = agent
         .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
         .set("user-agent", USER_AGENT)
-        .send_string(&formated)?;
+        .send_string(format!("{}steamToken%7C{}", formated, steam_token).as_str())?;
 
-    let json: Value = body.into_json()?;
+    let json: Value = match body.into_json() {
+        Ok(json) => json,
+        Err(err) => {
+            return Err(error::CustomError::Other(format!("Failed to parse json: {}", err)));
+        }
+    };
     Ok(json["token"].to_string())
 }
 
