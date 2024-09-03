@@ -3279,7 +3279,7 @@ dependencies = [
 [[package]]
 name = "rusty_enet"
 version = "0.3.2"
-source = "git+https://github.com/CLOEI/rusty_enet.git#4918807cd62f4c369c35fdb1c5c65b2b045777c3"
+source = "git+https://github.com/CLOEI/rusty_enet.git#d8c562ef9472dc959275259f54be9fdd7bcdea98"
 dependencies = [
  "js-sys",
 ]

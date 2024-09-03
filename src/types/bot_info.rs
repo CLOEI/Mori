@@ -15,6 +15,15 @@ pub struct Info {
     pub ping: u32,
     pub status: String,
     pub timeout: u32,
+    pub proxy: Option<ProxyInfo>
+}
+
+#[derive(Debug)]
+pub struct ProxyInfo {
+    pub username: String,
+    pub password: String,
+    pub ip: String,
+    pub port: u16,
 }
 
 #[derive(Debug, Default)]
