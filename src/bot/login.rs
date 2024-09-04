@@ -94,7 +94,7 @@ pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str) -> Result<
     Ok(json["token"].to_string())
 }
 
-pub fn get_apple_token(url: &str) -> Result<String, std::io::Error> {
+pub fn get_apple_token(url: &str) -> Result<String, io::Error> {
     println!("Getting apple token");
     #[cfg(target_os = "windows")]
     {
@@ -161,7 +161,7 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
             ("password", &password),
         ])?;
 
-    let body = req.into_string().unwrap();
+    let body = req.into_string()?;
     let json: Value = serde_json::from_str(&body).unwrap();
     Ok(json["token"].as_str().unwrap().to_string())
 }

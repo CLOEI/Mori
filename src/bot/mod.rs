@@ -54,7 +54,7 @@ pub struct Bot {
     pub world: Arc<RwLock<gtworld_r::World>>,
     pub inventory: Arc<RwLock<Inventory>>,
     pub players: Arc<RwLock<Vec<Player>>>,
-    pub astar: Arc<Mutex<AStar>>,
+    pub astar: Arc<RwLock<AStar>>,
     pub ftue: Arc<RwLock<FTUE>>,
     pub item_database: Arc<ItemDatabase>,
 }
@@ -64,7 +64,7 @@ impl Bot {
         bot_config: types::config::BotConfig,
         item_database: Arc<ItemDatabase>,
     ) -> Self {
-        let proxy_address: std::option::Option<String> = None;
+        let proxy_address: Option<String> = None;
         let socket: SocketType = if let Some(proxy) = proxy_address {
             let proxy_addr = SocketAddr::from_str("").expect("Invalid proxy address");
             let username = "".to_string();
@@ -111,12 +111,13 @@ impl Bot {
             world: Arc::new(RwLock::new(gtworld_r::World::new(item_database.clone()))),
             inventory: Arc::new(RwLock::new(Inventory::new())),
             players: Arc::new(RwLock::new(Vec::new())),
-            astar: Arc::new(Mutex::new(AStar::new(item_database.clone()))),
+            astar: Arc::new(RwLock::new(AStar::new(item_database.clone()))),
             ftue: Arc::new(RwLock::new(FTUE::default())),
             item_database,
         }
     }
 }
+
 
 pub fn logon(bot: &Arc<Bot>, data: String) {
     set_status(bot, "Logging in...");
@@ -249,7 +250,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&response_text).unwrap();
 
-                if json_response["status"] == "success" {
+                return if json_response["status"] == "success" {
                     let token = json_response["token"]
                         .as_str()
                         .unwrap_or_default()
@@ -257,10 +258,10 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                     info!("Token is still valid | new token: {}", token);
                     let mut info = bot.info.write();
                     info.token = token;
-                    return true;
+                    true
                 } else {
                     error!("Token is invalid");
-                    return false;
+                    false
                 }
             }
             Err(err) => {
@@ -279,7 +280,7 @@ pub fn poll(bot: &Arc<Bot>) {
             break;
         }
         drop(state);
-        // collect(&bot_clone); disabled for now
+        collect(&bot_clone);
         set_ping(&bot_clone);
         thread::sleep(Duration::from_millis(20));
     });
@@ -381,8 +382,8 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
                     warn!("Failed to get OAuth links");
                     sleep(bot);
                 } else {
-                    let body = res.into_string().unwrap();
-                    let pattern = regex::Regex::new("https:\\/\\/login\\.growtopiagame\\.com\\/(apple|google|player\\/growid)\\/(login|redirect)\\?token=[^\"]+");
+                    let body = res.into_string()?;
+                    let pattern = regex::Regex::new("https://login\\.growtopiagame\\.com/(apple|google|player/growid)/(login|redirect)\\?token=[^\"]+");
                     let links = pattern
                         .unwrap()
                         .find_iter(&body)
@@ -549,7 +550,7 @@ fn process_events(bot: &Arc<Bot>) {
                     }
                 }
             }
-            std::thread::sleep(Duration::from_millis(10));
+            thread::sleep(Duration::from_millis(10));
         }
     }
 }
@@ -571,17 +572,17 @@ pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
 }
 
 pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
-    let packet_size = std::mem::size_of::<EPacketType>()
-        + std::mem::size_of::<TankPacket>()
+    let packet_size = size_of::<EPacketType>()
+        + size_of::<TankPacket>()
         + packet.extended_data_length as usize;
     let mut enet_packet_data = vec![0u8; packet_size];
 
     let packet_type = EPacketType::NetMessageGamePacket as u32;
-    enet_packet_data[..std::mem::size_of::<u32>()].copy_from_slice(&packet_type.to_le_bytes());
+    enet_packet_data[..size_of::<u32>()].copy_from_slice(&packet_type.to_le_bytes());
 
     let tank_packet_bytes = bincode::serialize(packet).expect("Failed to serialize TankPacket");
     enet_packet_data
-        [std::mem::size_of::<u32>()..std::mem::size_of::<u32>() + tank_packet_bytes.len()]
+        [size_of::<u32>()..size_of::<u32>() + tank_packet_bytes.len()]
         .copy_from_slice(&tank_packet_bytes);
 
     let enet_packet = enet::Packet::reliable(enet_packet_data.as_slice());
@@ -601,15 +602,29 @@ pub fn collect(bot: &Arc<Bot>) {
         return;
     }
 
-    let world = bot.world.read();
-    for obj in &world.dropped.items {
-        let distance;
-        {
-            let position = bot.position.read();
-            distance = ((position.x - obj.x).powi(2) + (position.y - obj.y).powi(2)).sqrt() / 32.0;
-        }
+    let (bot_x, bot_y) = {
+        let position = bot.position.read();
+        (position.x, position.y)
+    };
+
+    let items = {
+        let world = bot.world.read();
+        world.dropped.items.clone()
+    };
+
+    for obj in items {
+        let distance = ((bot_x - obj.x).powi(2) + (bot_y - obj.y).powi(2)).sqrt() / 32.0;
         if distance <= 5.0 {
-            let can_collect = true;
+            let can_collect = {
+                let astar = bot.astar.read();
+                let pos = astar.find_path(
+                    (bot_x / 32.0) as u32,
+                    (bot_y / 32.0) as u32,
+                    (obj.x / 32.0) as u32,
+                    (obj.y / 32.0) as u32,
+                );
+                pos.is_none()
+            };
 
             if bot
                 .inventory
@@ -717,16 +732,19 @@ pub fn walk(bot: &Arc<Bot>, x: i32, y: i32, ap: bool) {
 }
 
 pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
-    let astar = bot.astar.lock();
     let position = {
         let position = bot.position.read();
         position.clone()
     };
-    let paths = astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y);
+
+    let paths = {
+        let astar = bot.astar.read();
+        astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y)
+    };
+
     let delay = utils::config::get_findpath_delay();
     if let Some(paths) = paths {
-        for i in 0..paths.len() {
-            let node = &paths[i];
+        for node in paths {
             {
                 let mut position = bot.position.write();
                 position.x = node.x as f32 * 32.0;

@@ -113,7 +113,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     warn!("Writing world.dat");
                     fs::write("world.dat", &data[56..]).unwrap();
                     bot.world.write().parse(&data[56..]);
-                    bot.astar.lock().update(bot);
+                    bot.astar.write().update(bot);
                     bot::send_packet(
                         bot,
                         EPacketType::NetMessageGenericText,

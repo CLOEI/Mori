@@ -1,5 +1,5 @@
 use crate::bot;
-use crate::bot::{disconnect, is_inworld, send_packet};
+use crate::bot::{disconnect, send_packet};
 use crate::types::epacket_type::EPacketType;
 use crate::types::etank_packet_type::ETankPacketType;
 use crate::types::player::Player;
@@ -116,7 +116,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
-            let data = utils::textparse::parse_and_store_as_map(&message);
+            let data = textparse::parse_and_store_as_map(&message);
             if data.contains_key("type") {
                 if data.get("type").unwrap() == "local" {
                     let mut state = bot.state.write();
@@ -189,7 +189,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnRemove" => {
             let message = variant.get(1).unwrap().as_string();
-            let data = utils::textparse::parse_and_store_as_map(&message);
+            let data = textparse::parse_and_store_as_map(&message);
             let net_id: u32 = data.get("netID").unwrap().parse().unwrap();
 
             let mut players = bot.players.write();

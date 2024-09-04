@@ -1839,7 +1839,7 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#3002b522889d08f63ee314063bab90394e06000f"
+source = "git+https://github.com/CLOEI/gtworld-r.git#e1d15c536c3f47e17b4f78bbf675be7a259f3f9c"
 dependencies = [
  "byteorder",
  "gtitem-r",
@@ -3279,7 +3279,7 @@ dependencies = [
 [[package]]
 name = "rusty_enet"
 version = "0.3.2"
-source = "git+https://github.com/CLOEI/rusty_enet.git#d8c562ef9472dc959275259f54be9fdd7bcdea98"
+source = "git+https://github.com/CLOEI/rusty_enet.git#4918807cd62f4c369c35fdb1c5c65b2b045777c3"
 dependencies = [
  "js-sys",
 ]
