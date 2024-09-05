@@ -14,6 +14,7 @@ use inventory::Inventory;
 use paris::{error, info, warn};
 use std::sync::{Arc, Mutex, RwLock};
 use std::{collections::HashMap, thread, time::Duration, vec};
+use std::mem::size_of;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::{self, FromStr};
 use urlencoding::encode;
@@ -624,7 +625,7 @@ pub fn collect(bot: &Arc<Bot>) {
                 .inventory
                 .read().unwrap()
                 .items
-                .get(obj.id as usize)
+                .get(&obj.id)
                 .map_or(0, |item| item.amount)
                 < 200
             {

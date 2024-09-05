@@ -29,9 +29,9 @@ impl Inventory {
                 ui.label("Inventory");
                 ui.separator();
 
-                for inventory_item in inventory_items {
+                for (id, inventory_item) in inventory_items {
                     let item = {
-                        let item = manager.read().unwrap().items_database.get_item(&(inventory_item.id as u32)).unwrap();
+                        let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
                         item.clone()
                     };
                     ui.horizontal(|ui| {

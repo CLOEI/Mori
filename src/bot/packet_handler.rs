@@ -202,21 +202,15 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                             bot.state.write().unwrap().gems += obj.count as i32;
                                         } else {
                                             let mut inventory = bot.inventory.write().unwrap();
-                                            let mut added = false;
-                                            for item in &mut inventory.items {
-                                                if item.id == obj.id {
-                                                    let temp = item.amount + obj.count as u16;
-                                                    item.amount = if temp > 200 { 200 } else { temp };
-                                                    added = true;
-                                                    break;
-                                                }
-                                            }
-                                            if !added {
+                                            if let Some(item) = inventory.items.get_mut(&obj.id) {
+                                                let temp = item.amount + obj.count as u16;
+                                                item.amount = if temp > 200 { 200 } else { temp };
+                                            } else {
                                                 let item = InventoryItem {
                                                     id: obj.id,
                                                     amount: obj.count as u16,
                                                 };
-                                                inventory.items.push(item);
+                                                inventory.items.insert(obj.id, item);
                                             }
                                         }
                                     }
