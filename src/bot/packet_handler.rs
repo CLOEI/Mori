@@ -110,7 +110,6 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     bot.inventory.write().parse(&data[56..]);
                 }
                 ETankPacketType::NetGamePacketSendMapData => {
-                    warn!("Writing world.dat");
                     fs::write("world.dat", &data[56..]).unwrap();
                     bot.world.write().parse(&data[56..]);
                     bot.astar.write().update(bot);

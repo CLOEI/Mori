@@ -615,16 +615,7 @@ pub fn collect(bot: &Arc<Bot>) {
     for obj in items {
         let distance = ((bot_x - obj.x).powi(2) + (bot_y - obj.y).powi(2)).sqrt() / 32.0;
         if distance <= 5.0 {
-            let can_collect = {
-                let astar = bot.astar.read();
-                let pos = astar.find_path(
-                    (bot_x / 32.0) as u32,
-                    (bot_y / 32.0) as u32,
-                    (obj.x / 32.0) as u32,
-                    (obj.y / 32.0) as u32,
-                );
-                pos.is_none()
-            };
+            let can_collect = true;
 
             if bot
                 .inventory
