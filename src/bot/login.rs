@@ -91,6 +91,7 @@ pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str) -> Result<
             return Err(error::CustomError::Other(format!("Failed to parse json: {}", err)));
         }
     };
+    info!("Steam: {:?}", json);
     Ok(json["token"].to_string())
 }
 

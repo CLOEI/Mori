@@ -1,8 +1,6 @@
 use std::{fs, sync::Arc};
-
 use paris::{error, info, warn};
 use regex::Regex;
-
 use crate::{
     bot::{self, variant_handler},
     types::{
@@ -10,24 +8,31 @@ use crate::{
     },
     utils,
 };
-
 use super::{inventory::InventoryItem, send_packet_raw, Bot};
 
 pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
-            if bot.state.read().is_redirecting {
-                let info = bot.info.read();
-                let message = format!(
-                    "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
-                    info.login_info.uuid, info.login_info.protocol, info.login_info.fhash, info.login_info.mac, info.login_info.requested_name, info.login_info.hash2, info.login_info.fz, info.login_info.f, info.login_info.player_age, info.login_info.game_version, info.login_info.lmode, info.login_info.cbits, info.login_info.rid, info.login_info.gdpr, info.login_info.hash, info.login_info.category, info.login_info.token, info.login_info.total_playtime, info.login_info.door_id, info.login_info.klv, info.login_info.meta, info.login_info.platform_id, info.login_info.device_version, info.login_info.zf, info.login_info.country, info.login_info.user, info.login_info.wk);
+            let is_redirecting = {
+                let state = bot.state.read();
+                state.is_redirecting
+            };
+            if is_redirecting {
+                let message = {
+                    let info = bot.info.read();
+                    format!(
+                        "UUIDToken|{}\nprotocol|{}\nfhash|{}\nmac|{}\nrequestedName|{}\nhash2|{}\nfz|{}\nf|{}\nplayer_age|{}\ngame_version|{}\nlmode|{}\ncbits|{}\nrid|{}\nGDPR|{}\nhash|{}\ncategory|{}\ntoken|{}\ntotal_playtime|{}\ndoor_id|{}\nklv|{}\nmeta|{}\nplatformID|{}\ndeviceVersion|{}\nzf|{}\ncountry|{}\nuser|{}\nwk|{}\n",
+                        info.login_info.uuid, info.login_info.protocol, info.login_info.fhash, info.login_info.mac, info.login_info.requested_name, info.login_info.hash2, info.login_info.fz, info.login_info.f, info.login_info.player_age, info.login_info.game_version, info.login_info.lmode, info.login_info.cbits, info.login_info.rid, info.login_info.gdpr, info.login_info.hash, info.login_info.category, info.login_info.token, info.login_info.total_playtime, info.login_info.door_id, info.login_info.klv, info.login_info.meta, info.login_info.platform_id, info.login_info.device_version, info.login_info.zf, info.login_info.country, info.login_info.user, info.login_info.wk)
+                };
                 bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
             } else {
+                let token = {
+                    let info = bot.info.read();
+                    info.token.clone()
+                };
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
-                    209,
-                    bot.info.read().token,
-                    "0,1,1"
+                    209, token, "0,1,1"
                 );
                 bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
             }
@@ -38,32 +43,35 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             info!("Message: {}", message);
 
             if message.contains("logon_fail") {
-                bot.state.write().is_redirecting = false;
+                let mut state = bot.state.write();
+                state.is_redirecting = false;
                 bot::disconnect(bot);
             }
             if message.contains("currently banned") {
-                {
-                    let mut state = bot.state.write();
-                    state.is_running = false;
-                    state.is_banned = true;
-                }
+                let mut state = bot.state.write();
+                state.is_running = false;
+                state.is_banned = true;
                 bot::disconnect(bot);
             }
             if message.contains("Advanced Account Protection") {
-                bot.state.write().is_running = false;
+                let mut state = bot.state.write();
+                state.is_running = false;
                 bot::disconnect(bot);
             }
             if message.contains("temporarily suspended") {
-                bot.state.write().is_running = false;
+                let mut state = bot.state.write();
+                state.is_running = false;
                 bot::disconnect(bot);
             }
             if message.contains("has been suspended") {
-                bot.state.write().is_running = false;
-                bot.state.write().is_banned = true;
+                let mut state = bot.state.write();
+                state.is_running = false;
+                state.is_banned = true;
                 bot::disconnect(bot);
             }
             if message.contains("Growtopia is not quite ready for users") {
-                bot.info.write().timeout = 60;
+                let mut info = bot.info.write();
+                info.timeout = 60;
                 bot::sleep(bot);
             }
             if message.contains("UPDATE REQUIRED") {
@@ -71,9 +79,15 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 if let Some(caps) = re.captures(&message) {
                     let version = caps.get(1).unwrap().as_str();
                     warn!("Update required: {}, updating...", version);
-                    bot.info.write().login_info.game_version = version.to_string();
+                    {
+                        let mut info = bot.info.write();
+                        info.login_info.game_version = version.to_string();
+                    }
                     utils::config::set_game_version(version.to_string());
-                    let username = bot.info.read().username.clone();
+                    let username = {
+                        let info = bot.info.read();
+                        info.username.clone()
+                    };
                     utils::config::save_token_to_bot(username, "".to_string(), "".to_string());
                 }
             }
@@ -83,7 +97,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 info!("Received: {:?}", tank_packet._type);
                 match tank_packet._type {
                     ETankPacketType::NetGamePacketState => {
-                        for player in bot.players.write().iter_mut() {
+                        let mut players = bot.players.write();
+                        for player in players.iter_mut() {
                             if player.net_id == tank_packet.net_id {
                                 player.position.x = tank_packet.vector_x;
                                 player.position.y = tank_packet.vector_y;
@@ -110,12 +125,17 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         info!("Replied to ping request");
                     }
                     ETankPacketType::NetGamePacketSendInventoryState => {
-                        bot.inventory.write().parse(&data[56..]);
+                        let mut inventory = bot.inventory.write();
+                        inventory.parse(&data[56..]);
                     }
                     ETankPacketType::NetGamePacketSendMapData => {
                         fs::write("world.dat", &data[56..]).unwrap();
-                        bot.world.write().parse(&data[56..]);
-                        bot.astar.write().update(bot);
+                        {
+                            let mut world = bot.world.write();
+                            world.parse(&data[56..]);
+                        }
+                        let mut astar = bot.astar.write();
+                        astar.update(bot);
                         bot::send_packet(
                             bot,
                             EPacketType::NetMessageGenericText,
@@ -140,7 +160,6 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                 }
                             }
                         }
-
 
                         let mut world = bot.world.write();
                         if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
@@ -194,9 +213,13 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             let mut remove_index = None;
                             for (i, obj) in world.dropped.items.iter().enumerate() {
                                 if obj.uid == tank_packet.value {
-                                    if tank_packet.net_id == bot.state.read().net_id {
+                                    if tank_packet.net_id == {
+                                        let state = bot.state.read();
+                                        state.net_id
+                                    } {
                                         if obj.id == 112 {
-                                            bot.state.write().gems += obj.count as i32;
+                                            let mut state = bot.state.write();
+                                            state.gems += obj.count as i32;
                                         } else {
                                             let mut inventory = bot.inventory.write();
                                             let mut added = false;
