@@ -44,6 +44,7 @@ Any contribution would help alot.
 - [ ] Auto rotation
 - [ ] Auto dirt farm
 - [ ] Auto tutorial
+- [x] Auto clear world ( There's a bug at coordianate 89 it won't continue)
 - [ ] Spam
 - [ ] Socks5 support
 

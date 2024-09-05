@@ -17,6 +17,7 @@ use types::{
     config::{Config},
 };
 use mlua::prelude::*;
+use paris::error;
 use parking_lot::RwLock;
 
 mod bot;
@@ -42,6 +43,18 @@ fn init_config() {
 }
 
 fn main() {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        for deadlock in parking_lot::deadlock::check_deadlock() {
+            for deadlock in deadlock {
+                error!(
+                    "Found a deadlock! {}:\n{:?}",
+                    deadlock.thread_id(),
+                    deadlock.backtrace()
+                );
+            }
+        }
+    });
     init_config();
 
     let options = eframe::NativeOptions {

@@ -80,6 +80,13 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
             info!("Received console message: {}", message);
+            if message.contains("wants to add you to") && message.contains("Wrench yourself to accept") {
+                send_packet(
+                    bot,
+                    EPacketType::NetMessageGenericText,
+                    format!("action|wrench\n|netid|{}\n", bot.state.read().net_id),
+                );
+            }
         }
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();

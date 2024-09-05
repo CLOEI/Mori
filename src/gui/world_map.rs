@@ -9,6 +9,7 @@ use crate::{
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use paris::info;
 use parking_lot::RwLock;
+use crate::bot::features;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -160,7 +161,7 @@ impl WorldMap {
                         if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
                             let bot_clone = bot.clone();
                             thread::spawn(move || {
-                                bot::place(&bot_clone, 0, -1, 2);
+                                features::auto_clear_world::start(&bot_clone);
                             });
                         }
                     });

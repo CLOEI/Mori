@@ -79,153 +79,157 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             }
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
-            Ok(tank_packet) => match tank_packet._type {
-                ETankPacketType::NetGamePacketState => {
-                    for player in bot.players.write().iter_mut() {
-                        if player.net_id == tank_packet.net_id {
-                            player.position.x = tank_packet.vector_x;
-                            player.position.y = tank_packet.vector_y;
-                            break;
-                        }
-                    }
-                }
-                ETankPacketType::NetGamePacketCallFunction => {
-                    variant_handler::handle(bot, &tank_packet, &data[56..]);
-                }
-                ETankPacketType::NetGamePacketPingRequest => {
-                    let packet = TankPacket {
-                        _type: ETankPacketType::NetGamePacketPingReply,
-                        net_id: 0,
-                        unk2: 0,
-                        vector_x: 64.0,
-                        vector_y: 64.0,
-                        vector_x2: 1000.0,
-                        vector_y2: 250.0,
-                        ..Default::default()
-                    };
-
-                    send_packet_raw(&bot, &packet);
-                }
-                ETankPacketType::NetGamePacketSendInventoryState => {
-                    bot.inventory.write().parse(&data[56..]);
-                }
-                ETankPacketType::NetGamePacketSendMapData => {
-                    fs::write("world.dat", &data[56..]).unwrap();
-                    bot.world.write().parse(&data[56..]);
-                    bot.astar.write().update(bot);
-                    bot::send_packet(
-                        bot,
-                        EPacketType::NetMessageGenericText,
-                        "action|getDRAnimations\n".to_string(),
-                    );
-                }
-                ETankPacketType::NetGamePacketTileChangeRequest => {
-                    if tank_packet.net_id == bot.state.read().net_id && tank_packet.value != 18 {
-                        let mut inventory = bot.inventory.write();
-                        for i in 0..inventory.items.len() {
-                            if inventory.items[i].id == tank_packet.value as u16 {
-                                inventory.items[i].amount -= 1;
-                                if inventory.items[i].amount == 0 || inventory.items[i].amount > 200
-                                {
-                                    inventory.items.remove(i);
-                                }
+            Ok(tank_packet) => {
+                info!("Received: {:?}", tank_packet._type);
+                match tank_packet._type {
+                    ETankPacketType::NetGamePacketState => {
+                        for player in bot.players.write().iter_mut() {
+                            if player.net_id == tank_packet.net_id {
+                                player.position.x = tank_packet.vector_x;
+                                player.position.y = tank_packet.vector_y;
                                 break;
                             }
                         }
                     }
-
-                    let mut world = bot.world.write();
-                    if let Some(tile) =
-                        world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32)
-                    {
-                        if tank_packet.value == 18 {
-                            if tile.foreground_item_id != 0 {
-                                tile.foreground_item_id = 0;
-                            } else {
-                                tile.background_item_id = 0;
-                            }
-                        } else {
-                            if let Some(item) = bot.item_database.items.get(&tank_packet.value) {
-                                if item.action_type == 22
-                                    || item.action_type == 28
-                                    || item.action_type == 18
-                                {
-                                    tile.background_item_id = tank_packet.value as u16;
-                                } else {
-                                    info!("TileChangeRequest: {:?}", tank_packet);
-                                    tile.foreground_item_id = tank_packet.value as u16;
-                                }
-                            }
-                        }
+                    ETankPacketType::NetGamePacketCallFunction => {
+                        variant_handler::handle(bot, &tank_packet, &data[56..]);
                     }
-                }
-                ETankPacketType::NetGamePacketItemChangeObject => {
-                    let mut world = bot.world.write();
-                    info!("ItemChangeObject: {:?}", tank_packet);
-
-                    if tank_packet.net_id == u32::MAX {
-                        let item = gtworld_r::DroppedItem {
-                            id: tank_packet.value as u16,
-                            x: tank_packet.vector_x.ceil(),
-                            y: tank_packet.vector_y.ceil(),
-                            count: tank_packet.unk6 as u8,
-                            flags: tank_packet.unk1,
-                            uid: world.dropped.last_dropped_item_uid + 1,
+                    ETankPacketType::NetGamePacketPingRequest => {
+                        let packet = TankPacket {
+                            _type: ETankPacketType::NetGamePacketPingReply,
+                            net_id: 0,
+                            unk2: 0,
+                            vector_x: 64.0,
+                            vector_y: 64.0,
+                            vector_x2: 1000.0,
+                            vector_y2: 250.0,
+                            ..Default::default()
                         };
 
-                        world.dropped.items.push(item);
-                        world.dropped.last_dropped_item_uid += 1;
-                        world.dropped.items_count += 1;
-                        return;
-                    } else if tank_packet.net_id == u32::MAX - 3 {
-                        for obj in &mut world.dropped.items {
-                            if obj.id == tank_packet.value as u16
-                                && obj.x == tank_packet.vector_x.ceil()
-                                && obj.y == tank_packet.vector_y.ceil()
-                            {
-                                obj.count = tank_packet.unk6 as u8;
-                                break;
+                        send_packet_raw(&bot, &packet);
+                        info!("Replied to ping request");
+                    }
+                    ETankPacketType::NetGamePacketSendInventoryState => {
+                        bot.inventory.write().parse(&data[56..]);
+                    }
+                    ETankPacketType::NetGamePacketSendMapData => {
+                        fs::write("world.dat", &data[56..]).unwrap();
+                        bot.world.write().parse(&data[56..]);
+                        bot.astar.write().update(bot);
+                        bot::send_packet(
+                            bot,
+                            EPacketType::NetMessageGenericText,
+                            "action|getDRAnimations\n".to_string(),
+                        );
+                    }
+                    ETankPacketType::NetGamePacketTileChangeRequest => {
+                        let should_update_inventory = {
+                            let state = bot.state.read();
+                            state.net_id == tank_packet.net_id && tank_packet.value != 18
+                        };
+
+                        if should_update_inventory {
+                            let mut inventory = bot.inventory.write();
+                            for i in 0..inventory.items.len() {
+                                if inventory.items[i].id == tank_packet.value as u16 {
+                                    inventory.items[i].amount -= 1;
+                                    if inventory.items[i].amount == 0 || inventory.items[i].amount > 200 {
+                                        inventory.items.remove(i);
+                                    }
+                                    break;
+                                }
                             }
                         }
-                    } else if tank_packet.net_id > 0 {
-                        let mut remove_index = None;
-                        for (i, obj) in world.dropped.items.iter().enumerate() {
-                            if obj.uid == tank_packet.value {
-                                if tank_packet.net_id == bot.state.read().net_id {
-                                    if obj.id == 112 {
-                                        bot.state.write().gems += obj.count as i32;
+
+
+                        let mut world = bot.world.write();
+                        if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+                            if tank_packet.value == 18 {
+                                if tile.foreground_item_id != 0 {
+                                    tile.foreground_item_id = 0;
+                                } else {
+                                    tile.background_item_id = 0;
+                                }
+                            } else {
+                                if let Some(item) = bot.item_database.items.get(&tank_packet.value) {
+                                    if item.action_type == 22 || item.action_type == 28 || item.action_type == 18 {
+                                        tile.background_item_id = tank_packet.value as u16;
                                     } else {
-                                        let mut inventory = bot.inventory.write();
-                                        let mut added = false;
-                                        for item in &mut inventory.items {
-                                            if item.id == obj.id {
-                                                let temp = item.amount + obj.count as u16;
-                                                item.amount = if temp > 200 { 200 } else { temp };
-                                                added = true;
-                                                break;
-                                            }
-                                        }
-                                        if !added {
-                                            let item = InventoryItem {
-                                                id: obj.id,
-                                                amount: obj.count as u16,
-                                            };
-                                            inventory.items.push(item);
-                                        }
+                                        info!("TileChangeRequest: {:?}", tank_packet);
+                                        tile.foreground_item_id = tank_packet.value as u16;
                                     }
                                 }
-                                remove_index = Some(i);
-                                break;
                             }
                         }
-                        if let Some(i) = remove_index {
-                            world.dropped.items.remove(i);
-                            world.dropped.items_count -= 1;
+                    }
+                    ETankPacketType::NetGamePacketItemChangeObject => {
+                        let mut world = bot.world.write();
+                        info!("ItemChangeObject: {:?}", tank_packet);
+
+                        if tank_packet.net_id == u32::MAX {
+                            let item = gtworld_r::DroppedItem {
+                                id: tank_packet.value as u16,
+                                x: tank_packet.vector_x.ceil(),
+                                y: tank_packet.vector_y.ceil(),
+                                count: tank_packet.unk6 as u8,
+                                flags: tank_packet.unk1,
+                                uid: world.dropped.last_dropped_item_uid + 1,
+                            };
+
+                            world.dropped.items.push(item);
+                            world.dropped.last_dropped_item_uid += 1;
+                            world.dropped.items_count += 1;
+                            return;
+                        } else if tank_packet.net_id == u32::MAX - 3 {
+                            for obj in &mut world.dropped.items {
+                                if obj.id == tank_packet.value as u16
+                                    && obj.x == tank_packet.vector_x.ceil()
+                                    && obj.y == tank_packet.vector_y.ceil()
+                                {
+                                    obj.count = tank_packet.unk6 as u8;
+                                    break;
+                                }
+                            }
+                        } else if tank_packet.net_id > 0 {
+                            let mut remove_index = None;
+                            for (i, obj) in world.dropped.items.iter().enumerate() {
+                                if obj.uid == tank_packet.value {
+                                    if tank_packet.net_id == bot.state.read().net_id {
+                                        if obj.id == 112 {
+                                            bot.state.write().gems += obj.count as i32;
+                                        } else {
+                                            let mut inventory = bot.inventory.write();
+                                            let mut added = false;
+                                            for item in &mut inventory.items {
+                                                if item.id == obj.id {
+                                                    let temp = item.amount + obj.count as u16;
+                                                    item.amount = if temp > 200 { 200 } else { temp };
+                                                    added = true;
+                                                    break;
+                                                }
+                                            }
+                                            if !added {
+                                                let item = InventoryItem {
+                                                    id: obj.id,
+                                                    amount: obj.count as u16,
+                                                };
+                                                inventory.items.push(item);
+                                            }
+                                        }
+                                    }
+                                    remove_index = Some(i);
+                                    break;
+                                }
+                            }
+                            if let Some(i) = remove_index {
+                                world.dropped.items.remove(i);
+                                world.dropped.items_count -= 1;
+                            }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             Err(..) => {
                 error!("Failed to deserialize TankPacket: {:?}", data[0]);
             }

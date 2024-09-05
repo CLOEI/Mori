@@ -262,7 +262,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                 } else {
                     error!("Token is invalid");
                     false
-                }
+                };
             }
             Err(err) => {
                 error!("Request error: {}", err);
@@ -275,12 +275,13 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
 pub fn poll(bot: &Arc<Bot>) {
     let bot_clone = bot.clone();
     thread::spawn(move || loop {
-        let state = bot_clone.state.read();
-        if !state.is_running {
-            break;
+        {
+            let state = bot_clone.state.read();
+            if !state.is_running {
+                break;
+            }
         }
-        drop(state);
-        collect(&bot_clone);
+        // collect(&bot_clone);
         set_ping(&bot_clone);
         thread::sleep(Duration::from_millis(20));
     });
@@ -545,7 +546,6 @@ fn process_events(bot: &Arc<Bot>) {
                         }
                         let packet_id = LittleEndian::read_u32(&data[0..4]);
                         let packet_type = EPacketType::from(packet_id);
-                        info!("Received packet: {:?}", packet_type);
                         packet_handler::handle(bot, packet_type, &data[4..]);
                     }
                 }
