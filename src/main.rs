@@ -4,7 +4,7 @@ use std::{
     fs::{self, File},
     io::Write,
 };
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use crate::gui::inventory::Inventory;
 use bot::Bot;
 use eframe::egui::ViewportBuilder;
@@ -18,7 +18,6 @@ use types::{
 };
 use mlua::prelude::*;
 use paris::error;
-use parking_lot::RwLock;
 
 mod bot;
 mod gui;
@@ -43,18 +42,6 @@ fn init_config() {
 }
 
 fn main() {
-    std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        for deadlock in parking_lot::deadlock::check_deadlock() {
-            for deadlock in deadlock {
-                error!(
-                    "Found a deadlock! {}:\n{:?}",
-                    deadlock.thread_id(),
-                    deadlock.backtrace()
-                );
-            }
-        }
-    });
     init_config();
 
     let options = eframe::NativeOptions {
@@ -91,7 +78,7 @@ impl App {
         let lua = Lua::new();
         let bots = utils::config::get_bots();
         for bot in bots.clone() {
-            manager.write().add_bot(bot);
+            manager.write().unwrap().add_bot(bot);
         }
 
         lua_register::register(&lua, &manager);

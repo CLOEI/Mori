@@ -1,7 +1,6 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use crate::manager::Manager;
 use eframe::egui::{self, Ui};
-use parking_lot::RwLock;
 use crate::utils;
 
 #[derive(Default)]
@@ -14,7 +13,7 @@ impl Inventory {
         self.selected_bot = utils::config::get_selected_bot();
         if !self.selected_bot.is_empty() {
             let bot = {
-                let manager = manager.read();
+                let manager = manager.read().unwrap();
 
                 match manager.get_bot(&self.selected_bot) {
                     Some(bot) => Some(bot.clone()),
@@ -23,7 +22,7 @@ impl Inventory {
             };
             if let Some(bot) = bot {
                 let inventory_items = {
-                    let inventory = bot.inventory.read();
+                    let inventory = bot.inventory.read().unwrap();
                     inventory.items.clone()
                 };
 
@@ -32,7 +31,7 @@ impl Inventory {
 
                 for inventory_item in inventory_items {
                     let item = {
-                        let item = manager.read().items_database.get_item(&(inventory_item.id as u32)).unwrap();
+                        let item = manager.read().unwrap().items_database.get_item(&(inventory_item.id as u32)).unwrap();
                         item.clone()
                     };
                     ui.horizontal(|ui| {

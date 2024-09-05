@@ -1,7 +1,6 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use crate::manager::Manager;
 use eframe::egui::{self, Ui};
-use parking_lot::RwLock;
 
 #[derive(Default)]
 pub struct ItemDatabase {
@@ -13,7 +12,7 @@ impl ItemDatabase {
     pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>, _ctx: &egui::Context) {
         ui.horizontal(|ui| {
             let (item_database_version, item_database_item_count) = {
-                let manager = manager.read();
+                let manager = manager.read().unwrap();
                 (manager.items_database.version.clone(), manager.items_database.item_count)
             };
 
@@ -28,7 +27,7 @@ impl ItemDatabase {
         ui.separator();
 
         let mut filtered_items: Vec<u32> = {
-            manager.read().items_database.items.iter()
+            manager.read().unwrap().items_database.items.iter()
                 .filter_map(|(&id, item)| {
                     if item.name.to_lowercase().contains(&self.search_query.to_lowercase()) {
                         Some(id)
@@ -60,7 +59,7 @@ impl ItemDatabase {
                                     for i in row_range {
                                         let item_id = filtered_items[i];
                                         let item = {
-                                            let manager = manager.read();
+                                            let manager = manager.read().unwrap();
                                             manager.items_database.get_item(&item_id).unwrap()
                                         };
                                         if ui
@@ -88,7 +87,7 @@ impl ItemDatabase {
                     ui.vertical(|ui| {
                         if let Some(selected_index) = self.selected_item_index {
                             let selected_item = {
-                                let manager = manager.read();
+                                let manager = manager.read().unwrap();
                                 manager.items_database.get_item(&selected_index).unwrap().clone()
                             };
                             ui.label(format!("Name: {}", selected_item.name));

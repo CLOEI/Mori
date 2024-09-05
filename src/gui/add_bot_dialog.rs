@@ -1,7 +1,6 @@
 use std::fs;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use eframe::egui::{self};
-use parking_lot::RwLock;
 use crate::{
     manager::Manager,
     types::{config::BotConfig, elogin_method::ELoginMethod},
@@ -75,7 +74,7 @@ impl AddBotDialog {
                             data: "".to_string(),
                         };
                         {
-                            manager.write().add_bot(config.clone());
+                            manager.write().unwrap().add_bot(config.clone());
                         }
                         let mut data = utils::config::parse_config().unwrap();
                         data.bots.push(config);

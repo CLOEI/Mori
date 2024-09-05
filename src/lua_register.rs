@@ -1,7 +1,6 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use mlua::Lua;
 use mlua::prelude::LuaResult;
-use parking_lot::RwLock;
 use crate::manager::Manager;
 use crate::utils;
 

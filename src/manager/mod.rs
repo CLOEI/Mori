@@ -53,23 +53,23 @@ impl Manager {
             let bot_clone = Arc::clone(bot);
             thread::spawn(move || {
                 let is_running = {
-                    let state = bot_clone.state.read();
+                    let state = bot_clone.state.read().unwrap();
                     state.is_running
                 };
 
                 if is_running {
-                    bot_clone.state.write().is_running = false;
+                    bot_clone.state.write().unwrap().is_running = false;
                     bot::disconnect(&bot_clone);
                 }
             });
-            self.bots.retain(|(b, _)| b.info.read().username != username);
+            self.bots.retain(|(b, _)| b.info.read().unwrap().username != username);
             utils::config::remove_bot(username.to_string());
         }
     }
 
     pub fn get_bot(&self, username: &str) -> Option<&Arc<Bot>> {
         for (bot, _) in &self.bots {
-            if bot.info.read().username == username {
+            if bot.info.read().unwrap().username == username {
                 return Some(bot);
             }
         }

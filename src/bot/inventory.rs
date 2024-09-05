@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Cursor;
 
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -6,7 +7,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 pub struct Inventory {
     pub size: u32,
     pub item_count: u16,
-    pub items: Vec<InventoryItem>,
+    pub items: HashMap<u16, InventoryItem>,
 }
 
 #[derive(Debug, Clone)]
@@ -20,7 +21,7 @@ impl Inventory {
         Inventory {
             size: 0,
             item_count: 0,
-            items: Vec::new(),
+            items: HashMap::new(),
         }
     }
 
@@ -33,7 +34,7 @@ impl Inventory {
         for _ in 0..self.item_count {
             let id = data.read_u16::<LittleEndian>().unwrap();
             let amount = data.read_u16::<LittleEndian>().unwrap();
-            self.items.push(InventoryItem { id, amount });
+            self.items.insert(id, InventoryItem { id, amount });
         }
     }
 

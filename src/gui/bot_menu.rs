@@ -1,8 +1,7 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread;
 
 use eframe::egui::{self, Ui};
-use parking_lot::RwLock;
 use crate::{bot::warp, manager::Manager, types::config::BotConfig, utils, Bot};
 use crate::bot::leave;
 
@@ -53,7 +52,7 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         let bot = {
-                                            let manager = manager.read();
+                                            let manager = manager.read().unwrap();
 
                                             match manager.get_bot(&self.selected_bot) {
                                                 Some(bot) => Some(bot.clone()),
@@ -62,8 +61,8 @@ impl BotMenu {
                                         };
                                         if let Some(bot) = bot {
                                             let (username, status, ping, world_name, timeout) = {
-                                                let info = bot.info.read();
-                                                let world = bot.world.read();
+                                                let info = bot.info.read().unwrap();
+                                                let world = bot.world.read().unwrap();
                                                 (
                                                     info.login_info.tank_id_name.clone(),
                                                     info.status.clone(),
@@ -120,7 +119,7 @@ impl BotMenu {
                             });
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                                 if ui.button("Leave").clicked() {
-                                    if let Some(bot) = manager.read().get_bot(&self.selected_bot) {
+                                    if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
                                         let bot_clone = bot.clone();
                                         thread::spawn(move || {
                                             leave(&bot_clone);
@@ -128,7 +127,7 @@ impl BotMenu {
                                     }
                                 }
                                 if ui.button("Warp").clicked() {
-                                    if let Some(bot) = manager.read().get_bot(&self.selected_bot) {
+                                    if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
                                         let bot_clone = bot.clone();
                                         let world_name = self.warp_name.clone();
                                         thread::spawn(move || {
@@ -148,7 +147,7 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         let bot = {
-                                            let manager = manager.read();
+                                            let manager = manager.read().unwrap();
 
                                             match manager.get_bot(&self.selected_bot) {
                                                 Some(bot) => Some(bot.clone()),
@@ -157,7 +156,7 @@ impl BotMenu {
                                         };
                                         if let Some(bot) = bot {
                                             let (ip, port) = {
-                                                let server = bot.server.read();
+                                                let server = bot.server.read().unwrap();
                                                 (server.ip.clone(), server.port.clone().to_string())
                                             };
                                             ui.label("IP");
@@ -192,7 +191,7 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         let bot = {
-                                            let manager = manager.read();
+                                            let manager = manager.read().unwrap();
 
                                             match manager.get_bot(&self.selected_bot) {
                                                 Some(bot) => Some(bot.clone()),
@@ -201,7 +200,7 @@ impl BotMenu {
                                         };
                                         if let Some(bot) = bot {
                                             let (username, password, code, method) = {
-                                                let info = bot.info.read();
+                                                let info = bot.info.read().unwrap();
                                                 (
                                                     info.username.clone(),
                                                     info.password.clone(),
@@ -248,7 +247,7 @@ impl BotMenu {
                                     .max_col_width(120.0)
                                     .show(ui, |ui| {
                                         let bot = {
-                                            let manager = manager.read();
+                                            let manager = manager.read().unwrap();
 
                                             match manager.get_bot(&self.selected_bot) {
                                                 Some(bot) => Some(bot.clone()),
@@ -256,10 +255,10 @@ impl BotMenu {
                                             }
                                         };
                                         if let Some(bot) = bot {
-                                            let net_id = bot.state.read().net_id.clone();
-                                            let token = bot.info.read().token.clone();
-                                            let is_banned = bot.state.read().is_banned.clone();
-                                            let position = bot.position.read().clone();
+                                            let net_id = bot.state.read().unwrap().net_id.clone();
+                                            let token = bot.info.read().unwrap().token.clone();
+                                            let is_banned = bot.state.read().unwrap().is_banned.clone();
+                                            let position = bot.position.read().unwrap().clone();
                                             ui.label("NetID");
                                             ui.label(net_id.to_string());
                                             ui.end_row();

@@ -1,6 +1,5 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use eframe::egui::{self, include_image, Ui};
-use parking_lot::RwLock;
 use crate::manager::Manager;
 use crate::utils;
 use super::add_bot_dialog::AddBotDialog;
@@ -94,7 +93,7 @@ impl Navbar {
                 .clicked()
             {
                 let selected_bot = utils::config::get_selected_bot();
-                manager.write().remove_bot(&selected_bot);
+                manager.write().unwrap().remove_bot(&selected_bot);
             }
         });
     }
