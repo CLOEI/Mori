@@ -9,7 +9,7 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>, _ctx: &egui::Context) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>) {
         self.selected_bot = utils::config::get_selected_bot();
         if !self.selected_bot.is_empty() {
             let bot = {
@@ -26,19 +26,18 @@ impl Inventory {
                     inventory.items.clone()
                 };
 
-                ui.label("Inventory");
-                ui.separator();
-
-                for (id, inventory_item) in inventory_items {
-                    let item = {
-                        let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
-                        item.clone()
-                    };
-                    ui.horizontal(|ui| {
-                        ui.label(item.name.clone());
-                        ui.label(format!("x{}", inventory_item.amount));
-                    });
-                }
+                ui.vertical(|ui| {
+                    for (id, inventory_item) in inventory_items {
+                        let item = {
+                            let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
+                            item.clone()
+                        };
+                        ui.horizontal(|ui| {
+                            ui.label(item.name.clone());
+                            ui.label(format!("x{}", inventory_item.amount));
+                        });
+                    }
+                });
             }
         }
     }

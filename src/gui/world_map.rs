@@ -131,40 +131,41 @@ impl WorldMap {
                     }
                 }
 
-                egui::Window::new("Movement").show(ui.ctx(), |ui| {
-                    ui.horizontal(|ui| {
-                        if ui.button("Up").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot::walk(&bot_clone, 0, -1, false);
-                            });
-                        }
-                        if ui.button("Down").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot::walk(&bot_clone, 0, 1, false);
-                            });
-                        }
-                        if ui.button("Left").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot::walk(&bot_clone, -1, 0, false);
-                            });
-                        }
-                        if ui.button("Right").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot::walk(&bot_clone, 1, 0, false);
-                            });
-                        }
-                        if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                features::auto_clear_world::start(&bot_clone);
-                            });
-                        }
+                egui::Window::new("Movement")
+                    .show(ui.ctx(), |ui| {
+                        ui.horizontal(|ui| {
+                            if ui.button("Up").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot::walk(&bot_clone, 0, -1, false);
+                                });
+                            }
+                            if ui.button("Down").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot::walk(&bot_clone, 0, 1, false);
+                                });
+                            }
+                            if ui.button("Left").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot::walk(&bot_clone, -1, 0, false);
+                                });
+                            }
+                            if ui.button("Right").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot::walk(&bot_clone, 1, 0, false);
+                                });
+                            }
+                            if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    features::auto_clear_world::start(&bot_clone);
+                                });
+                            }
+                        });
                     });
-                });
             }
         }
     }

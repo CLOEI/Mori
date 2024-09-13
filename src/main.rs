@@ -67,8 +67,6 @@ struct App {
     add_bot_dialog: AddBotDialog,
     manager: Arc<RwLock<Manager>>,
     bot_menu: BotMenu,
-    world_map: WorldMap,
-    inventory: Inventory,
     lua: Lua,
 }
 
@@ -88,8 +86,6 @@ impl App {
             item_database: Default::default(),
             add_bot_dialog: Default::default(),
             bot_menu: Default::default(),
-            world_map: Default::default(),
-            inventory: Default::default(),
             manager,
             lua,
         }
@@ -108,12 +104,8 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.navbar.current_menu == "bots" {
                 self.bot_menu.render(ui, &self.manager);
-            } else if self.navbar.current_menu == "inventory" {
-                self.inventory.render(ui, &self.manager, ctx);
             } else if self.navbar.current_menu == "item_database" {
                 self.item_database.render(ui, &self.manager, ctx);
-            } else if self.navbar.current_menu == "world_map" {
-                self.world_map.render(ui, &self.manager);
             } else {
                 ui.label("Not implemented yet");
             }

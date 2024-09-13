@@ -32,39 +32,12 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::image_and_text(
-                    include_image!("../../assets/earth.png"),
-                    "World",
-                ))
-                .clicked()
-            {
-                self.current_menu = "world_map".to_string();
-            }
-            if ui
-                .add(egui::Button::image_and_text(
-                    include_image!("../../assets/backpack.png"),
-                    "Inventory",
-                ))
-                .clicked()
-            {
-                self.current_menu = "inventory".to_string();
-            }
-            if ui
-                .add(egui::Button::image_and_text(
                     include_image!("../../assets/database.png"),
                     "Item database",
                 ))
                 .clicked()
             {
                 self.current_menu = "item_database".to_string();
-            }
-            if ui
-                .add(egui::Button::image_and_text(
-                    include_image!("../../assets/blocks.png"),
-                    "Features",
-                ))
-                .clicked()
-            {
-                self.current_menu = "features".to_string();
             }
             if ui
                 .add(egui::Button::image_and_text(
