@@ -11,6 +11,8 @@ use crate::{
 pub struct AddBotDialog {
     pub username: String,
     pub password: String,
+    pub steam_user: String,
+    pub steam_pass: String,
     pub code: String,
     pub method: ELoginMethod,
     pub open: bool,
@@ -33,6 +35,12 @@ impl AddBotDialog {
                             ui.end_row();
                             ui.label("Password");
                             ui.text_edit_singleline(&mut self.password);
+                            ui.end_row();
+                            ui.label("Steam username");
+                            ui.text_edit_singleline(&mut self.steam_user);
+                            ui.end_row();
+                            ui.label("Steam Password");
+                            ui.text_edit_singleline(&mut self.steam_pass);
                             ui.end_row();
                             ui.label("2FA Code");
                             ui.text_edit_singleline(&mut self.code);
@@ -65,13 +73,24 @@ impl AddBotDialog {
                             ui.end_row();
                         });
                     if ui.button("Add").clicked() {
-                        let config = BotConfig {
-                            payload: format!("{}|{}", self.username, self.password),
-                            recovery_code: self.code.clone(),
-                            login_method: self.method.clone(),
-                            token: "".to_string(),
-                            data: "".to_string(),
-                        };
+                        let config;
+                        if self.method == ELoginMethod::STEAM {
+                            config = BotConfig {
+                                payload: format!("{}|{}|{}|{}", self.username, self.password, self.steam_user, self.steam_pass),
+                                recovery_code: self.code.clone(),
+                                login_method: self.method.clone(),
+                                token: "".to_string(),
+                                data: "".to_string(),
+                            };
+                        } else {
+                            config = BotConfig {
+                                payload: format!("{}|{}", self.username, self.password),
+                                recovery_code: self.code.clone(),
+                                login_method: self.method.clone(),
+                                token: "".to_string(),
+                                data: "".to_string(),
+                            };
+                        }
                         {
                             manager.write().unwrap().add_bot(config.clone());
                         }

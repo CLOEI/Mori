@@ -1,15 +1,16 @@
-use paris::{error, info};
+use paris::{error, info, warn};
 use regex::Regex;
 use serde_json::Value;
-use std::{io, process::Command, time::Duration};
+use std::{env, io, process::Command, time::Duration};
+use std::process::Stdio;
 use base64::Engine;
 use base64::engine::general_purpose;
-use steamworks::{AppId, Client};
-use steamworks::networking_types::NetworkingIdentity;
+use egui::TextBuffer;
 use ureq::Agent;
 use urlencoding::encode;
 use crate::utils::error;
-use crate::utils::textparse::format_byte_as_steam_token;
+use wait_timeout::ChildExt;
+use crate::utils;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -56,7 +57,7 @@ pub fn get_ubisoft_session(
     Ok(game_token)
 }
 
-pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str) -> Result<String, error::CustomError> {
+pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str, steamuser: &str, steampassword: &str) -> Result<String, error::CustomError> {
     let agent = ureq::AgentBuilder::new().redirects(5).build();
     let session = match get_ubisoft_session(&agent, email, password) {
         Ok(res) => res,
@@ -65,34 +66,46 @@ pub fn get_ubisoft_token(bot_info: &str, email: &str, password: &str) -> Result<
         }
     };
 
-    let steam = Client::init_app(AppId(866020));
-    let mut steam_token: String;
-    match steam {
-        Ok((client, single)) => {
-            info!("Steam initialized");
-            let (.., vec) = client.user().authentication_session_ticket(NetworkingIdentity::new());
-            steam_token = format!("{}.240", format_byte_as_steam_token(vec));
-        }
-        Err(err) => {
-            error!("Failed to initialize steam: {}", err);
-            return Err(error::CustomError::SteamError(format!("Failed to initialize steam: {}", err)));
+    let current_dir = env::current_dir().expect("Failed to get current directory");
+    let executable_path = current_dir.join("steamtoken.exe");
+    let timeout = Duration::from_secs(5);
+
+    loop {
+        let mut child = Command::new(&executable_path)
+            .arg("866020")
+            .arg(steamuser)
+            .arg(steampassword)
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Failed to execute steamtoken");
+
+        match child.wait_timeout(timeout).unwrap() {
+            Some(status) => {
+                if status.success() {
+                    let output = child.wait_with_output().expect("Failed to read output");
+                    let steam_token = utils::textparse::format_string_as_steam_token(String::from_utf8_lossy(&output.stdout).as_str());
+
+                    let formated = encode(format!("UbiTicket|{}{}\n", session, bot_info).as_str()).to_string();
+                    let body = agent
+                        .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
+                        .set("user-agent", USER_AGENT)
+                        .send_string(format!("{}steamToken%7C{}.240", formated, steam_token.trim_end()).as_str())?;
+
+                    let json: Value = match body.into_json() {
+                        Ok(json) => json,
+                        Err(err) => {
+                            return Err(error::CustomError::Other(format!("Failed to parse json: {}", err)));
+                        }
+                    };
+                    return Ok(json["token"].to_string())
+                }
+            }
+            None => {
+                child.kill().expect("Failed to kill process");
+                warn!("Process timed out, retrying...");
+            }
         }
     }
-
-    let formated = encode(format!("UbiTicket|{}{}\n", session, bot_info).as_str()).to_string();
-    let body = agent
-        .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
-        .set("user-agent", USER_AGENT)
-        .send_string(format!("{}steamToken%7C{}", formated, steam_token).as_str())?;
-
-    let json: Value = match body.into_json() {
-        Ok(json) => json,
-        Err(err) => {
-            return Err(error::CustomError::Other(format!("Failed to parse json: {}", err)));
-        }
-    };
-    info!("Steam: {:?}", json);
-    Ok(json["token"].to_string())
 }
 
 pub fn get_apple_token(url: &str) -> Result<String, io::Error> {

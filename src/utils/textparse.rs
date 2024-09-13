@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 pub fn parse_and_store_as_vec(input: &str) -> Vec<String> {
-    input.split('|').map(|s| s.to_string()).collect()
+    input.split('|').map(|s| s.trim_end().to_string()).collect()
 }
 
 pub fn parse_and_store_as_map(input: &str) -> HashMap<String, String> {
@@ -17,10 +17,6 @@ pub fn parse_and_store_as_map(input: &str) -> HashMap<String, String> {
     map
 }
 
-pub fn format_byte_as_steam_token(data: Vec<u8>) -> String {
-    data
-        .iter()
-        .map(|byte| format!("{:02x}", byte))
-        .collect::<Vec<String>>()
-        .join("+")
+pub fn format_string_as_steam_token(data: &str) -> String {
+    data.replace(" ", "+")
 }

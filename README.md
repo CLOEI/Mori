@@ -37,7 +37,7 @@ Any contribution would help alot.
 - [x] Session refresh
 - [x] Legacy login
 - [ ] Apple login 
-- [x] Ubisoft-steam login - Steam must be installed, running and logged in
+- [x] Ubisoft-steam login - (Build steamtoken and place it in the project root directory)
 - [x] Configureable delay
 - [ ] Embedded scripting
 - [ ] Bot terminal view
@@ -46,7 +46,7 @@ Any contribution would help alot.
 - [ ] Auto rotation
 - [ ] Auto dirt farm
 - [ ] Auto tutorial
-- [x] Auto clear world ( There's a bug at coordianate 89 it won't continue)
+- [x] Auto clear world
 - [ ] Spam
 - [ ] Socks5 support
 
