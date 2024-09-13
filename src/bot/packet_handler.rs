@@ -101,12 +101,12 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     ETankPacketType::NetGamePacketPingRequest => {
                         let packet = TankPacket {
                             _type: ETankPacketType::NetGamePacketPingReply,
-                            net_id: 0,
-                            unk2: 0,
                             vector_x: 64.0,
                             vector_y: 64.0,
                             vector_x2: 1000.0,
                             vector_y2: 250.0,
+                            value: tank_packet.value,
+                            unk4: utils::proton::hash_string(&tank_packet.value.to_string()),
                             ..Default::default()
                         };
 
@@ -164,6 +164,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                 }
                             }
                         }
+                        bot.astar.write().unwrap().update(bot);
                     }
                     ETankPacketType::NetGamePacketItemChangeObject => {
                         let mut world = bot.world.write().unwrap();
