@@ -94,8 +94,7 @@ impl Bot {
 
         Self {
             info: Arc::new(RwLock::new(Info {
-                username: bot_config.username,
-                password: bot_config.password,
+                payload: utils::textparse::parse_and_store_as_vec(&bot_config.payload),
                 recovery_code: bot_config.recovery_code,
                 login_method: bot_config.login_method,
                 token: bot_config.token,
@@ -307,11 +306,10 @@ pub fn get_token(bot: &Arc<Bot>) {
 
     info!("Getting token for bot");
     set_status(bot, "Getting token");
-    let (username, password, recovery_code, method, oauth_links) = {
+    let (payload, recovery_code, method, oauth_links) = {
         let info = bot.info.read().unwrap();
         (
-            info.username.clone(),
-            info.password.clone(),
+            info.payload.clone(),
             info.recovery_code.clone(),
             info.login_method.clone(),
             info.oauth_links.clone(),
@@ -320,7 +318,7 @@ pub fn get_token(bot: &Arc<Bot>) {
 
     let token_result = match method {
         ELoginMethod::GOOGLE => {
-            match login::get_google_token(oauth_links[1].as_str(), &username, &password) {
+            match login::get_google_token(oauth_links[1].as_str(), &payload[0], &payload[1]) {
                 Ok(res) => res,
                 Err(err) => {
                     if err.to_string().contains("too many people") {
@@ -335,8 +333,8 @@ pub fn get_token(bot: &Arc<Bot>) {
         ELoginMethod::LEGACY => {
             match login::get_legacy_token(
                 oauth_links[2].as_str(),
-                username.as_str(),
-                password.as_str(),
+                &payload[0],
+                &payload[1],
             ) {
                 Ok(res) => res,
                 Err(err) => {
@@ -350,7 +348,7 @@ pub fn get_token(bot: &Arc<Bot>) {
                 bot.info.write().unwrap().login_info.platform_id = "15,1,0".to_string();
             }
             let info = bot.info.read().unwrap().login_info.to_string().clone();
-            match login::get_ubisoft_token(&info, &username, &password) {
+            match login::get_ubisoft_token(&info, &payload[0], &payload[1]) {
                 Ok(res) => res,
                 Err(err) => {
                     error!("Failed to get Ubisoft token: {}", err);

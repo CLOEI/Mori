@@ -13,8 +13,7 @@ pub struct Config {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BotConfig {
-    pub username: String,
-    pub password: String,
+    pub payload: String,
     pub recovery_code: String,
     pub login_method: ELoginMethod,
     pub token: String,

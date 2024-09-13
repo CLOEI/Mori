@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::types::config::{BotConfig, Config};
+use crate::utils;
 
 pub fn parse_config() -> Result<Config, ()> {
     if fs::metadata("config.json").is_ok() {
@@ -31,7 +32,10 @@ pub fn get_bots() -> Vec<BotConfig> {
 
 pub fn remove_bot(username: String) {
     let mut config = parse_config().unwrap();
-    config.bots.retain(|x| x.username != username);
+    config.bots.retain(|x| {
+        let payload = utils::textparse::parse_and_store_as_vec(&x.payload);
+        payload[0] != username
+    });
     let j = serde_json::to_string_pretty(&config).unwrap();
     let mut file = File::create("config.json").unwrap();
     file.write_all(j.as_bytes()).unwrap();
@@ -61,7 +65,8 @@ pub fn edit_findpath_delay(findpath_delay: u32) {
 pub fn save_token_to_bot(username: String, token: String, data: String) {
     let mut config = parse_config().unwrap();
     for bot in config.bots.iter_mut() {
-        if bot.username == username {
+        let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
+        if payload[0] == username {
             bot.token = token.clone();
             bot.data = data.clone();
         }

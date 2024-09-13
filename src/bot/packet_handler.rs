@@ -75,7 +75,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         bot.info.write().unwrap().login_info.game_version = version.to_string();
                     }
                     utils::config::set_game_version(version.to_string());
-                    let username = bot.info.read().unwrap().username.clone();
+                    let username = bot.info.read().unwrap().payload[0].clone();
                     utils::config::save_token_to_bot(username, "".to_string(), "".to_string());
                 }
             }

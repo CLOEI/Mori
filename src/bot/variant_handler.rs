@@ -99,7 +99,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let mut info = bot.info.write().unwrap();
             info.login_info.tank_id_name = growid;
             utils::config::save_token_to_bot(
-                info.username.clone(),
+                info.payload[0].clone(),
                 info.token.clone(),
                 info.login_info.to_string(),
             );

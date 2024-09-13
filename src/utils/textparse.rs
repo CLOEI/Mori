@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-pub fn parse_and_store_as_vec(input: &str) -> Vec<&str> {
-    input.split('|').collect()
+pub fn parse_and_store_as_vec(input: &str) -> Vec<String> {
+    input.split('|').map(|s| s.to_string()).collect()
 }
 
 pub fn parse_and_store_as_map(input: &str) -> HashMap<String, String> {

@@ -66,8 +66,7 @@ impl AddBotDialog {
                         });
                     if ui.button("Add").clicked() {
                         let config = BotConfig {
-                            username: self.username.clone(),
-                            password: self.password.clone(),
+                            payload: format!("{}|{}", self.username, self.password),
                             recovery_code: self.code.clone(),
                             login_method: self.method.clone(),
                             token: "".to_string(),

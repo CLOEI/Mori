@@ -25,11 +25,12 @@ impl BotMenu {
                         ui.label("Bots");
                         ui.end_row();
                         for bot in self.bots.clone() {
+                            let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
                             if ui
-                                .add(egui::Button::new(bot.username.clone()).truncate())
+                                .add(egui::Button::new(payload[0].clone()).truncate())
                                 .clicked()
                             {
-                                self.selected_bot = bot.username.clone();
+                                self.selected_bot = payload[0].clone();
                                 utils::config::set_selected_bot(self.selected_bot.clone());
                             }
                             ui.end_row();
@@ -199,20 +200,19 @@ impl BotMenu {
                                             }
                                         };
                                         if let Some(bot) = bot {
-                                            let (username, password, code, method) = {
+                                            let (payload, code, method) = {
                                                 let info = bot.info.read().unwrap();
                                                 (
-                                                    info.username.clone(),
-                                                    info.password.clone(),
+                                                    info.payload.clone(),
                                                     info.recovery_code.clone(),
                                                     info.login_method.clone(),
                                                 )
                                             };
                                             ui.label("Username");
-                                            ui.add(egui::Label::new(username).truncate());
+                                            ui.add(egui::Label::new(&payload[0]).truncate());
                                             ui.end_row();
                                             ui.label("Password");
-                                            ui.label(password);
+                                            ui.label(&payload[1]);
                                             ui.end_row();
                                             ui.label("2FA Code");
                                             ui.label(code);

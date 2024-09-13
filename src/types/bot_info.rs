@@ -4,8 +4,7 @@ use super::{elogin_method::ELoginMethod, login_info::LoginInfo};
 
 #[derive(Debug, Default)]
 pub struct Info {
-    pub username: String,
-    pub password: String,
+    pub payload: Vec<String>,
     pub recovery_code: String,
     pub login_method: ELoginMethod,
     pub oauth_links: Vec<String>,

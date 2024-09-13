@@ -62,14 +62,14 @@ impl Manager {
                     bot::disconnect(&bot_clone);
                 }
             });
-            self.bots.retain(|(b, _)| b.info.read().unwrap().username != username);
+            self.bots.retain(|(b, _)| b.info.read().unwrap().payload[0] != username);
             utils::config::remove_bot(username.to_string());
         }
     }
 
     pub fn get_bot(&self, username: &str) -> Option<&Arc<Bot>> {
         for (bot, _) in &self.bots {
-            if bot.info.read().unwrap().username == username {
+            if bot.info.read().unwrap().payload[0] == username {
                 return Some(bot);
             }
         }
