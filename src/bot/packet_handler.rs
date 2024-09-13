@@ -1,7 +1,6 @@
 use std::{fs, sync::Arc};
 use paris::{error, info, warn};
 use regex::Regex;
-use std::sync::{Mutex, RwLock};
 use crate::{
     bot::{self, variant_handler},
     types::{
@@ -136,34 +135,44 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         };
 
                         if should_update_inventory {
-                            let mut inventory = bot.inventory.write().unwrap();
-                            if let Some(item) = inventory.items.get_mut(&(tank_packet.value as u16)) {
-                                item.amount -= 1;
-                                if item.amount == 0 || item.amount > 200 {
-                                    inventory.items.remove(&(tank_packet.value as u16));
+                            let mut remove_item = None;
+                            {
+                                let mut inventory = bot.inventory.write().unwrap();
+                                if let Some(item) = inventory.items.get_mut(&(tank_packet.value as u16)) {
+                                    item.amount -= 1;
+                                    if item.amount == 0 || item.amount > 200 {
+                                        remove_item = Some(tank_packet.value as u16);
+                                    }
                                 }
+                            }
+                            if let Some(item_id) = remove_item {
+                                let mut inventory = bot.inventory.write().unwrap();
+                                inventory.items.remove(&item_id);
                             }
                         }
 
-                        let mut world = bot.world.write().unwrap();
-                        if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
-                            if tank_packet.value == 18 {
-                                if tile.foreground_item_id != 0 {
-                                    tile.foreground_item_id = 0;
-                                } else {
-                                    tile.background_item_id = 0;
-                                }
-                            } else {
-                                if let Some(item) = bot.item_database.items.get(&tank_packet.value) {
-                                    if item.action_type == 22 || item.action_type == 28 || item.action_type == 18 {
-                                        tile.background_item_id = tank_packet.value as u16;
+                        {
+                            let mut world = bot.world.write().unwrap();
+                            if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+                                if tank_packet.value == 18 {
+                                    if tile.foreground_item_id != 0 {
+                                        tile.foreground_item_id = 0;
                                     } else {
-                                        info!("TileChangeRequest: {:?}", tank_packet);
-                                        tile.foreground_item_id = tank_packet.value as u16;
+                                        tile.background_item_id = 0;
+                                    }
+                                } else {
+                                    if let Some(item) = bot.item_database.items.get(&tank_packet.value) {
+                                        if item.action_type == 22 || item.action_type == 28 || item.action_type == 18 {
+                                            tile.background_item_id = tank_packet.value as u16;
+                                        } else {
+                                            info!("TileChangeRequest: {:?}", tank_packet);
+                                            tile.foreground_item_id = tank_packet.value as u16;
+                                        }
                                     }
                                 }
                             }
                         }
+
                         bot.astar.write().unwrap().update(bot);
                     }
                     ETankPacketType::NetGamePacketItemChangeObject => {
