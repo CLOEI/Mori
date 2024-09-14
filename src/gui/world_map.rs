@@ -38,7 +38,7 @@ impl WorldMap {
                 let min = Pos2::new(p.x, p.y);
                 let max = Pos2::new(p.x + size.x, p.y + size.y);
                 let rect = Rect::from_min_max(min, max);
-                draw_list.rect_filled(rect, 0.0, Color32::BLACK);
+                draw_list.rect_filled(rect, 0.0, Color32::from_rgb(27, 27, 27));
 
                 let world = bot.world.read().unwrap();
                 let cell_width = size.x / world.width as f32;
@@ -107,7 +107,6 @@ impl WorldMap {
                                 );
                             }
                         }
-
 
 
                         for player in bot.players.read().unwrap().clone() {
