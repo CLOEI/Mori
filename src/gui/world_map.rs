@@ -38,7 +38,7 @@ impl WorldMap {
                 let min = Pos2::new(p.x, p.y);
                 let max = Pos2::new(p.x + size.x, p.y + size.y);
                 let rect = Rect::from_min_max(min, max);
-                draw_list.rect_filled(rect, 0.0, Color32::WHITE);
+                draw_list.rect_filled(rect, 0.0, Color32::BLACK);
 
                 let world = bot.world.read().unwrap();
                 let cell_width = size.x / world.width as f32;
@@ -65,22 +65,50 @@ impl WorldMap {
                             .get_item(&(tile.foreground_item_id as u32))
                             .unwrap();
 
-                        let color = bot
-                            .item_database
-                            .get_item(&((tile.foreground_item_id + 1) as u32))
-                            .unwrap()
-                            .overlay_color;
+                        if item.id == 0 {
+                            if tile.background_item_id != 0 {
+                                let item = bot
+                                    .item_database
+                                    .get_item(&((tile.background_item_id + 1) as u32))
+                                    .unwrap();
+                                let color = item.base_color;
+                                let r = ((color >> 24) & 0xFF) as u8;
+                                let g = ((color >> 16) & 0xFF) as u8;
+                                let b = ((color >> 8) & 0xFF) as u8;
+                                draw_list.rect_filled(
+                                    Rect::from_min_max(Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
+                                                       Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0)),
+                                    0.0,
+                                    Color32::from_rgb(b, g, r),
+                                );
+                            }
+                        } else {
+                            let color = bot
+                                .item_database
+                                .get_item(&((tile.foreground_item_id + 1) as u32))
+                                .unwrap()
+                                .base_color;
+                            let r = ((color >> 24) & 0xFF) as u8;
+                            let g = ((color >> 16) & 0xFF) as u8;
+                            let b = ((color >> 8) & 0xFF) as u8;
+                            if item.name == "Bedrock" {
+                                draw_list.rect_filled(
+                                    Rect::from_min_max(Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
+                                                       Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0)),
+                                    0.0,
+                                    Color32::from_rgb(105, 105, 105),
+                                );
+                            } else {
+                                draw_list.rect_filled(
+                                    Rect::from_min_max(Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
+                                                       Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0)),
+                                    0.0,
+                                    Color32::from_rgb(b, g, r),
+                                );
+                            }
+                        }
 
-                        let r = ((color >> 24) & 0xFF) as u8;
-                        let g = ((color >> 16) & 0xFF) as u8;
-                        let b = ((color >> 8) & 0xFF) as u8;
-                        let a = (color & 0xFF) as u8;
 
-                        draw_list.rect_filled(
-                            Rect::from_min_max(cell_min, cell_max),
-                            0.0,
-                            Color32::from_rgba_unmultiplied(r, g, b, a),
-                        );
 
                         for player in bot.players.read().unwrap().clone() {
                             if player.position.x / 32.0 == (x as f32)
