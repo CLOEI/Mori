@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 use eframe::egui::{self, include_image, Ui};
-use crate::manager::Manager;
+use crate::manager::bot_manager::BotManager;
 use crate::utils;
 use super::add_bot_dialog::AddBotDialog;
 
@@ -17,7 +17,7 @@ impl Default for Navbar {
 }
 
 impl Navbar {
-    pub fn render(&mut self, ui: &mut egui::Ui, add_bot_dialog: &mut AddBotDialog, manager: &Arc<RwLock<Manager>>) {
+    pub fn render(&mut self, ui: &mut egui::Ui, add_bot_dialog: &mut AddBotDialog, manager: &Arc<RwLock<BotManager>>) {
         ui.horizontal(|ui| {
             ui.heading("Mori");
             ui.separator();
@@ -38,6 +38,15 @@ impl Navbar {
                 .clicked()
             {
                 self.current_menu = "item_database".to_string();
+            }
+            if ui
+                .add(egui::Button::image_and_text(
+                    include_image!("../../assets/waypoints.png"),
+                    "Proxy",
+                ))
+                .clicked()
+            {
+                self.current_menu = "proxy_list".to_string();
             }
             if ui
                 .add(egui::Button::image_and_text(

@@ -106,3 +106,24 @@ pub fn set_game_version(version: String) {
     let mut file = File::create("config.json").unwrap();
     file.write_all(j.as_bytes()).unwrap();
 }
+
+pub fn get_proxies() -> Vec<crate::types::config::Proxy> {
+    let config = parse_config().unwrap();
+    config.proxy
+}
+
+pub fn add_proxy(proxy: crate::types::config::Proxy) {
+    let mut config = parse_config().unwrap();
+    config.proxy.push(proxy);
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
+}
+
+pub fn remove_proxy(index: usize) {
+    let mut config = parse_config().unwrap();
+    config.proxy.remove(index);
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
+}

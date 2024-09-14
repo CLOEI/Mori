@@ -5,19 +5,19 @@ use std::{
     io::Write,
 };
 use std::sync::{Arc, RwLock};
-use crate::gui::inventory::Inventory;
 use bot::Bot;
 use eframe::egui::ViewportBuilder;
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
-    world_map::WorldMap,
 };
-use manager::Manager;
 use types::{
     config::{Config},
 };
 use mlua::prelude::*;
-use paris::error;
+use crate::gui::add_proxy_dialog::AddProxyDialog;
+use crate::gui::proxy_list::ProxyList;
+use crate::manager::bot_manager::BotManager;
+use crate::manager::proxy_manager::ProxyManager;
 
 mod bot;
 mod gui;
@@ -31,10 +31,11 @@ fn init_config() {
         let mut file = File::create("config.json").unwrap();
         let config = Config {
             bots: Vec::new(),
+            proxy: Vec::new(),
             timeout: 5,
             findpath_delay: 30,
             selected_bot: "".to_string(),
-            game_version: "4.64".to_string(),
+            game_version: "4.65".to_string(),
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
@@ -65,28 +66,35 @@ struct App {
     navbar: Navbar,
     item_database: ItemDatabase,
     add_bot_dialog: AddBotDialog,
-    manager: Arc<RwLock<Manager>>,
+    add_proxy_dialog: AddProxyDialog,
+    bot_manager: Arc<RwLock<BotManager>>,
+    proxy_manager: ProxyManager,
+    proxy_list: ProxyList,
     bot_menu: BotMenu,
     lua: Lua,
 }
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut manager = Arc::new(RwLock::new(Manager::new()));
+        let mut bot_manager = Arc::new(RwLock::new(BotManager::new()));
+        let proxy_manager = ProxyManager::new();
         let lua = Lua::new();
         let bots = utils::config::get_bots();
         for bot in bots.clone() {
-            manager.write().unwrap().add_bot(bot);
+            bot_manager.write().unwrap().add_bot(bot);
         }
 
-        lua_register::register(&lua, &manager);
+        lua_register::register(&lua, &bot_manager);
 
         Self {
             navbar: Default::default(),
             item_database: Default::default(),
             add_bot_dialog: Default::default(),
+            add_proxy_dialog: Default::default(),
             bot_menu: Default::default(),
-            manager,
+            proxy_list: Default::default(),
+            proxy_manager,
+            bot_manager,
             lua,
         }
     }
@@ -98,18 +106,21 @@ impl eframe::App for App {
         egui_extras::install_image_loaders(ctx);
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.navbar
-                .render(ui, &mut self.add_bot_dialog, &self.manager);
+                .render(ui, &mut self.add_bot_dialog, &self.bot_manager);
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             if self.navbar.current_menu == "bots" {
-                self.bot_menu.render(ui, &self.manager);
+                self.bot_menu.render(ui, &self.bot_manager);
             } else if self.navbar.current_menu == "item_database" {
-                self.item_database.render(ui, &self.manager, ctx);
+                self.item_database.render(ui, &self.bot_manager, ctx);
+            } else if self.navbar.current_menu == "proxy_list" {
+                self.proxy_list.render(ui, &mut self.proxy_manager, &mut self.add_proxy_dialog, ctx);
             } else {
                 ui.label("Not implemented yet");
             }
         });
-        self.add_bot_dialog.render(&mut self.manager, ctx);
+        self.add_bot_dialog.render(&mut self.bot_manager, ctx);
+        self.add_proxy_dialog.render(&mut self.proxy_manager, ctx);
     }
 }

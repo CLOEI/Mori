@@ -3,7 +3,7 @@ use std::thread;
 
 use eframe::egui::{self, Ui};
 use egui::include_image;
-use crate::{bot::warp, manager::Manager, types::config::BotConfig, utils, Bot};
+use crate::{bot::warp, manager::bot_manager::BotManager, types::config::BotConfig, utils, Bot};
 use crate::bot::leave;
 use crate::gui::inventory::Inventory;
 use crate::gui::world_map::WorldMap;
@@ -19,7 +19,7 @@ pub struct BotMenu {
 }
 
 impl BotMenu {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {

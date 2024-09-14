@@ -1,5 +1,5 @@
 use std::sync::{Arc, RwLock};
-use crate::manager::Manager;
+use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
 
 #[derive(Default)]
@@ -9,7 +9,7 @@ pub struct ItemDatabase {
 }
 
 impl ItemDatabase {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>, _ctx: &egui::Context) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>, _ctx: &egui::Context) {
         ui.horizontal(|ui| {
             let (item_database_version, item_database_item_count) = {
                 let manager = manager.read().unwrap();

@@ -1,5 +1,5 @@
 use std::sync::{Arc, RwLock};
-use crate::manager::Manager;
+use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
 use crate::utils;
 
@@ -9,7 +9,7 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>) {
         self.selected_bot = utils::config::get_selected_bot();
         if !self.selected_bot.is_empty() {
             let bot = {

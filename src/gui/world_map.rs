@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use crate::{
     bot::{self},
-    manager::Manager,
+    manager::bot_manager::BotManager,
     types::config::BotConfig,
     utils,
 };
@@ -18,7 +18,7 @@ pub struct WorldMap {
 }
 
 impl WorldMap {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<Manager>>) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
 

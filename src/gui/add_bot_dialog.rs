@@ -2,7 +2,7 @@ use std::fs;
 use std::sync::{Arc, RwLock};
 use eframe::egui::{self};
 use crate::{
-    manager::Manager,
+    manager::bot_manager::BotManager,
     types::{config::BotConfig, elogin_method::ELoginMethod},
     utils,
 };
@@ -19,7 +19,7 @@ pub struct AddBotDialog {
 }
 
 impl AddBotDialog {
-    pub fn render(&mut self, manager: &Arc<RwLock<Manager>>, ctx: &egui::Context) {
+    pub fn render(&mut self, manager: &Arc<RwLock<BotManager>>, ctx: &egui::Context) {
         if self.open {
             let mut close_dialog = false;
             egui::Window::new("Add bot")
