@@ -234,6 +234,13 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             }
                         }
                     }
+                    ETankPacketType::NetGamePacketSendTileTreeState => {
+                        let mut world = bot.world.write().unwrap();
+                        let tile = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32).unwrap();
+                        if let gtworld_r::TileType::Seed { ready_to_harvest, .. } = &mut tile.tile_type {
+                            *ready_to_harvest = true;
+                        }
+                    }
                     _ => {}
                 }
             }
