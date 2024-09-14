@@ -252,6 +252,14 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             let message = String::from_utf8_lossy(&data);
             info!("Message: {}", message);
         }
+        EPacketType::NetMessageTrack => {
+            let message = String::from_utf8_lossy(&data);
+            let data = utils::textparse::parse_and_store_as_map(&message);
+            if data.contains_key("Level") {
+                let level = data.get("Level").unwrap();
+                bot.state.write().unwrap().level = level.parse().unwrap();
+            }
+        }
         _ => (),
     }
 }

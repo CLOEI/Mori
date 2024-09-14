@@ -465,13 +465,26 @@ pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
 fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
     info!("Connecting to the server {}:{}", ip, port);
     set_status(&bot, "Connecting to the server");
-    let mut host = bot.host.lock().unwrap();
-    host.connect(
-        SocketAddr::from_str(format!("{}:{}", ip, port).as_str()).unwrap(),
-        2,
-        0,
-    )
-        .expect("Failed to connect to the server");
+
+    let host_result = bot.host.lock();
+    if host_result.is_err() {
+        error!("Host lock poisoned, attempting to recover");
+        let mut host = host_result.unwrap_or_else(|poisoned| poisoned.into_inner());
+        host.connect(
+            SocketAddr::from_str(format!("{}:{}", ip, port).as_str()).unwrap(),
+            2,
+            0,
+        )
+            .expect("Failed to connect to the server");
+    } else {
+        let mut host = host_result.unwrap();
+        host.connect(
+            SocketAddr::from_str(format!("{}:{}", ip, port).as_str()).unwrap(),
+            2,
+            0,
+        )
+            .expect("Failed to connect to the server");
+    }
 }
 
 pub fn set_ping(bot: &Arc<Bot>) {
@@ -568,7 +581,12 @@ pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
     let peer_id = bot.peer_id.read().unwrap().unwrap().clone();
     let mut host = bot.host.lock().unwrap();
     let peer = host.peer_mut(peer_id);
-    peer.send(0, &pkt).expect("Failed to send packet");
+    match peer.send(0, &pkt) {
+        Ok(_) => {}
+        Err(err) => {
+            error!("Failed to send packet: {}", err);
+        }
+    }
 }
 
 pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
@@ -589,8 +607,12 @@ pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
     let peer_id = bot.peer_id.read().unwrap().unwrap().clone();
     let mut host = bot.host.lock().unwrap();
     let peer = host.peer_mut(peer_id);
-    peer.send(0, &enet_packet)
-        .expect("Failed to send raw packet");
+    match peer.send(0, &enet_packet) {
+        Ok(_) => {}
+        Err(err) => {
+            error!("Failed to send packet: {}", err);
+        }
+    }
 }
 
 pub fn is_inworld(bot: &Arc<Bot>) -> bool {

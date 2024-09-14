@@ -293,6 +293,9 @@ impl BotMenu {
                                                 ui.label("Is Banned");
                                                 ui.label(is_banned.to_string());
                                                 ui.end_row();
+                                                ui.label("Level");
+                                                ui.label(bot.state.read().unwrap().level.to_string());
+                                                ui.end_row();
                                                 ui.label("Gems");
                                                 ui.label(bot.state.read().unwrap().gems.to_string());
                                                 ui.end_row();
