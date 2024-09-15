@@ -241,6 +241,12 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             *ready_to_harvest = true;
                         }
                     }
+                    ETankPacketType::NetGamePacketModifyItemInventory => {
+                        let mut inventory = bot.inventory.write().unwrap();
+                        if let Some(item) = inventory.items.get_mut(&(tank_packet.value as u16)) {
+                            item.amount -= tank_packet.unk2 as u16;
+                        }
+                    }
                     _ => {}
                 }
             }
