@@ -7,6 +7,7 @@ use crate::{
     utils,
 };
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
+use gtworld_r::TileType;
 use paris::info;
 use crate::bot::features;
 
@@ -133,20 +134,41 @@ impl WorldMap {
                         }
 
                         if ui.rect_contains_pointer(Rect::from_min_max(cell_min, cell_max)) {
+                            let mut data;
+                            if let TileType::Seed { ready_to_harvest, timer, .. } = &tile.tile_type {
+                                let elapsed = timer.elapsed().as_secs();
+                                let ready_to_harvest = if *ready_to_harvest {
+                                    "Yes"
+                                } else {
+                                    if world.is_tile_harvestable(tile) {
+                                        "Yes"
+                                    } else {
+                                        "No"
+                                    }
+                                };
+                                data = format!(
+                                    "Position: {}|{}\nItem name: {}\nCollision type: {}\nReady to harvest: {}\nTime passed: {}",
+                                    x, y, item.name, item.collision_type, ready_to_harvest, elapsed
+                                )
+                            } else {
+                                data = format!(
+                                    "Position: {}|{}\nItem name: {}\nCollision type: {}",
+                                    x, y, item.name, item.collision_type
+                                )
+                            }
+
                             egui::show_tooltip(
                                 ui.ctx(),
                                 ui.layer_id(),
                                 egui::Id::new("tile_info"),
                                 |ui| {
                                     ui.label(
-                                        egui::RichText::new(format!(
-                                            "Position: {}|{}\nItem name: {}\nCollision type: {}",
-                                            x, y, item.name, item.collision_type
-                                        ))
+                                        egui::RichText::new(data)
                                             .monospace(),
                                     );
                                 },
                             );
+
                             if ui.input(|i| i.pointer.any_click()) {
                                 info!("Clicked on tile: {}|{}", x, y);
                                 let bot_clone = bot.clone();

@@ -211,9 +211,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.88"
+version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e1496f8fb1fbf272686b8d37f523dab3e4a7443300055e74cdaa449f3114356"
+checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
 
 [[package]]
 name = "arbitrary"
@@ -249,9 +249,9 @@ dependencies = [
 
 [[package]]
 name = "arrayref"
-version = "0.3.8"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d151e35f61089500b617991b791fc8bfd237ae50cd5950803758a179b41e67a"
+checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
 
 [[package]]
 name = "arrayvec"
@@ -1803,7 +1803,7 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#a1559adbe092c1fdc2499f845547efa7f9ca5ff9"
+source = "git+https://github.com/CLOEI/gtworld-r.git#1b1a04676b02472cbd53ce7563c753db3998a3a1"
 dependencies = [
  "byteorder",
  "gtitem-r",

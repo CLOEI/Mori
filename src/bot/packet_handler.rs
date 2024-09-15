@@ -1,4 +1,6 @@
 use std::{fs, sync::Arc};
+use std::time::Instant;
+use gtworld_r::TileType;
 use paris::{error, info, warn};
 use regex::Regex;
 use crate::{
@@ -165,8 +167,16 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                         if item.action_type == 22 || item.action_type == 28 || item.action_type == 18 {
                                             tile.background_item_id = tank_packet.value as u16;
                                         } else {
-                                            info!("TileChangeRequest: {:?}", tank_packet);
                                             tile.foreground_item_id = tank_packet.value as u16;
+                                            let item = bot.item_database.get_item(&tank_packet.value).unwrap();
+                                            if item.name.contains("Seed") {
+                                                tile.tile_type = TileType::Seed {
+                                                    ready_to_harvest: false,
+                                                    time_passed: 0,
+                                                    item_on_tree: 0,
+                                                    timer: Instant::now(),
+                                                };
+                                            }
                                         }
                                     }
                                 }
@@ -237,9 +247,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     ETankPacketType::NetGamePacketSendTileTreeState => {
                         let mut world = bot.world.write().unwrap();
                         let tile = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32).unwrap();
-                        if let gtworld_r::TileType::Seed { ready_to_harvest, .. } = &mut tile.tile_type {
-                            *ready_to_harvest = true;
-                        }
+                        tile.foreground_item_id = 0;
+                        tile.tile_type = TileType::Basic;
                     }
                     ETankPacketType::NetGamePacketModifyItemInventory => {
                         let mut inventory = bot.inventory.write().unwrap();
