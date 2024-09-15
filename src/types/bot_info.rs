@@ -50,3 +50,9 @@ pub struct FTUE { // First Time User Experience
     pub total_progress: i32,
     pub info: String,
 }
+
+#[derive(Debug, Default)]
+pub struct TemporaryData {
+    pub drop: (u32, u32),
+    pub trash: (u32, u32),
+}

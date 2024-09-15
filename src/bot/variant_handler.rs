@@ -64,11 +64,40 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
+            info!("Received dialog request: {}", message);
             if message.contains("Gazette") {
                 send_packet(
                     bot,
                     EPacketType::NetMessageGenericText,
                     "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string(),
+                );
+            }
+            if message.contains("Trash") {
+                let (item_id, amount) = {
+                    let temp_data = bot.temporary_data.read().unwrap();
+                    temp_data.trash
+                };
+                send_packet(
+                    bot,
+                    EPacketType::NetMessageGenericText,
+                    format!(
+                        "action|dialog_return\ndialog_name|trash_item\nitemID|{}|\ncount|{}\n",
+                        item_id, amount
+                    ),
+                );
+            }
+            if message.contains("Drop") {
+                let (item_id, amount) = {
+                    let temp_data = bot.temporary_data.read().unwrap();
+                    temp_data.drop
+                };
+                send_packet(
+                    bot,
+                    EPacketType::NetMessageGenericText,
+                    format!(
+                        "action|dialog_return\ndialog_name|drop_item\nitemID|{}|\ncount|{}\n",
+                        item_id, amount
+                    ),
                 );
             }
         }

@@ -1,6 +1,8 @@
 use std::sync::{Arc, RwLock};
+use std::thread::spawn;
 use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
+use crate::bot::{drop_item, trash_item};
 use crate::utils;
 
 #[derive(Default)]
@@ -35,6 +37,20 @@ impl Inventory {
                         ui.horizontal(|ui| {
                             ui.label(item.name.clone());
                             ui.label(format!("x{}", inventory_item.amount));
+                            ui.group(|ui| {
+                                if ui.button("Drop").clicked() {
+                                    let bot_clone = bot.clone();
+                                    spawn(move || {
+                                        drop_item(&bot_clone, id as u32,  1);
+                                    });
+                                }
+                                if ui.button("Trash").clicked() {
+                                    let bot_clone = bot.clone();
+                                    spawn(move || {
+                                        trash_item(&bot_clone, id as u32,  1);
+                                    });
+                                }
+                            });
                         });
                     }
                 });

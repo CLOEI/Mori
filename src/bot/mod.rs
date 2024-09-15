@@ -20,7 +20,7 @@ use std::str::{self, FromStr};
 use urlencoding::encode;
 use socks::{Socks5Datagram};
 
-use crate::types::bot_info::FTUE;
+use crate::types::bot_info::{TemporaryData, FTUE};
 use crate::types::{etank_packet_type::ETankPacketType, player::Player};
 use crate::{
     types::{self, tank_packet::TankPacket},
@@ -49,6 +49,7 @@ pub struct Bot {
     pub state: Arc<RwLock<State>>,
     pub server: Arc<RwLock<Server>>,
     pub position: Arc<RwLock<Vector2>>,
+    pub temporary_data: Arc<RwLock<TemporaryData>>,
     pub host: Arc<Mutex<enet::Host<SocketType>>>,
     pub peer_id: Arc<RwLock<Option<enet::PeerID>>>,
     pub world: Arc<RwLock<gtworld_r::World>>,
@@ -105,6 +106,7 @@ impl Bot {
             state: Arc::new(RwLock::new(State::default())),
             server: Arc::new(RwLock::new(Server::default())),
             position: Arc::new(RwLock::new(Vector2::default())),
+            temporary_data: Arc::new(RwLock::new(TemporaryData::default())),
             host: Arc::new(Mutex::new(host)),
             peer_id: Arc::new(RwLock::new(None)),
             world: Arc::new(RwLock::new(gtworld_r::World::new(item_database.clone()))),
@@ -777,14 +779,8 @@ pub fn drop_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
         EPacketType::NetMessageGenericText,
         format!("action|drop\n|itemID|{}\n", item_id),
     );
-    send_packet(
-        bot,
-        EPacketType::NetMessageGenericText,
-        format!(
-            "action|dialog_return.dialog_name|drop_item\nitemID|{}|\ncount|{}",
-            item_id, amount
-        ),
-    );
+    thread::sleep(Duration::from_millis(100));
+    bot.temporary_data.write().unwrap().drop = (item_id, amount);
 }
 
 pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
@@ -793,12 +789,6 @@ pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
         EPacketType::NetMessageGenericText,
         format!("action|trash\n|itemID|{}\n", item_id),
     );
-    send_packet(
-        bot,
-        EPacketType::NetMessageGenericText,
-        format!(
-            "action|dialog_return.dialog_name|trash_item\nitemID|{}|\ncount|{}",
-            item_id, amount
-        ),
-    );
+    thread::sleep(Duration::from_millis(100));
+    bot.temporary_data.write().unwrap().trash = (item_id, amount);
 }

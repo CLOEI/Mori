@@ -49,6 +49,7 @@ pub fn start(bot: &Arc<Bot>) {
                     break;
                 }
                 find_path(&bot, x, y - 1);
+                thread::sleep(Duration::from_millis(100));
                 punch(&bot, 0, 1);
                 thread::sleep(Duration::from_millis(350));
             }
