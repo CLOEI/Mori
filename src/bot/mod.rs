@@ -350,7 +350,11 @@ pub fn get_token(bot: &Arc<Bot>) {
                 bot.info.write().unwrap().login_info.platform_id = "15,1,0".to_string();
             }
             let info = bot.info.read().unwrap().login_info.to_string().clone();
-            match login::get_ubisoft_token(&info, &payload[0], &payload[1], &payload[2], &payload[3]) {
+            let recovery_code = {
+                let info = bot.info.read().unwrap();
+                info.recovery_code.clone()
+            };
+            match login::get_ubisoft_token(&info, &recovery_code, &payload[0], &payload[1], &payload[2], &payload[3]) {
                 Ok(res) => res,
                 Err(err) => {
                     error!("Failed to get Ubisoft token: {}", err);
