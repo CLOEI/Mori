@@ -40,7 +40,7 @@ pub fn break_lava_block(bot: &Arc<Bot>) {
         };
         if ((local.x / 32.0) as u32) == 97 && ((local.y / 32.0) as u32) == 51 {
             if tile.y % 1 == 0 || tile.x == 0 || tile.x == 1 || tile.x == 98 || tile.x == 99 {
-                if (tile.foreground_item_id == 10 || tile.foreground_item_id == 4) && tile.foreground_item_id != 8 {
+                if tile.foreground_item_id == 4 {
                     find_path(&bot, tile.x, tile.y - 1);
                     thread::sleep(Duration::from_millis(100));
                     loop {

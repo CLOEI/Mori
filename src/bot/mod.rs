@@ -286,7 +286,7 @@ pub fn poll(bot: &Arc<Bot>) {
         }
         collect(&bot_clone);
         set_ping(&bot_clone);
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(100));
     });
 }
 
@@ -645,25 +645,33 @@ pub fn collect(bot: &Arc<Bot>) {
         let dy = (bot_y - obj.y).abs() / 32.0;
         let distance = (dx.powi(2) + dy.powi(2)).sqrt();
         if distance <= 5.0 {
-            let can_collect = true;
+            let can_collect = {
+                let inventory = bot.inventory.read().unwrap();
+                let inventory_size = inventory.size.clone();
 
-            if bot
-                .inventory
-                .read().unwrap()
-                .items
-                .get(&obj.id)
-                .map_or(0, |item| item.amount)
-                < 200
-            {
-                if can_collect {
-                    let mut pkt = TankPacket::default();
-                    pkt._type = ETankPacketType::NetGamePacketItemActivateObjectRequest;
-                    pkt.vector_x = obj.x;
-                    pkt.vector_y = obj.y;
-                    pkt.value = obj.uid;
-                    send_packet_raw(bot, &pkt);
-                    info!("Collect packet sent");
+                if inventory.items.get(&obj.id).is_none() && inventory_size > inventory.item_count as u32 {
+                    true
+                } else {
+                    if let Some(item) = inventory.items.get(&obj.id) {
+                        if item.amount < 200 {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
                 }
+            };
+
+            if can_collect {
+                let mut pkt = TankPacket::default();
+                pkt._type = ETankPacketType::NetGamePacketItemActivateObjectRequest;
+                pkt.vector_x = obj.x;
+                pkt.vector_y = obj.y;
+                pkt.value = obj.uid;
+                send_packet_raw(bot, &pkt);
+                info!("Collect packet sent");
             }
         }
     }
