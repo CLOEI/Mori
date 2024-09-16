@@ -781,9 +781,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.18"
+version = "1.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b62ac837cdb5cb22e10a256099b4fc502b1dfe560cb282963a974d7abd80e476"
+checksum = "2d74707dde2ba56f86ae90effb3b43ddd369504387e718014de010cec7959800"
 dependencies = [
  "jobserver",
  "libc",
@@ -1803,7 +1803,7 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#1b1a04676b02472cbd53ce7563c753db3998a3a1"
+source = "git+https://github.com/CLOEI/gtworld-r.git#1a11249dcd2ae6c4a7fe0c2ca83643d5a820019c"
 dependencies = [
  "byteorder",
  "gtitem-r",

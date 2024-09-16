@@ -210,7 +210,7 @@ impl WorldMap {
                             if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    features::auto_clear_world::start(&bot_clone);
+                                    features::auto_dirt_farm::start(&bot_clone);
                                 });
                             }
                         });
