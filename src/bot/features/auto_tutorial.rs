@@ -8,7 +8,7 @@
 7.  `oCollect Rock Seeds``|Break the `2Rock`` to collect `2Rock Seeds``.|6|interface/tutorial/tut_npc.rttex|Break the `2Rock`` to collect `2Rock Seeds``.|1
 8.  `oBreak Cave Backgrounds``|Select the `2Fist`` and break some `2Cave Background``!|20|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Cave Background``!|1
 9.  `oCollect Cave Background Seeds``|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|14|interface/tutorial/tut_npc.rttex|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|1
-10.
+10. `oSplice Rock and Cave Background Seeds``|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|15|interface/tutorial/tut_npc.rttex|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|1
 11.
 12.
  */
@@ -24,6 +24,7 @@ static ROCK: u16 = 10;
 static CAVE_BACKGROUND: u16 = 14;
 static DIRT_SEEDS: u16 = 3;
 static ROCK_SEED: u16 = 11;
+static CAVE_BACKGROUND_SEED: u16 = 15;
 
 pub fn lock_the_world(bot: &Arc<Bot>) {
     if !is_current_task(bot, "`oLock the World`") {
@@ -243,6 +244,48 @@ pub fn break_cave_background(bot: &Arc<Bot>) {
         }
     });
 }
+
+pub fn collect_cave_background_seed(bot: &Arc<Bot>) {
+    let bot_clone = bot.clone();
+
+    thread::spawn(move || {
+        while is_current_task(&bot_clone, "`oCollect Cave Background Seeds`") {
+            let cbg_tree_tiles = {
+                let world = bot_clone.world.read().unwrap();
+                world.tiles.clone().into_iter().filter(|tile| tile.foreground_item_id == CAVE_BACKGROUND_SEED).collect::<Vec<_>>()
+            };
+
+            for tile in cbg_tree_tiles.iter() {
+                if !is_current_task(&bot_clone, "`oCollect Cave Background Seeds`") {
+                    return;
+                }
+
+                bot::find_path(&bot_clone, tile.x, tile.y);
+                thread::sleep(std::time::Duration::from_millis(100));
+                bot::punch(&bot_clone, 0, 0);
+                thread::sleep(std::time::Duration::from_millis(250));
+            }
+
+            bot::find_path(&bot_clone, 0, 0);
+            thread::sleep(std::time::Duration::from_millis(100));
+
+            while is_current_task(&bot_clone, "`oCollect Cave Background Seeds`") {
+                bot::place(&bot_clone, 1, 0, ROCK as u32);
+                thread::sleep(std::time::Duration::from_millis(100));
+
+                while {
+                    let world = bot_clone.world.read().unwrap();
+                    world.get_tile(1, 0).map_or(false, |tile| tile.foreground_item_id == CAVE_BACKGROUND)
+                } {
+                    bot::punch(&bot_clone, 1, 0);
+                    thread::sleep(std::time::Duration::from_millis(250));
+                }
+            }
+        }
+    });
+}
+
+
 
 fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
     let ftue = bot.ftue.read().unwrap();
