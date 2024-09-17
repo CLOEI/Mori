@@ -1,6 +1,7 @@
 use std::{
-    collections::HashMap,
-    sync::{Arc},
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap, HashSet},
+    sync::Arc,
 };
 
 use gtitem_r::structs::ItemDatabase;
@@ -13,7 +14,8 @@ pub struct AStar {
     pub grid: Vec<Node>,
     pub item_database: Arc<ItemDatabase>,
 }
-#[derive(Clone, Debug, PartialEq)]
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Node {
     pub g: u32,
     pub h: u32,
@@ -24,15 +26,28 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new() -> Node {
+    pub fn new(x: u32, y: u32, collision_type: u8) -> Node {
         Node {
             g: 0,
             h: 0,
             f: 0,
-            x: 0,
-            y: 0,
-            collision_type: 0,
+            x,
+            y,
+            collision_type,
         }
+    }
+}
+
+impl Ord for Node {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.f.cmp(&self.f)
+            .then_with(|| other.h.cmp(&self.h))
+    }
+}
+
+impl PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -58,104 +73,125 @@ impl AStar {
         self.width = world.width;
         self.height = world.height;
         for i in 0..world.tiles.len() {
-            let mut node = Node::new();
-            node.x = (i as u32) % world.width;
-            node.y = (i as u32) / world.width;
+            let x = (i as u32) % world.width;
+            let y = (i as u32) / world.width;
             let item = self
                 .item_database
                 .get_item(&(world.tiles[i].foreground_item_id as u32))
                 .unwrap();
-            node.collision_type = item.collision_type;
-            self.grid.push(node);
+            let collision_type = item.collision_type;
+            self.grid.push(Node::new(x, y, collision_type));
         }
     }
 
-    pub fn find_path(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> Option<Vec<Node>> {
-        let mut open_list: Vec<Node> = Vec::new();
-        let mut closed_list: Vec<Node> = Vec::new();
+    pub fn find_path(
+        &self,
+        from_x: u32,
+        from_y: u32,
+        to_x: u32,
+        to_y: u32,
+    ) -> Option<Vec<Node>> {
+        let mut open_list = BinaryHeap::new();
         let mut came_from: HashMap<(u32, u32), (u32, u32)> = HashMap::new();
+        let mut closed_set: HashSet<(u32, u32)> = HashSet::new();
 
         let start_index = (from_y * self.width + from_x) as usize;
-        let mut start_node = self.grid[start_index].clone();
+        let start_node = self.grid[start_index].clone();
+        let mut start_node = start_node;
         start_node.g = 0;
         start_node.h = self.calculate_h(from_x, from_y, to_x, to_y);
         start_node.f = start_node.g + start_node.h;
         open_list.push(start_node);
 
-        while !open_list.is_empty() {
-            let current_index = open_list
-                .iter()
-                .enumerate()
-                .min_by_key(|&(_, node)| node.f)
-                .unwrap()
-                .0;
-            let current_node = open_list.remove(current_index);
-
+        while let Some(current_node) = open_list.pop() {
             if current_node.x == to_x && current_node.y == to_y {
                 return Some(self.reconstruct_path(&came_from, (to_x, to_y), (from_x, from_y)));
             }
 
-            let children = self.get_neighbors(&current_node);
+            if closed_set.contains(&(current_node.x, current_node.y)) {
+                continue;
+            }
 
-            for mut child in children {
-                if closed_list
-                    .iter()
-                    .any(|closed_node| closed_node.x == child.x && closed_node.y == child.y)
-                {
+            closed_set.insert((current_node.x, current_node.y));
+
+            let neighbors = self.get_neighbors(&current_node);
+
+            for neighbor in neighbors {
+                if closed_set.contains(&(neighbor.x, neighbor.y)) {
                     continue;
                 }
 
-                child.g = current_node.g + 1;
-                child.h = self.calculate_h(child.x, child.y, to_x, to_y);
-                child.f = child.g + child.h;
+                let tentative_g = current_node.g + self.movement_cost(&current_node, &neighbor);
 
-                if let Some(open_node) = open_list
-                    .iter()
-                    .find(|node| node.x == child.x && node.y == child.y)
-                {
-                    if child.g > open_node.g {
-                        continue;
-                    }
+                let neighbor_index = (neighbor.y * self.width + neighbor.x) as usize;
+                let mut neighbor_node = self.grid[neighbor_index].clone();
+                if tentative_g < neighbor_node.g || neighbor_node.f == 0 {
+                    neighbor_node.g = tentative_g;
+                    neighbor_node.h = self.calculate_h(neighbor.x, neighbor.y, to_x, to_y);
+                    neighbor_node.f = neighbor_node.g + neighbor_node.h;
+                    open_list.push(neighbor_node);
+                    came_from.insert((neighbor.x, neighbor.y), (current_node.x, current_node.y));
                 }
-
-                came_from.insert((child.x, child.y), (current_node.x, current_node.y));
-                open_list.push(child);
             }
-
-            closed_list.push(current_node);
         }
 
         None
     }
 
-    fn calculate_h(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> u32 {
-        let dx = (from_x as i32 - to_x as i32).abs();
-        let dy = (from_y as i32 - to_y as i32).abs();
-        if dx == dy {
-            14 * dx as u32
+    fn movement_cost(&self, from: &Node, to: &Node) -> u32 {
+        let dx = if to.x > from.x {
+            to.x - from.x
         } else {
-            10 * (dx + dy) as u32
+            from.x - to.x
+        };
+        let dy = if to.y > from.y {
+            to.y - from.y
+        } else {
+            from.y - to.y
+        };
+        if dx == 1 && dy == 1 {
+            14
+        } else {
+            10
         }
+    }
+
+    fn calculate_h(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> u32 {
+        let dx = if to_x > from_x {
+            to_x - from_x
+        } else {
+            from_x - to_x
+        };
+        let dy = if to_y > from_y {
+            to_y - from_y
+        } else {
+            from_y - to_y
+        };
+        14 * dx.min(dy) + 10 * (dx.max(dy) - dx.min(dy))
     }
 
     fn get_neighbors(&self, node: &Node) -> Vec<Node> {
         let mut neighbors = Vec::new();
         let directions = [
-            (-1, 0),
-            (1, 0),
-            (0, -1),
-            (0, 1),
-            (-1, -1),
-            (-1, 1),
-            (1, -1),
-            (1, 1),
+            (-1, 0),  // Left
+            (1, 0),   // Right
+            (0, -1),  // Up
+            (0, 1),   // Down
+            (-1, -1), // Up-Left
+            (-1, 1),  // Down-Left
+            (1, -1),  // Up-Right
+            (1, 1),   // Down-Right
         ];
 
-        for (dx, dy) in directions.iter() {
+        for &(dx, dy) in &directions {
             let new_x = node.x as i32 + dx;
             let new_y = node.y as i32 + dy;
 
-            if new_x >= 0 && new_x < self.width as i32 && new_y >= 0 && new_y < self.height as i32 {
+            if new_x >= 0
+                && new_x < self.width as i32
+                && new_y >= 0
+                && new_y < self.height as i32
+            {
                 let index = (new_y as u32 * self.width + new_x as u32) as usize;
                 let neighbor = &self.grid[index];
 
@@ -176,6 +212,7 @@ impl AStar {
     ) -> Vec<Node> {
         let mut path = Vec::new();
         let mut current = current;
+
         while current != start {
             if let Some(node) = self
                 .grid
@@ -184,15 +221,20 @@ impl AStar {
             {
                 path.push(node.clone());
             }
-            current = *came_from.get(&current).unwrap();
+            current = match came_from.get(&current) {
+                Some(&prev) => prev,
+                None => break,
+            };
         }
-        path.push(
-            self.grid
-                .iter()
-                .find(|node| node.x == start.0 && node.y == start.1)
-                .unwrap()
-                .clone(),
-        );
+
+        if let Some(start_node) = self
+            .grid
+            .iter()
+            .find(|node| node.x == start.0 && node.y == start.1)
+        {
+            path.push(start_node.clone());
+        }
+
         path.reverse();
         path
     }
