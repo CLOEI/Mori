@@ -187,13 +187,15 @@ impl AStar {
             let new_x = node.x as i32 + dx;
             let new_y = node.y as i32 + dy;
 
-            if new_x >= 0
-                && new_x < self.width as i32
-                && new_y >= 0
-                && new_y < self.height as i32
-            {
+            if new_x >= 0 && new_x < self.width as i32 && new_y >= 0 && new_y < self.height as i32 {
                 let index = (new_y as u32 * self.width + new_x as u32) as usize;
                 let neighbor = &self.grid[index];
+
+                if neighbor.collision_type == 2 {
+                    if dy == 1 {
+                        continue;
+                    }
+                }
 
                 if neighbor.collision_type != 1 {
                     neighbors.push(neighbor.clone());
