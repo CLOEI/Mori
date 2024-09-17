@@ -38,6 +38,7 @@ pub fn post_ubisoft_2fa_ticket(
     ticket: &str,
     token: &str,
 ) -> Result<String, ureq::Error> {
+    println!("{} {}", ticket, token);
     let body = agent
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
@@ -55,8 +56,8 @@ pub fn post_ubisoft_2fa_ticket(
     let json: Value = body.into_json()?;
     let ticket = &json["ticket"].to_string();
     if json.get("rememberMeTicket").is_some() {
-        let remember_me_ticket = &json["rememberMeTicket"].to_string();
-        let ticket = post_ubisoft_rememberme(&agent, remember_me_ticket)?;
+        let remember_me_ticket = json["rememberMeTicket"].as_str().unwrap().to_string();
+        let ticket = post_ubisoft_rememberme(&agent, &remember_me_ticket)?;
         return Ok(ticket.to_string());
     }
     Ok(ticket.to_string())
@@ -103,7 +104,7 @@ pub fn get_ubisoft_session(
     let json: Value = body.into_json()?;
     if json.get("twoFactorAuthenticationTicket").is_some()
     {
-        let ticket = &json["twoFactorAuthenticationTicket"].to_string();
+        let ticket = &json["twoFactorAuthenticationTicket"].as_str().unwrap().to_string();
         let token = rust_otp::make_totp(&recovery_code.to_ascii_uppercase(), 30, 0).unwrap();
         let session_ticket = post_ubisoft_2fa_ticket(&agent, ticket, &token.to_string())?;
         Ok(session_ticket)
