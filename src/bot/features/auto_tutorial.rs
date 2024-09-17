@@ -7,7 +7,7 @@
 6.  `oBreak Rock Blocks``|Select the `2Fist`` and break some `2Rock``!|19|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Rock``!|1
 7.  `oCollect Rock Seeds``|Break the `2Rock`` to collect `2Rock Seeds``.|6|interface/tutorial/tut_npc.rttex|Break the `2Rock`` to collect `2Rock Seeds``.|1
 8.  `oBreak Cave Backgrounds``|Select the `2Fist`` and break some `2Cave Background``!|20|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Cave Background``!|1
-9.
+9.  `oCollect Cave Background Seeds``|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|14|interface/tutorial/tut_npc.rttex|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|1
 10.
 11.
 12.
@@ -55,7 +55,7 @@ pub fn break_dirt_block(bot: &Arc<Bot>) {
                         return;
                     }
 
-                    if {
+                    while {
                         let world = bot_clone.world.read().unwrap();
                         world.get_tile(tile.x, tile.y).unwrap().foreground_item_id == DIRT
                     } {
@@ -86,7 +86,7 @@ pub fn plant_dirt_seed(bot: &Arc<Bot>) {
                         return;
                     }
 
-                    if {
+                    while {
                         let world = bot_clone.world.read().unwrap();
                         world.get_tile(tile.x, tile.y - 1).unwrap().foreground_item_id == 0
                     } {
@@ -116,7 +116,7 @@ pub fn harvest_dirt_tree(bot: &Arc<Bot>) {
                     return;
                 }
 
-                if {
+                while {
                     let world = bot_clone.world.read().unwrap();
                     world.is_tile_harvestable(&tile)
                 } {
@@ -215,7 +215,33 @@ pub fn collect_rock_seed(bot: &Arc<Bot>) {
 }
 
 pub fn break_cave_background(bot: &Arc<Bot>) {
+    let bot_clone = bot.clone();
 
+    thread::spawn(move || {
+        while is_current_task(&bot_clone, "`oBreak Cave Backgrounds`") {
+            let dirt_tiles = {
+                let world = bot_clone.world.read().unwrap();
+                world.tiles.clone().into_iter().filter(|tile| tile.foreground_item_id == DIRT).collect::<Vec<_>>()
+            };
+
+            for tile in dirt_tiles.iter() {
+                if !is_current_task(&bot_clone, "`oBreak Cave Backgrounds`") {
+                    return;
+                }
+
+                while {
+                    let world = bot_clone.world.read().unwrap();
+                    let tile = world.get_tile(tile.x, tile.y).unwrap();
+                    tile.background_item_id != 0 || tile.foreground_item_id != 0
+                } {
+                    bot::find_path(&bot_clone, tile.x, tile.y - 1);
+                    thread::sleep(std::time::Duration::from_millis(100));
+                    bot::punch(&bot_clone, 0, 1);
+                    thread::sleep(std::time::Duration::from_millis(250));
+                }
+            }
+        }
+    });
 }
 
 fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
