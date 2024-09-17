@@ -6,7 +6,11 @@
 5.  `oHarvest Dirt Trees``|Harvest the `2Dirt Tree`` that you planted!|5|interface/tutorial/tut_npc.rttex|Harvest the `2Dirt Tree`` that you planted!|1
 6.  `oBreak Rock Blocks``|Select the `2Fist`` and break some `2Rock``!|19|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Rock``!|1
 7.  `oCollect Rock Seeds``|Break the `2Rock`` to collect `2Rock Seeds``.|6|interface/tutorial/tut_npc.rttex|Break the `2Rock`` to collect `2Rock Seeds``.|1
-8.
+8.  `oBreak Cave Backgrounds``|Select the `2Fist`` and break some `2Cave Background``!|20|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Cave Background``!|1
+9.
+10.
+11.
+12.
  */
 use std::sync::Arc;
 use std::thread;
@@ -17,6 +21,7 @@ use crate::types::epacket_type::EPacketType;
 
 static DIRT: u16 = 2;
 static ROCK: u16 = 10;
+static CAVE_BACKGROUND: u16 = 14;
 static DIRT_SEEDS: u16 = 3;
 static ROCK_SEED: u16 = 11;
 
@@ -153,20 +158,64 @@ pub fn break_rock_block(bot: &Arc<Bot>) {
 
             bot::find_path(&bot_clone, 0, 0);
             thread::sleep(std::time::Duration::from_millis(100));
-            while is_current_task(bot, "`oBreak Rock Blocks`") {
-                bot::place(bot, 1, 0, ROCK as u32);
+            while is_current_task(&bot_clone, "`oBreak Rock Blocks`") {
+                bot::place(&bot_clone, 1, 0, ROCK as u32);
                 thread::sleep(std::time::Duration::from_millis(100));
 
                 while {
-                    let world = bot.world.read().unwrap();
+                    let world = &bot_clone.world.read().unwrap();
                     world.get_tile(1, 0).map_or(false, |tile| tile.foreground_item_id == ROCK)
                 } {
-                    bot::punch(bot, 1, 0);
+                    bot::punch(&bot_clone, 1, 0);
                     thread::sleep(std::time::Duration::from_millis(250));
                 }
             }
         }
     });
+}
+
+pub fn collect_rock_seed(bot: &Arc<Bot>) {
+    let bot_clone = bot.clone();
+
+    thread::spawn(move || {
+        while is_current_task(&bot_clone, "`oCollect Rock Seeds`") {
+            let rock_tree_tiles = {
+                let world = bot_clone.world.read().unwrap();
+                world.tiles.clone().into_iter().filter(|tile| tile.foreground_item_id == ROCK_SEED).collect::<Vec<_>>()
+            };
+
+            for tile in rock_tree_tiles.iter() {
+                if !is_current_task(&bot_clone, "`oCollect Rock Seeds`") {
+                    return;
+                }
+
+                bot::find_path(&bot_clone, tile.x, tile.y);
+                thread::sleep(std::time::Duration::from_millis(100));
+                bot::punch(&bot_clone, 0, 0);
+                thread::sleep(std::time::Duration::from_millis(250));
+            }
+
+            bot::find_path(&bot_clone, 0, 0);
+            thread::sleep(std::time::Duration::from_millis(100));
+
+            while is_current_task(&bot_clone, "`oCollect Rock Seeds`") {
+                bot::place(&bot_clone, 1, 0, ROCK as u32);
+                thread::sleep(std::time::Duration::from_millis(100));
+
+                while {
+                    let world = bot_clone.world.read().unwrap();
+                    world.get_tile(1, 0).map_or(false, |tile| tile.foreground_item_id == ROCK)
+                } {
+                    bot::punch(&bot_clone, 1, 0);
+                    thread::sleep(std::time::Duration::from_millis(250));
+                }
+            }
+        }
+    });
+}
+
+pub fn break_cave_background(bot: &Arc<Bot>) {
+
 }
 
 fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
