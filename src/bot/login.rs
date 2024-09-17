@@ -38,7 +38,6 @@ pub fn post_ubisoft_2fa_ticket(
     ticket: &str,
     token: &str,
 ) -> Result<String, ureq::Error> {
-    println!("{} {}", ticket, token);
     let body = agent
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
@@ -124,6 +123,7 @@ pub fn get_ubisoft_token(bot_info: &str, recovery_code: &str, email: &str, passw
     };
 
     let current_dir = env::current_dir().expect("Failed to get current directory");
+    // TODO: Add support for linux and mac
     let executable_path = current_dir.join("steamtoken.exe");
     let timeout = Duration::from_secs(5);
 

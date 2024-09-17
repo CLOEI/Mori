@@ -44,7 +44,7 @@ pub struct Server {
     pub port: u16,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FTUE { // First Time User Experience
     pub current_progress: i32,
     pub total_progress: i32,

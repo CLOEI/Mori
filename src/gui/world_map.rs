@@ -210,9 +210,28 @@ impl WorldMap {
                             if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    features::auto_dirt_farm::start(&bot_clone);
+                                    features::auto_tutorial::lock_the_world(&bot_clone);
                                 });
                             }
+                            if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    features::auto_tutorial::plant_dirt_seed(&bot_clone);
+                                });
+                            }
+                        });
+                    });
+
+                egui::Window::new("FTUE")
+                    .show(ui.ctx(), |ui| {
+                        ui.vertical(|ui| {
+                            let ftue = {
+                                let ftue = bot.ftue.read().unwrap();
+                                ftue.clone()
+                            };
+
+                            ui.label(format!("FTUE: {}", ftue.info));
+                            ui.label(format!("Current progress: {}/{}", ftue.current_progress, ftue.total_progress));
                         });
                     });
             }
