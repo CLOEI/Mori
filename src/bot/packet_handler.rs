@@ -256,6 +256,9 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             item.amount -= tank_packet.unk2 as u16;
                         }
                     }
+                    ETankPacketType::NetGamePacketSendTileUpdateData => {
+
+                    }
                     _ => {}
                 }
             }

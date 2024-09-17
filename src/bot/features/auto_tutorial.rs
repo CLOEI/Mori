@@ -9,7 +9,7 @@
 8.  `oBreak Cave Backgrounds``|Select the `2Fist`` and break some `2Cave Background``!|20|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Cave Background``!|1
 9.  `oCollect Cave Background Seeds``|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|14|interface/tutorial/tut_npc.rttex|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|1
 10. `oSplice Rock and Cave Background Seeds``|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|15|interface/tutorial/tut_npc.rttex|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|1
-11.
+11. `oPlace a Sign in the World``|Collect the `2Sign`` block that you have grown in the world.|16|interface/tutorial/tut_npc.rttex|Collect the `2Sign`` block that you have grown in the world.|1
 12.
  */
 use std::sync::Arc;
@@ -285,7 +285,20 @@ pub fn collect_cave_background_seed(bot: &Arc<Bot>) {
     });
 }
 
+pub fn splice_rock_and_cbg_seed(bot: &Arc<Bot>) {
+    let bot_clone = bot.clone();
 
+    thread::spawn(move || {
+        bot::find_path(&bot_clone, 0, 0);
+        thread::sleep(std::time::Duration::from_millis(100));
+        bot::place(&bot_clone, 1, 1, ROCK as u32);
+        thread::sleep(std::time::Duration::from_millis(100));
+        bot::place(&bot_clone, 1, 0, CAVE_BACKGROUND_SEED as u32);
+        thread::sleep(std::time::Duration::from_millis(100));
+        bot::place(&bot_clone, 1, 0, ROCK_SEED as u32);
+        thread::sleep(std::time::Duration::from_millis(100));
+    });
+}
 
 fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
     let ftue = bot.ftue.read().unwrap();
