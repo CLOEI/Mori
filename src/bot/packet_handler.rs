@@ -1,4 +1,5 @@
 use std::{fs, sync::Arc};
+use std::io::Cursor;
 use std::time::Instant;
 use gtworld_r::TileType;
 use paris::{error, info, warn};
@@ -257,7 +258,13 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         }
                     }
                     ETankPacketType::NetGamePacketSendTileUpdateData => {
-
+                        let tile = {
+                            let mut world = bot.world.write().unwrap();
+                            world.get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32).unwrap().clone()
+                        };
+                        let data = &data[56..];
+                        let mut cursor = Cursor::new(data);
+                        bot.world.write().unwrap().update_tile(tile, &mut cursor, true);
                     }
                     _ => {}
                 }
