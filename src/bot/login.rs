@@ -140,7 +140,9 @@ pub fn get_ubisoft_token(bot_info: &str, recovery_code: &str, email: &str, passw
             Some(status) => {
                 if status.success() {
                     let output = child.wait_with_output().expect("Failed to read output");
-                    let steam_token = utils::textparse::format_string_as_steam_token(String::from_utf8_lossy(&output.stdout).as_str());
+                    let output_str = String::from_utf8_lossy(&output.stdout);
+                    let data = output_str.split("\n").collect::<Vec<&str>>();
+                    let steam_token = utils::textparse::format_string_as_steam_token(&data[0]);
 
                     let formated = encode(format!("UbiTicket|{}{}\n", session, bot_info).as_str()).to_string();
                     let body = agent
