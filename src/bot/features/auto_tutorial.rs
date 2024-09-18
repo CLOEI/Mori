@@ -10,7 +10,10 @@
 9.  `oCollect Cave Background Seeds``|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|14|interface/tutorial/tut_npc.rttex|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|1
 10. `oSplice Rock and Cave Background Seeds``|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|15|interface/tutorial/tut_npc.rttex|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|1
 11. `oPlace a Sign in the World``|Collect the `2Sign`` block that you have grown in the world.|16|interface/tutorial/tut_npc.rttex|Collect the `2Sign`` block that you have grown in the world.|1
-12.
+12. `oWrench the Sign that you placed``|Wrench the `2Sign`` to change what it says!|17|interface/tutorial/tut_npc.rttex|Wrench the `2Sign`` to change what it says!|1
+13.
+14.
+15.
  */
 use std::sync::Arc;
 use std::thread;
@@ -22,9 +25,11 @@ use crate::types::epacket_type::EPacketType;
 static DIRT: u16 = 2;
 static ROCK: u16 = 10;
 static CAVE_BACKGROUND: u16 = 14;
+static SIGN: u16 = 20;
 static DIRT_SEEDS: u16 = 3;
 static ROCK_SEED: u16 = 11;
 static CAVE_BACKGROUND_SEED: u16 = 15;
+static SIGN_SEED: u16 = 21;
 
 pub fn lock_the_world(bot: &Arc<Bot>) {
     if !is_current_task(bot, "`oLock the World`") {
@@ -297,6 +302,36 @@ pub fn splice_rock_and_cbg_seed(bot: &Arc<Bot>) {
         thread::sleep(std::time::Duration::from_millis(100));
         bot::place(&bot_clone, 1, 0, ROCK_SEED as u32);
         thread::sleep(std::time::Duration::from_millis(100));
+    });
+}
+
+pub fn place_sign_in_world(bot: &Arc<Bot>) {
+    let bot_clone = bot.clone();
+
+    thread::spawn(move || {
+        loop {
+            let (sign_tree_tile, is_harvestable, sign_count) = {
+                let world = bot_clone.world.read().unwrap();
+                let inventory = bot_clone.inventory.read().unwrap();
+                let sign_count = inventory.items.get(&SIGN).map_or(0, |item| item.amount);
+                let tile = world.tiles.clone().into_iter().find(|tile| tile.foreground_item_id == SIGN_SEED).unwrap();
+                let is_harvestable = world.is_tile_harvestable(&tile);
+                (tile, is_harvestable, sign_count)
+            };
+
+            if is_harvestable {
+                bot::find_path(&bot_clone, sign_tree_tile.x, sign_tree_tile.y);
+                thread::sleep(std::time::Duration::from_millis(100));
+                bot::punch(&bot_clone, 0, 0);
+                thread::sleep(std::time::Duration::from_millis(250));
+                break;
+            }
+
+            if sign_count > 0 {
+                bot::place(&bot_clone, 0, 0, SIGN as u32);
+                thread::sleep(std::time::Duration::from_millis(250));
+            }
+        }
     });
 }
 
