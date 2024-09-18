@@ -38,6 +38,7 @@ Any contribution would help alot.
 - [x] Legacy login
 - [ ] Apple login 
 - [x] Ubisoft-steam login - (Build steamtoken and place it in the project root directory)
+- [x] Auto link ubisoft account to steam account
 - [x] Configureable delay
 - [ ] Embedded scripting
 - [ ] Bot terminal view
