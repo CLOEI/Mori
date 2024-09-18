@@ -14,14 +14,12 @@
 13. `oBreak Lava Blocks``|Select the `2Fist`` and break some `2Lava``!|21|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Lava``!|1
 14. `oCollect Lava Seeds``|Break the `2Lava`` until Lava Seeds fall out!|7|interface/tutorial/tut_npc.rttex|Break the `2Lava`` until Lava Seeds fall out!|1
 15. `oSplice Lava and Dirt Seeds``|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|8|interface/tutorial/tut_npc.rttex|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|1
-16.
+16. `oBuild Wood Blocks``|Collect the `2Wood Blocks`` that you have grown in the world.|9|interface/tutorial/tut_npc.rttex|Collect the `2Wood Blocks`` that you have grown in the world.|1
 17.
 18.
  */
-use std::fmt::format;
 use std::sync::Arc;
 use std::thread;
-use gtworld_r::TileType;
 use crate::bot;
 use crate::bot::Bot;
 use crate::types::epacket_type::EPacketType;
@@ -454,7 +452,62 @@ pub fn collect_lava_seed(bot: &Arc<Bot>) {
 }
 
 pub fn splice_lava_and_dirt_seed(bot: &Arc<Bot>) {
+    bot::find_path(&bot, 2, 4);
+    thread::sleep(std::time::Duration::from_millis(100));
+    loop {
+        let (lava_seed_count, dirt_seed_count) = {
+            let inventory = bot.inventory.read().unwrap();
+            let lava_seed_count = inventory.items.get(&LAVA_SEED).map_or(0, |item| item.amount);
+            let dirt_seed_count = inventory.items.get(&DIRT_SEEDS).map_or(0, |item| item.amount);
+            (lava_seed_count, dirt_seed_count)
+        };
 
+        if lava_seed_count < 3 {
+            break_item_from_inventory(&bot, LAVA, 3);
+        }
+
+        if dirt_seed_count < 3 {
+            break_item_from_inventory(&bot, DIRT, 3);
+        }
+
+        if lava_seed_count >= 3 && dirt_seed_count >= 3 {
+            break;
+        }
+    }
+
+    thread::sleep(std::time::Duration::from_millis(100));
+    bot::place(&bot, 0, -1, ROCK as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+    bot::place(&bot, -1, -1, ROCK as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+    bot::place(&bot, 1, -1, ROCK as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+
+    bot::place(&bot, 0, -2, LAVA_SEED as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+    bot::place(&bot, -1, -2, LAVA_SEED as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+    bot::place(&bot, 1, -2, LAVA_SEED as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+
+    bot::place(&bot, 0, -2, DIRT_SEEDS as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+    bot::place(&bot, -1, -2, DIRT_SEEDS as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+    bot::place(&bot, 1, -2, DIRT_SEEDS as u32);
+    thread::sleep(std::time::Duration::from_millis(250));
+}
+
+pub fn break_item_from_inventory(bot: &Arc<Bot>, item_id: u16, target: u16) {
+    while {
+        let inventory = bot.inventory.read().unwrap();
+        inventory.items.get(&(&item_id + 1)).map_or(0, |item| item.amount) < target
+    } {
+        bot::place(&bot, 1, 0, item_id as u32);
+        thread::sleep(std::time::Duration::from_millis(100));
+        bot::punch(bot, 1, 0);
+        thread::sleep(std::time::Duration::from_millis(250));
+    }
 }
 
 fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
