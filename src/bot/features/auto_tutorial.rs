@@ -10,11 +10,12 @@
 9.  `oCollect Cave Background Seeds``|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|14|interface/tutorial/tut_npc.rttex|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|1
 10. `oSplice Rock and Cave Background Seeds``|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|15|interface/tutorial/tut_npc.rttex|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|1
 11. `oPlace a Sign in the World``|Collect the `2Sign`` block that you have grown in the world.|16|interface/tutorial/tut_npc.rttex|Collect the `2Sign`` block that you have grown in the world.|1
-12. `oWrench the Sign that you placed``|Wrench the `2Sign`` to change what it says!|17|interface/tutorial/tut_npc.rttex|Wrench the `2Sign`` to change what it says!|1
-13.
+12. `oWrench the Sign that you placed``|Wrench the `2Sign`` to change what it says!|17|interfae/tutorial/tut_npc.rttex|Wrench the `2Sign`` to change what it says!|1c
+13. `oBreak Lava Blocks``|Select the `2Fist`` and break some `2Lava``!|21|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Lava``!|1
 14.
 15.
  */
+use std::fmt::format;
 use std::sync::Arc;
 use std::thread;
 use gtworld_r::TileType;
@@ -26,10 +27,12 @@ static DIRT: u16 = 2;
 static ROCK: u16 = 10;
 static CAVE_BACKGROUND: u16 = 14;
 static SIGN: u16 = 20;
+static LAVA: u16 = 4;
 static DIRT_SEEDS: u16 = 3;
 static ROCK_SEED: u16 = 11;
 static CAVE_BACKGROUND_SEED: u16 = 15;
 static SIGN_SEED: u16 = 21;
+static LAVA_SEED: u16 = 5;
 
 pub fn lock_the_world(bot: &Arc<Bot>) {
     if !is_current_task(bot, "`oLock the World`") {
@@ -329,6 +332,82 @@ pub fn place_sign_in_world(bot: &Arc<Bot>) {
 
             if sign_count > 0 {
                 bot::place(&bot_clone, 0, 0, SIGN as u32);
+                thread::sleep(std::time::Duration::from_millis(250));
+            }
+        }
+    });
+}
+
+pub fn wrench_sign(bot: &Arc<Bot>) {
+    let bot_clone = bot.clone();
+
+    thread::spawn(move || {
+        let sign_tile = {
+            let world = bot_clone.world.read().unwrap();
+            let tile = world.tiles.clone().into_iter().find(|tile| tile.foreground_item_id == SIGN);
+            (tile)
+        };
+
+        if sign_tile.is_some() {
+            let sign_tile = sign_tile.unwrap();
+            bot::find_path(&bot_clone, sign_tile.x, sign_tile.y);
+            thread::sleep(std::time::Duration::from_millis(100));
+            bot::wrench(&bot_clone, 0, 0);
+            thread::sleep(std::time::Duration::from_millis(1000));
+            bot::send_packet(&bot_clone, EPacketType::NetMessageGenericText, format!("action|dialog_return\ndialog_name|sign_edit\ntilex|{}|\ntiley|{}|\nsign_text|CLOEI\n", sign_tile.x, sign_tile.y).to_string());
+            thread::sleep(std::time::Duration::from_millis(1000));
+            while {
+                let world = bot_clone.world.read().unwrap();
+                world.get_tile(1, 0).map_or(false, |tile| tile.foreground_item_id == SIGN)
+            } {
+                bot::punch(&bot_clone, 0, 0);
+                thread::sleep(std::time::Duration::from_millis(250));
+            }
+        }
+    });
+}
+
+pub fn harvest_and_break_lava(bot: &Arc<Bot>) {
+    let bot_clone = bot.clone();
+
+    thread::spawn(move || {
+        let lava_tree_tiles = {
+            let world = bot_clone.world.read().unwrap();
+            let tiles = world.tiles.clone().into_iter().filter(|tile| tile.foreground_item_id == LAVA_SEED).collect::<Vec<_>>();
+            (tiles)
+        };
+
+        for tile in lava_tree_tiles.iter() {
+            let (is_harvestable, lava_count) = {
+                let world = bot_clone.world.read().unwrap();
+                let inventory = bot_clone.inventory.read().unwrap();
+                let lava_count = inventory.items.get(&LAVA).map_or(0, |item| item.amount);
+                (world.is_tile_harvestable(&tile), lava_count)
+            };
+
+            if lava_count > 5 {
+                break;
+            }
+
+            if is_harvestable && lava_count < 5 {
+                bot::find_path(&bot_clone, tile.x, tile.y);
+                thread::sleep(std::time::Duration::from_millis(100));
+                bot::punch(&bot_clone, 0, 0);
+                thread::sleep(std::time::Duration::from_millis(250));
+            }
+        }
+
+        bot::find_path(&bot_clone, 0, 0);
+        thread::sleep(std::time::Duration::from_millis(100));
+        while is_current_task(&bot_clone, "`oBreak Lava Blocks`") {
+            bot::place(&bot_clone, 1, 0, LAVA as u32);
+            thread::sleep(std::time::Duration::from_millis(250));
+
+            while {
+                let world = bot_clone.world.read().unwrap();
+                world.get_tile(1, 0).map_or(false, |tile| tile.foreground_item_id == LAVA)
+            } {
+                bot::punch(&bot_clone, 1, 0);
                 thread::sleep(std::time::Duration::from_millis(250));
             }
         }

@@ -707,6 +707,10 @@ pub fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
     place(bot, offset_x, offset_y, 18);
 }
 
+pub fn wrench(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
+    place(bot, offset_x, offset_y, 32);
+}
+
 pub fn warp(bot: &Arc<Bot>, world_name: String) {
     if bot.state.read().unwrap().is_not_allowed_to_warp {
         return;
