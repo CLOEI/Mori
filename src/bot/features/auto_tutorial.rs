@@ -12,8 +12,11 @@
 11. `oPlace a Sign in the World``|Collect the `2Sign`` block that you have grown in the world.|16|interface/tutorial/tut_npc.rttex|Collect the `2Sign`` block that you have grown in the world.|1
 12. `oWrench the Sign that you placed``|Wrench the `2Sign`` to change what it says!|17|interfae/tutorial/tut_npc.rttex|Wrench the `2Sign`` to change what it says!|1c
 13. `oBreak Lava Blocks``|Select the `2Fist`` and break some `2Lava``!|21|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Lava``!|1
-14.
-15.
+14. `oCollect Lava Seeds``|Break the `2Lava`` until Lava Seeds fall out!|7|interface/tutorial/tut_npc.rttex|Break the `2Lava`` until Lava Seeds fall out!|1
+15. `oSplice Lava and Dirt Seeds``|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|8|interface/tutorial/tut_npc.rttex|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|1
+16.
+17.
+18.
  */
 use std::fmt::format;
 use std::sync::Arc;
@@ -412,6 +415,46 @@ pub fn harvest_and_break_lava(bot: &Arc<Bot>) {
             }
         }
     });
+}
+
+pub fn collect_lava_seed(bot: &Arc<Bot>) {
+    while is_current_task(bot, "`oCollect Lava Seeds`") {
+        let lava_tree_tiles = {
+            let world = bot.world.read().unwrap();
+            world.tiles.clone().into_iter().filter(|tile| tile.foreground_item_id == LAVA_SEED).collect::<Vec<_>>()
+        };
+
+        for tile in lava_tree_tiles.iter() {
+            if !is_current_task(bot, "`oCollect Lava Seeds`") {
+                return;
+            }
+
+            bot::find_path(bot, tile.x, tile.y);
+            thread::sleep(std::time::Duration::from_millis(100));
+            bot::punch(bot, 0, 0);
+            thread::sleep(std::time::Duration::from_millis(250));
+        }
+
+        bot::find_path(bot, 0, 0);
+        thread::sleep(std::time::Duration::from_millis(100));
+
+        while is_current_task(bot, "`oCollect Lava Seeds`") {
+            bot::place(bot, 1, 0, LAVA as u32);
+            thread::sleep(std::time::Duration::from_millis(100));
+
+            while {
+                let world = bot.world.read().unwrap();
+                world.get_tile(1, 0).map_or(false, |tile| tile.foreground_item_id == LAVA)
+            } {
+                bot::punch(bot, 1, 0);
+                thread::sleep(std::time::Duration::from_millis(250));
+            }
+        }
+    }
+}
+
+pub fn splice_lava_and_dirt_seed(bot: &Arc<Bot>) {
+
 }
 
 fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
