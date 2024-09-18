@@ -3,6 +3,7 @@ use regex::Regex;
 use serde_json::Value;
 use std::{env, io, process::Command, time::Duration};
 use std::process::Stdio;
+use std::sync::Arc;
 use base64::Engine;
 use base64::engine::general_purpose;
 use egui::TextBuffer;
@@ -10,6 +11,7 @@ use ureq::Agent;
 use urlencoding::encode;
 use crate::utils::error;
 use wait_timeout::ChildExt;
+use crate::bot::Bot;
 use crate::utils;
 
 static USER_AGENT: &str =
@@ -82,6 +84,7 @@ pub fn get_ubisoft_game_token(agent: &Agent, token: &str) -> Result<String, ureq
 
 pub fn get_ubisoft_session(
     agent: &Agent,
+    bot: &Arc<Bot>,
     email: &str,
     password: &str,
     recovery_code: &str,
@@ -105,19 +108,35 @@ pub fn get_ubisoft_session(
     {
         let ticket = &json["twoFactorAuthenticationTicket"].as_str().unwrap().to_string();
         let token = rust_otp::make_totp(&recovery_code.to_ascii_uppercase(), 30, 0).unwrap();
-        let session_ticket = post_ubisoft_2fa_ticket(&agent, ticket, &token.to_string())?;
-        Ok(session_ticket)
+        match post_ubisoft_2fa_ticket(&agent, ticket, &token.to_string()) {
+            Ok(res) => {
+                Ok(res)
+            }
+            Err(err) => {
+                {
+                    bot.info.write().unwrap().status = "2FA Failed".to_string();
+                }
+                Err(err)
+            }
+        }
     } else {
         let game_token = get_ubisoft_game_token(agent, json["ticket"].as_str().unwrap().to_string().as_str())?;
         Ok(game_token)
     }
 }
 
-pub fn get_ubisoft_token(bot_info: &str, recovery_code: &str, email: &str, password: &str, steamuser: &str, steampassword: &str) -> Result<String, error::CustomError> {
+pub fn get_ubisoft_token(bot: &Arc<Bot>, recovery_code: &str, email: &str, password: &str, steamuser: &str, steampassword: &str) -> Result<String, error::CustomError> {
+    let info = {
+        let data = bot.info.read().unwrap().login_info.to_string();
+        data.clone()
+    };
     let agent = ureq::AgentBuilder::new().redirects(5).build();
-    let session = match get_ubisoft_session(&agent, email, password, recovery_code) {
+    let session = match get_ubisoft_session(&agent, &bot, email, password, recovery_code) {
         Ok(res) => res,
         Err(err) => {
+            {
+                bot.state.write().unwrap().is_running = false;
+            }
             return Err(error::CustomError::Other(format!("Failed to get ubisoft session: {}", err)));
         }
     };
@@ -144,7 +163,7 @@ pub fn get_ubisoft_token(bot_info: &str, recovery_code: &str, email: &str, passw
                     let data = output_str.split("\n").collect::<Vec<&str>>();
                     let steam_token = utils::textparse::format_string_as_steam_token(&data[0]);
 
-                    let formated = encode(format!("UbiTicket|{}{}\n", session, bot_info).as_str()).to_string();
+                    let formated = encode(format!("UbiTicket|{}{}\n", session, info).as_str()).to_string();
                     let body = agent
                         .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
                         .set("user-agent", USER_AGENT)

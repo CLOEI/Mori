@@ -135,7 +135,7 @@ pub fn set_status(bot: &Arc<Bot>, message: &str) {
     bot.info.write().unwrap().status = message.to_string();
 }
 
-pub fn reconnect(bot: &Arc<Bot>) {
+pub fn reconnect(bot: &Arc<Bot>) -> bool {
     set_status(bot, "Reconnecting...");
     to_http(bot);
 
@@ -162,12 +162,18 @@ pub fn reconnect(bot: &Arc<Bot>) {
             }
             Err(err) => {
                 info!("Failed to get OAuth links: {}", err);
-                return;
+                return false;
             }
         }
     }
 
     get_token(bot);
+
+    if {
+        !bot.state.write().unwrap().is_running
+    } {
+        return false;
+    }
 
     let (server, port) = {
         let info = bot.info.read().unwrap();
@@ -178,6 +184,7 @@ pub fn reconnect(bot: &Arc<Bot>) {
     };
 
     connect_to_server(bot, server, port);
+    true
 }
 
 fn update_login_info(bot: &Arc<Bot>, data: String) {
@@ -349,12 +356,11 @@ pub fn get_token(bot: &Arc<Bot>) {
             {
                 bot.info.write().unwrap().login_info.platform_id = "15,1,0".to_string();
             }
-            let info = bot.info.read().unwrap().login_info.to_string().clone();
             let recovery_code = {
                 let info = bot.info.read().unwrap();
                 info.recovery_code.clone()
             };
-            match login::get_ubisoft_token(&info, &recovery_code, &payload[0], &payload[1], &payload[2], &payload[3]) {
+            match login::get_ubisoft_token(&bot, &recovery_code, &payload[0], &payload[1], &payload[2], &payload[3]) {
                 Ok(res) => res,
                 Err(err) => {
                     error!("Failed to get Ubisoft token: {}", err);
@@ -528,7 +534,9 @@ fn process_events(bot: &Arc<Bot>) {
             info!("Redirecting to the server {}:{}", ip, port);
             connect_to_server(bot, ip, port);
         } else {
-            reconnect(bot);
+            if !reconnect(bot) {
+                return;
+            }
         }
 
         loop {
