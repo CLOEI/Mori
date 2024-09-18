@@ -200,7 +200,7 @@ pub fn get_ubisoft_token(bot: &Arc<Bot>, recovery_code: &str, email: &str, passw
                             match link_ubisoft_to_steam(&agent, &session, &profile_id, &data[1]) {
                                 Ok(token) => {
                                     info!("Successfully linked Ubisoft to Steam");
-                                    return Ok(token);
+                                    return Ok("".to_string());
                                 }
                                 Err(err) => {
                                     return Err(error::CustomError::Other(format!("Failed to link Ubisoft to Steam: {}", err)));
