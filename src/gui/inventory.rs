@@ -29,30 +29,32 @@ impl Inventory {
                 };
 
                 ui.vertical(|ui| {
-                    for (id, inventory_item) in inventory_items {
-                        let item = {
-                            let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
-                            item.clone()
-                        };
-                        ui.horizontal(|ui| {
-                            ui.label(item.name.clone());
-                            ui.label(format!("x{}", inventory_item.amount));
-                            ui.group(|ui| {
-                                if ui.button("Drop").clicked() {
-                                    let bot_clone = bot.clone();
-                                    spawn(move || {
-                                        drop_item(&bot_clone, id as u32,  1);
-                                    });
-                                }
-                                if ui.button("Trash").clicked() {
-                                    let bot_clone = bot.clone();
-                                    spawn(move || {
-                                        trash_item(&bot_clone, id as u32,  1);
-                                    });
-                                }
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        for (id, inventory_item) in inventory_items {
+                            let item = {
+                                let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
+                                item.clone()
+                            };
+                            ui.horizontal(|ui| {
+                                ui.label(item.name.clone());
+                                ui.label(format!("x{}", inventory_item.amount));
+                                ui.group(|ui| {
+                                    if ui.button("Drop").clicked() {
+                                        let bot_clone = bot.clone();
+                                        spawn(move || {
+                                            drop_item(&bot_clone, id as u32, 1);
+                                        });
+                                    }
+                                    if ui.button("Trash").clicked() {
+                                        let bot_clone = bot.clone();
+                                        spawn(move || {
+                                            trash_item(&bot_clone, id as u32, 1);
+                                        });
+                                    }
+                                });
                             });
-                        });
-                    }
+                        }
+                    });
                 });
             }
         }

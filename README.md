@@ -27,6 +27,7 @@ Any contribution would help alot.
 - [x] Item database
 - [x] Inventory (There's a bug, item count is not accurate)
 - [x] World map preview
+- [x] Growscan
 - [x] Bot movement + findpath
 - [x] Drop, trash item
 - [x] Warp

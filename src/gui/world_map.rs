@@ -216,7 +216,7 @@ impl WorldMap {
                             if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    features::auto_tutorial::harvest_and_place_wood_block(&bot_clone);
+                                    features::auto_tutorial::start(&bot_clone);
                                 });
                             }
                         });

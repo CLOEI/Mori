@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
@@ -5,6 +6,7 @@ use eframe::egui::{self, Ui};
 use egui::include_image;
 use crate::{bot::warp, manager::bot_manager::BotManager, types::config::BotConfig, utils, Bot};
 use crate::bot::leave;
+use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
 use crate::gui::world_map::WorldMap;
 
@@ -16,6 +18,7 @@ pub struct BotMenu {
     pub current_menu: String,
     pub world_map: WorldMap,
     pub inventory: Inventory,
+    pub growscan: Growscan,
 }
 
 impl BotMenu {
@@ -55,6 +58,11 @@ impl BotMenu {
                         include_image!("../../assets/backpack.png"),
                     )).clicked() {
                         self.current_menu = "inventory".to_string();
+                    }
+                    if ui.add_sized([30.0, 30.0], egui::Button::image(
+                        include_image!("../../assets/radar.png"),
+                    )).clicked() {
+                        self.current_menu = "radar".to_string();
                     }
                     if ui.add_sized([30.0, 30.0], egui::Button::image(
                         include_image!("../../assets/blocks.png"),
@@ -337,6 +345,10 @@ impl BotMenu {
                 } else if self.current_menu == "inventory" {
                     ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
                         self.inventory.render(ui, &manager);
+                    });
+                } else if self.current_menu == "radar" {
+                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                        self.growscan.render(ui, &manager);
                     });
                 } else if self.current_menu == "features" {
                     ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
