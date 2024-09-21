@@ -111,8 +111,8 @@ impl WorldMap {
 
 
                         for player in bot.players.read().unwrap().clone() {
-                            if player.position.x / 32.0 == (x as f32)
-                                && player.position.y / 32.0 == (y as f32)
+                            if (player.position.x / 32.0).floor() == (x as f32)
+                                && (player.position.y / 32.0).floor() == (y as f32)
                             {
                                 draw_list.rect_filled(
                                     Rect::from_min_max(cell_min, cell_max),
@@ -123,8 +123,8 @@ impl WorldMap {
                         }
 
                         let bot_position = bot.position.read().unwrap();
-                        if bot_position.x / 32.0 == (x as f32)
-                            && bot_position.y / 32.0 == (y as f32)
+                        if (bot_position.x / 32.0).floor() == (x as f32)
+                            && (bot_position.y / 32.0).floor() == (y as f32)
                         {
                             draw_list.rect_filled(
                                 Rect::from_min_max(cell_min, cell_max),
