@@ -216,7 +216,10 @@ impl WorldMap {
                             if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    features::auto_tutorial::start(&bot_clone);
+                                    loop {
+                                        bot::punch(&bot_clone, 0, 1);
+                                        thread::sleep(std::time::Duration::from_millis(350));
+                                    }
                                 });
                             }
                         });

@@ -61,14 +61,14 @@ pub struct Bot {
     pub astar: Arc<RwLock<AStar>>,
     pub ftue: Arc<RwLock<FTUE>>,
     pub item_database: Arc<ItemDatabase>,
-    pub proxy_manager: Arc<RwLock<ProxyManager>>
+    pub proxy_manager: Arc<RwLock<ProxyManager>>,
 }
 
 impl Bot {
     pub fn new(
         bot_config: types::config::BotConfig,
         item_database: Arc<ItemDatabase>,
-        proxy_manager: Arc<RwLock<ProxyManager>>
+        proxy_manager: Arc<RwLock<ProxyManager>>,
     ) -> Self {
         let payload = utils::textparse::parse_and_store_as_vec(&bot_config.payload);
         let mut proxy_address: Option<SocketAddr> = None;
@@ -135,7 +135,7 @@ impl Bot {
             astar: Arc::new(RwLock::new(AStar::new(item_database.clone()))),
             ftue: Arc::new(RwLock::new(FTUE::default())),
             item_database,
-            proxy_manager
+            proxy_manager,
         }
     }
 }
@@ -750,6 +750,13 @@ pub fn place(bot: &Arc<Bot>, offset_x: i32, offset_y: i32, item_id: u32) {
         && pkt.int_y <= base_y + 4
         && pkt.int_y >= base_y - 4
     {
+        send_packet_raw(bot, &pkt);
+        /*
+        00000000 00000000 00001010 00110000
+        the fifth bit from the end is set if facing left
+         */
+        pkt.flags = if offset_x > 0 { 2592 } else { 2608 };
+        pkt._type = ETankPacketType::NetGamePacketState;
         send_packet_raw(bot, &pkt);
     }
 }
