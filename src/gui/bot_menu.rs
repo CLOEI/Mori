@@ -4,8 +4,8 @@ use std::thread;
 
 use eframe::egui::{self, Ui};
 use egui::include_image;
-use crate::{bot::warp, manager::bot_manager::BotManager, types::config::BotConfig, utils, Bot};
-use crate::bot::leave;
+use crate::{bot, bot::warp, manager::bot_manager::BotManager, types::config::BotConfig, utils, Bot};
+use crate::bot::{leave, relog};
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
 use crate::gui::world_map::WorldMap;
@@ -120,6 +120,13 @@ impl BotMenu {
                                                 ui.label("Timeout");
                                                 ui.label(timeout.to_string());
                                                 ui.end_row();
+                                                // if ui.button("Relog").clicked() {
+                                                //     let bot_clone = bot.clone();
+                                                //     thread::spawn(move || {
+                                                //         relog(&bot_clone);
+                                                //     });
+                                                //     ui.end_row();
+                                                // }
                                             } else {
                                                 ui.label("GrowID");
                                                 ui.label("EMPTY");
@@ -136,6 +143,7 @@ impl BotMenu {
                                                 ui.label("Timeout");
                                                 ui.label("0");
                                                 ui.end_row();
+                                                // ui.add_enabled(false, egui::Button::new("Relog"));
                                             }
                                         });
                                 });

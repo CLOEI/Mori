@@ -16,8 +16,10 @@ use types::{
 use mlua::prelude::*;
 use crate::gui::add_proxy_dialog::AddProxyDialog;
 use crate::gui::proxy_list::ProxyList;
+use crate::gui::settings::Settings;
 use crate::manager::bot_manager::BotManager;
 use crate::manager::proxy_manager::ProxyManager;
+use crate::utils::config;
 
 mod bot;
 mod gui;
@@ -36,6 +38,7 @@ fn init_config() {
             findpath_delay: 30,
             selected_bot: "".to_string(),
             game_version: "4.65".to_string(),
+            use_alternate_server: false,
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
@@ -70,6 +73,7 @@ struct App {
     bot_manager: Arc<RwLock<BotManager>>,
     proxy_manager: ProxyManager,
     proxy_list: ProxyList,
+    settings: Settings,
     bot_menu: BotMenu,
     lua: Lua,
 }
@@ -93,6 +97,9 @@ impl App {
             add_proxy_dialog: Default::default(),
             bot_menu: Default::default(),
             proxy_list: Default::default(),
+            settings: Settings {
+                use_alternate: config::get_use_alternate_server(),
+            },
             proxy_manager,
             bot_manager,
             lua,
@@ -116,6 +123,8 @@ impl eframe::App for App {
                 self.item_database.render(ui, &self.bot_manager, ctx);
             } else if self.navbar.current_menu == "proxy_list" {
                 self.proxy_list.render(ui, &mut self.proxy_manager, &mut self.add_proxy_dialog, ctx);
+            } else if self.navbar.current_menu == "settings" {
+                self.settings.render(ui, ctx);
             } else {
                 ui.label("Not implemented yet");
             }

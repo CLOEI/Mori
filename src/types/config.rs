@@ -10,6 +10,7 @@ pub struct Config {
     pub findpath_delay: u32,
     pub selected_bot: String,
     pub game_version: String,
+    pub use_alternate_server: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

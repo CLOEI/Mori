@@ -127,3 +127,16 @@ pub fn remove_proxy(index: usize) {
     let mut file = File::create("config.json").unwrap();
     file.write_all(j.as_bytes()).unwrap();
 }
+
+pub fn get_use_alternate_server() -> bool {
+    let config = parse_config().unwrap();
+    config.use_alternate_server
+}
+
+pub fn set_use_alternate_server(use_alternate_server: bool) {
+    let mut config = parse_config().unwrap();
+    config.use_alternate_server = use_alternate_server;
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
+}

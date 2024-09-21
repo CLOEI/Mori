@@ -41,6 +41,7 @@ use crate::{
     },
 };
 use crate::bot::proxy::{SocketType, Socks5UdpSocket};
+use crate::utils::config;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -186,6 +187,18 @@ pub fn reconnect(bot: &Arc<Bot>) -> bool {
 
     connect_to_server(bot, server, port);
     true
+}
+
+pub fn relog(bot: &Arc<Bot>) {
+    info!("Relogging bot");
+    {
+        let mut state = bot.state.write().unwrap();
+        state.is_running = false;
+        state.is_redirecting = false;
+    }
+    set_status(&bot, "Relogging");
+    disconnect(&bot);
+    reconnect(&bot);
 }
 
 fn update_login_info(bot: &Arc<Bot>, data: String) {
@@ -432,9 +445,14 @@ pub fn spoof(bot: &Arc<Bot>) {
 
 pub fn to_http(bot: &Arc<Bot>) {
     info!("Fetching server data");
+    let server = if config::get_use_alternate_server() {
+        "https://www.growtopia2.com/growtopia/server_data.php"
+    } else {
+        "https://www.growtopia1.com/growtopia/server_data.php"
+    };
     set_status(bot, "Fetching server data");
     loop {
-        let req = ureq::post("https://www.growtopia1.com/growtopia/server_data.php").set(
+        let req = ureq::post(server).set(
             "User-Agent",
             "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
         );
@@ -584,8 +602,13 @@ fn process_events(bot: &Arc<Bot>) {
 }
 
 pub fn disconnect(bot: &Arc<Bot>) {
-    let peer_id = bot.peer_id.read().unwrap().unwrap().clone();
-    bot.host.lock().unwrap().peer_mut(peer_id).disconnect(0);
+    let peer_id = bot.peer_id.read().unwrap();
+    match *peer_id {
+        Some(peer_id) => {
+            bot.host.lock().unwrap().peer_mut(peer_id.clone()).disconnect(0);
+        }
+        None => {}
+    }
 }
 
 pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
