@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
-use crate::bot::{drop_item, trash_item};
+use crate::bot::{drop_item, trash_item, wear};
 use crate::utils;
 
 #[derive(Default)]
@@ -29,16 +29,28 @@ impl Inventory {
                 };
 
                 ui.vertical(|ui| {
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        for (id, inventory_item) in inventory_items {
-                            let item = {
-                                let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
-                                item.clone()
-                            };
-                            ui.horizontal(|ui| {
-                                ui.label(item.name.clone());
-                                ui.label(format!("x{}", inventory_item.amount));
-                                ui.group(|ui| {
+                    egui::Grid::new("inventory_grid")
+                        .num_columns(2)
+                        .spacing([0.0, 20.0])
+                        .striped(true)
+                        .min_col_width(ui.available_width() / 2.0)
+                        .show(ui, |ui| {
+                            for (id, inventory_item) in inventory_items {
+                                let (item, wear_disabled) = {
+                                    let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
+                                    (item.clone(), item.action_type != 20)
+                                };
+                                ui.horizontal(|ui| {
+                                    ui.label(item.name.clone());
+                                    ui.label(format!("x{}", inventory_item.amount));
+                                });
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.add_enabled(!wear_disabled, egui::Button::new("Wear")).clicked() {
+                                        let bot_clone = bot.clone();
+                                        spawn(move || {
+                                            wear(&bot_clone, id as u32);
+                                        });
+                                    }
                                     if ui.button("Drop").clicked() {
                                         let bot_clone = bot.clone();
                                         spawn(move || {
@@ -52,9 +64,9 @@ impl Inventory {
                                         });
                                     }
                                 });
-                            });
-                        }
-                    });
+                                ui.end_row();
+                            }
+                        });
                 });
             }
         }
