@@ -41,7 +41,7 @@ pub fn remove_bot(username: String) {
     file.write_all(j.as_bytes()).unwrap();
 }
 
-pub fn edit_timeout(timeout: u32) {
+pub fn set_timeout(timeout: u32) {
     let mut config = parse_config().unwrap();
     config.timeout = timeout;
     let j = serde_json::to_string_pretty(&config).unwrap();
@@ -54,7 +54,7 @@ pub fn get_timeout() -> u32 {
     config.timeout
 }
 
-pub fn edit_findpath_delay(findpath_delay: u32) {
+pub fn set_findpath_delay(findpath_delay: u32) {
     let mut config = parse_config().unwrap();
     config.findpath_delay = findpath_delay;
     let j = serde_json::to_string_pretty(&config).unwrap();

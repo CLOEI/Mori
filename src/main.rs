@@ -99,6 +99,8 @@ impl App {
             proxy_list: Default::default(),
             settings: Settings {
                 use_alternate: config::get_use_alternate_server(),
+                timeout_delay: config::get_timeout(),
+                findpath_delay: config::get_findpath_delay(),
             },
             proxy_manager,
             bot_manager,
