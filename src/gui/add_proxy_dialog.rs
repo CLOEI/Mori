@@ -1,3 +1,4 @@
+use std::sync::{Arc, RwLock};
 use eframe::egui::{self};
 use crate::manager::proxy_manager::ProxyManager;
 use crate::types::config;
@@ -10,7 +11,7 @@ pub struct AddProxyDialog {
 }
 
 impl AddProxyDialog {
-    pub fn render(&mut self, manager: &mut ProxyManager, ctx: &egui::Context) {
+    pub fn render(&mut self, manager: &Arc<RwLock<ProxyManager>>, ctx: &egui::Context) {
         if self.open {
             let mut close_dialog = false;
             egui::Window::new("Add proxy")
@@ -34,7 +35,7 @@ impl AddProxyDialog {
                             username: payload[2].clone(),
                             password: payload[3].clone(),
                         };
-                        manager.add(proxy_config);
+                        manager.write().unwrap().add(proxy_config);
                         self.payload.clear();
                         close_dialog = true;
                     }

@@ -41,6 +41,7 @@ use crate::{
     },
 };
 use crate::bot::proxy::{SocketType, Socks5UdpSocket};
+use crate::manager::proxy_manager::ProxyManager;
 use crate::utils::config;
 
 static USER_AGENT: &str =
@@ -60,21 +61,38 @@ pub struct Bot {
     pub astar: Arc<RwLock<AStar>>,
     pub ftue: Arc<RwLock<FTUE>>,
     pub item_database: Arc<ItemDatabase>,
+    pub proxy_manager: Arc<RwLock<ProxyManager>>
 }
 
 impl Bot {
     pub fn new(
         bot_config: types::config::BotConfig,
         item_database: Arc<ItemDatabase>,
+        proxy_manager: Arc<RwLock<ProxyManager>>
     ) -> Self {
-        let proxy_address: Option<String> = None;
-        let socket: SocketType = if let Some(proxy) = proxy_address {
-            let proxy_addr = SocketAddr::from_str("").expect("Invalid proxy address");
-            let username = "".to_string();
-            let password = "".to_string();
+        let payload = utils::textparse::parse_and_store_as_vec(&bot_config.payload);
+        let mut proxy_address: Option<SocketAddr> = None;
+        let mut proxy_username = String::new();
+        let mut proxy_password = String::new();
+        if config::get_bot_use_proxy(payload[0].clone()) {
+            let mut proxy_manager = proxy_manager.write().unwrap();
+            let proxy_index = proxy_manager.proxies.iter().position(|proxy| proxy.whos_using.len() < 3);
+            if let Some(proxy_index) = proxy_index {
+                let proxy_data = proxy_manager.get_mut(proxy_index).unwrap();
+                proxy_data.whos_using.push(payload[0].clone());
+                proxy_address = Some(SocketAddr::from_str(&format!("{}:{}", proxy_data.proxy.ip, proxy_data.proxy.port)).unwrap());
+                proxy_username = proxy_data.proxy.username.clone();
+                proxy_password = proxy_data.proxy.password.clone();
+            }
+        }
 
-            let udp_datagram = Socks5Datagram::bind_with_password(proxy_addr, SocketAddr::from_str("0.0.0.0:0").unwrap(), &username, &password)
+        let socket: SocketType = if let Some(proxy) = proxy_address {
+            if proxy_username.is_empty() || proxy_password.is_empty() {
+                error!("Proxy username or password is empty");
+            }
+            let udp_datagram = Socks5Datagram::bind_with_password(proxy, SocketAddr::from_str("0.0.0.0:0").unwrap(), &proxy_username, &proxy_password)
                 .expect("Failed to bind SOCKS5 datagram");
+            info!("Binded to proxy");
             SocketType::Socks5(Socks5UdpSocket::new(udp_datagram))
         } else {
             let udp_socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))
@@ -97,7 +115,7 @@ impl Bot {
 
         Self {
             info: Arc::new(RwLock::new(Info {
-                payload: utils::textparse::parse_and_store_as_vec(&bot_config.payload),
+                payload,
                 recovery_code: bot_config.recovery_code,
                 login_method: bot_config.login_method,
                 token: bot_config.token,
@@ -117,6 +135,7 @@ impl Bot {
             astar: Arc::new(RwLock::new(AStar::new(item_database.clone()))),
             ftue: Arc::new(RwLock::new(FTUE::default())),
             item_database,
+            proxy_manager
         }
     }
 }

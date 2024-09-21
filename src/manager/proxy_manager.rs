@@ -50,6 +50,10 @@ impl ProxyManager {
         self.proxies.get(index)
     }
 
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Proxy> {
+        self.proxies.get_mut(index)
+    }
+
     pub fn test(&mut self, index: usize) {
         let mut proxy_data = self.proxies.get_mut(index).unwrap();
         let proxy = proxy_data.proxy.clone();

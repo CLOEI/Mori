@@ -1,3 +1,4 @@
+use std::sync::{Arc, RwLock};
 use eframe::egui::{self, Ui};
 use paris::info;
 use crate::gui::add_proxy_dialog::AddProxyDialog;
@@ -7,7 +8,7 @@ use crate::manager::proxy_manager::ProxyManager;
 pub struct ProxyList {}
 
 impl ProxyList {
-    pub fn render(&mut self, ui: &mut Ui, proxy_manager: &mut ProxyManager, add_proxy_dialog: &mut AddProxyDialog, _ctx: &egui::Context) {
+    pub fn render(&mut self, ui: &mut Ui, proxy_manager: &Arc<RwLock<ProxyManager>>, add_proxy_dialog: &mut AddProxyDialog, _ctx: &egui::Context) {
         ui.vertical(|ui| {
             if ui.button("Add proxy").clicked() {
                 add_proxy_dialog.open = true;
@@ -23,7 +24,10 @@ impl ProxyList {
                     ui.label("Password");
                     ui.label("Status");
                     ui.end_row();
-                    let proxies = proxy_manager.proxies.clone();
+                    let proxies = {
+                        let proxy_manager = proxy_manager.read().unwrap();
+                        proxy_manager.proxies.clone()
+                    };
                     for (index, proxy_data) in proxies.iter().enumerate() {
                         let proxy = &proxy_data.proxy;
                         ui.label(proxy.ip.to_string());
@@ -37,11 +41,11 @@ impl ProxyList {
 
                         response.context_menu(|ui| {
                             if ui.button("Test").clicked() {
-                                proxy_manager.test(index);
+                                proxy_manager.write().unwrap().test(index);
                                 ui.close_menu();
                             }
                             if ui.button("Remove").clicked() {
-                                proxy_manager.remove(index);
+                                proxy_manager.write().unwrap().remove(index);
                                 ui.close_menu();
                             }
                         });

@@ -71,7 +71,7 @@ struct App {
     add_bot_dialog: AddBotDialog,
     add_proxy_dialog: AddProxyDialog,
     bot_manager: Arc<RwLock<BotManager>>,
-    proxy_manager: ProxyManager,
+    proxy_manager: Arc<RwLock<ProxyManager>>,
     proxy_list: ProxyList,
     settings: Settings,
     bot_menu: BotMenu,
@@ -80,8 +80,8 @@ struct App {
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut bot_manager = Arc::new(RwLock::new(BotManager::new()));
-        let proxy_manager = ProxyManager::new();
+        let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
+        let mut bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
         let lua = Lua::new();
         let bots = utils::config::get_bots();
         for bot in bots.clone() {
@@ -124,7 +124,7 @@ impl eframe::App for App {
             } else if self.navbar.current_menu == "item_database" {
                 self.item_database.render(ui, &self.bot_manager, ctx);
             } else if self.navbar.current_menu == "proxy_list" {
-                self.proxy_list.render(ui, &mut self.proxy_manager, &mut self.add_proxy_dialog, ctx);
+                self.proxy_list.render(ui, &self.proxy_manager, &mut self.add_proxy_dialog, ctx);
             } else if self.navbar.current_menu == "settings" {
                 self.settings.render(ui, ctx);
             } else {

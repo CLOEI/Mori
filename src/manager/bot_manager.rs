@@ -2,18 +2,20 @@ use crate::bot::{self, Bot};
 use crate::types::config::BotConfig;
 use gtitem_r::structs::ItemDatabase;
 use paris::{error, info};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::{spawn, JoinHandle};
+use crate::manager::proxy_manager::ProxyManager;
 use crate::utils;
 
 pub struct BotManager {
     pub bots: Vec<(Arc<Bot>, JoinHandle<()>)>,
     pub items_database: Arc<ItemDatabase>,
+    pub proxy_manager: Arc<RwLock<ProxyManager>>
 }
 
 impl BotManager {
-    pub fn new() -> Self {
+    pub fn new(proxy_manager: Arc<RwLock<ProxyManager>>) -> Self {
         let item_database = {
             match gtitem_r::load_from_file("items.dat") {
                 Ok(item_database) => {
@@ -30,6 +32,7 @@ impl BotManager {
         Self {
             bots: vec![],
             items_database: Arc::new(item_database),
+            proxy_manager
         }
     }
 }
@@ -37,8 +40,9 @@ impl BotManager {
 impl BotManager {
     pub fn add_bot(&mut self, bot: BotConfig) {
         let items_database_clone = Arc::clone(&self.items_database);
+        let proxy_manager_clone = Arc::clone(&self.proxy_manager);
 
-        let new_bot = Arc::new(Bot::new(bot.clone(), items_database_clone));
+        let new_bot = Arc::new(Bot::new(bot.clone(), items_database_clone, proxy_manager_clone));
         let newbot_clone = Arc::clone(&new_bot);
 
         let handle = spawn(move || {

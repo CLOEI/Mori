@@ -50,7 +50,7 @@ Any contribution would help alot.
 - [ ] Auto tutorial
 - [x] Auto clear world
 - [ ] Spam
-- [ ] Socks5 support
+- [x] Socks5 support
 
 ## Note
 This is for educational purposes only. I am not responsible for any misuse of this tool. You also not allowed to sell or re-upload this tool as your own without my permission. use it at your own risk.
