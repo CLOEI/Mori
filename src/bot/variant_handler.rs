@@ -1,7 +1,6 @@
 use crate::bot;
 use crate::bot::{disconnect, send_packet};
 use crate::types::epacket_type::EPacketType;
-use crate::types::etank_packet_type::ETankPacketType;
 use crate::types::player::Player;
 use crate::types::tank_packet::TankPacket;
 use crate::types::vector::Vector2;
@@ -9,7 +8,6 @@ use crate::utils::variant::VariantList;
 use crate::utils::{self, textparse};
 use paris::info;
 use std::sync::Arc;
-use egui::debug_text::print;
 use super::Bot;
 
 pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
@@ -44,7 +42,8 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 EPacketType::NetMessageGenericText,
                 "action|enter_game\n".to_string(),
             );
-            bot.state.write().unwrap().is_redirecting = false;
+            let mut state = bot.state.write().unwrap();
+            state.is_redirecting = false;
         }
         "OnCountryState" => {}
         "OnDialogRequest" => {
@@ -88,7 +87,8 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnSetBux" => {
             let bux = variant.get(1).unwrap().as_int32();
-            bot.state.write().unwrap().gems = bux;
+            let mut state = bot.state.write().unwrap();
+            state.gems = bux;
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
@@ -149,7 +149,6 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                         EPacketType::NetMessageGenericText,
                         "action|getDRAnimations\n".to_string(),
                     );
-                    let colrect = data.get("colrect");
                     return;
                 }
             } else {

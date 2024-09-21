@@ -114,10 +114,10 @@ pub fn get_ubisoft_session(
             }
             Err(err) => {
                 {
-                    {
-                        bot.state.write().unwrap().is_running = false;
-                    }
-                    bot.info.write().unwrap().status = "2FA Failed".to_string();
+                    let mut state = bot.state.write().unwrap();
+                    let mut info = bot.info.write().unwrap();
+                    state.is_running = false;
+                    info.status = "2FA Failed".to_string();
                 }
                 Err(err)
             }
@@ -129,7 +129,7 @@ pub fn get_ubisoft_session(
 }
 
 fn link_ubisoft_to_steam(agent: &Agent, session_ticket: &str, profile_id: &str, steam_ticket: &str) -> Result<(), ureq::Error> {
-    let body = agent
+    agent
         .post(format!("https://public-ubiservices.ubi.com/v2/users/{}/profiles", &profile_id).to_string().as_str())
         .set("User-Agent", USER_AGENT)
         .set("Authorization", &format!("steam t={}", &steam_ticket.trim()))
@@ -197,13 +197,13 @@ pub fn get_ubisoft_token(bot: &Arc<Bot>, recovery_code: &str, email: &str, passw
                         let message = json["message"].as_str().unwrap().to_string();
                         if message.contains("Please try login with Steam account connected with Ubisoft Connect.") {
                             warn!("Linking Ubisoft to Steam");
-                            match link_ubisoft_to_steam(&agent, &session, &profile_id, &data[1]) {
-                                Ok(token) => {
+                            return match link_ubisoft_to_steam(&agent, &session, &profile_id, &data[1]) {
+                                Ok(_token) => {
                                     info!("Successfully linked Ubisoft to Steam");
-                                    return Ok("".to_string());
+                                    Ok("".to_string())
                                 }
                                 Err(err) => {
-                                    return Err(error::CustomError::Other(format!("Failed to link Ubisoft to Steam: {}", err)));
+                                    Err(error::CustomError::Other(format!("Failed to link Ubisoft to Steam: {}", err)))
                                 }
                             }
                         }

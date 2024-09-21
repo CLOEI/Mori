@@ -23,10 +23,7 @@ use socks::{Socks5Datagram};
 
 use crate::types::bot_info::{TemporaryData, FTUE};
 use crate::types::{etank_packet_type::ETankPacketType, player::Player};
-use crate::{
-    types::{self, tank_packet::TankPacket},
-    utils,
-};
+use crate::{types, types::{tank_packet::TankPacket}, utils};
 use crate::{
     types::{
         bot_info::{Info, Server, State},
@@ -147,13 +144,17 @@ pub fn logon(bot: &Arc<Bot>, data: String) {
     } else {
         update_login_info(&bot, data);
     }
-    bot.state.write().unwrap().is_running = true;
+    {
+        let mut state = bot.state.write().unwrap();
+        state.is_running = true;
+    }
     poll(bot);
     process_events(&bot);
 }
 
 pub fn set_status(bot: &Arc<Bot>, message: &str) {
-    bot.info.write().unwrap().status = message.to_string();
+    let mut info = bot.info.write().unwrap();
+    info.status = message.to_string();
 }
 
 pub fn reconnect(bot: &Arc<Bot>) -> bool {
@@ -290,7 +291,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                 let json_response: serde_json::Value =
                     serde_json::from_str(&response_text).unwrap();
 
-                if json_response["status"] == "success" {
+                return if json_response["status"] == "success" {
                     let new_token = json_response["token"]
                         .as_str()
                         .unwrap_or_default()
@@ -300,10 +301,10 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                     let mut info = bot.info.write().unwrap();
                     info.token = new_token;
 
-                    return true;
+                    true
                 } else {
                     error!("Token is invalid");
-                    return false;
+                    false
                 }
             }
             Err(err) => {
@@ -332,7 +333,7 @@ pub fn poll(bot: &Arc<Bot>) {
 
 pub fn sleep(bot: &Arc<Bot>) {
     let mut info = bot.info.write().unwrap();
-    info.timeout += utils::config::get_timeout();
+    info.timeout += config::get_timeout();
     while info.timeout > 0 {
         info.timeout -= 1;
         drop(info);
@@ -387,12 +388,9 @@ pub fn get_token(bot: &Arc<Bot>) {
         }
         ELoginMethod::STEAM => {
             {
-                bot.info.write().unwrap().login_info.platform_id = "15,1,0".to_string();
+                let mut info = bot.info.write().unwrap();
+                info.login_info.platform_id = "15,1,0".to_string();
             }
-            let recovery_code = {
-                let info = bot.info.read().unwrap();
-                info.recovery_code.clone()
-            };
             match login::get_ubisoft_token(&bot, &recovery_code, &payload[0], &payload[1], &payload[2], &payload[3]) {
                 Ok(res) => res,
                 Err(err) => {
@@ -500,7 +498,8 @@ pub fn to_http(bot: &Arc<Bot>) {
 pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
     info!("Parsing server data");
     set_status(bot, "Parsing server data");
-    bot.info.write().unwrap().server_data = data
+    let mut info = bot.info.write().unwrap();
+    info.server_data = data
         .lines()
         .filter_map(|line| {
             let mut parts = line.splitn(2, '|');
@@ -843,7 +842,7 @@ pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
         astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y)
     };
 
-    let delay = utils::config::get_findpath_delay();
+    let delay = config::get_findpath_delay();
     if let Some(paths) = paths {
         for node in paths {
             let pos_y = get_coordinate_to_touch_ground(node.y as f32 * 32.0);
@@ -865,7 +864,8 @@ pub fn drop_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
         format!("action|drop\n|itemID|{}\n", item_id),
     );
     thread::sleep(Duration::from_millis(100));
-    bot.temporary_data.write().unwrap().drop = (item_id, amount);
+    let mut temp_data = bot.temporary_data.write().unwrap();
+    temp_data.drop = (item_id, amount);
 }
 
 pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
@@ -875,7 +875,8 @@ pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
         format!("action|trash\n|itemID|{}\n", item_id),
     );
     thread::sleep(Duration::from_millis(100));
-    bot.temporary_data.write().unwrap().trash = (item_id, amount);
+    let mut temp_data = bot.temporary_data.write().unwrap();
+    temp_data.trash = (item_id, amount);
 }
 
 pub fn get_coordinate_to_touch_ground(y: f32) -> f32 {

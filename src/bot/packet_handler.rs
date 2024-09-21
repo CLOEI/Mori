@@ -41,7 +41,10 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             info!("Message: {}", message);
 
             if message.contains("logon_fail") {
-                bot.state.write().unwrap().is_redirecting = false;
+                {
+                    let mut state = bot.state.write().unwrap();
+                    state.is_redirecting = false;
+                }
                 bot::disconnect(bot);
             }
             if message.contains("currently banned") {
@@ -51,11 +54,17 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 bot::disconnect(bot);
             }
             if message.contains("Advanced Account Protection") {
-                bot.state.write().unwrap().is_running = false;
+                {
+                    let mut state = bot.state.write().unwrap();
+                    state.is_running = false;
+                }
                 bot::disconnect(bot);
             }
             if message.contains("temporarily suspended") {
-                bot.state.write().unwrap().is_running = false;
+                {
+                    let mut state = bot.state.write().unwrap();
+                    state.is_running = false;
+                }
                 bot::disconnect(bot);
             }
             if message.contains("has been suspended") {
@@ -75,7 +84,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     let version = caps.get(1).unwrap().as_str();
                     warn!("Update required: {}, updating...", version);
                     {
-                        bot.info.write().unwrap().login_info.game_version = version.to_string();
+                        let mut info =bot.info.write().unwrap();
+                        info.login_info.game_version = version.to_string();
                     }
                     utils::config::set_game_version(version.to_string());
                     let username = bot.info.read().unwrap().payload[0].clone();
@@ -282,7 +292,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             let data = utils::textparse::parse_and_store_as_map(&message);
             if data.contains_key("Level") {
                 let level = data.get("Level").unwrap();
-                bot.state.write().unwrap().level = level.parse().unwrap();
+                let mut state = bot.state.write().unwrap();
+                state.level = level.parse().unwrap();
             }
         }
         _ => (),

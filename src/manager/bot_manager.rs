@@ -62,7 +62,10 @@ impl BotManager {
                 };
 
                 if is_running {
-                    bot_clone.state.write().unwrap().is_running = false;
+                    {
+                        let mut state = bot_clone.state.write().unwrap();
+                        state.is_running = false;
+                    }
                     bot::disconnect(&bot_clone);
                 }
             });
