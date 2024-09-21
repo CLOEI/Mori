@@ -7,6 +7,7 @@ use crate::{types, utils};
 pub struct Proxy {
     pub proxy: types::config::Proxy,
     pub status: String,
+    pub whos_using: Vec<String>,
 }
 
 pub struct ProxyManager {
@@ -20,6 +21,7 @@ impl ProxyManager {
             Proxy {
                 proxy: proxy.clone(),
                 status: "Not tested".to_string(),
+                whos_using: vec![],
             }
         }).collect();
 
@@ -34,6 +36,7 @@ impl ProxyManager {
         self.proxies.push(Proxy {
             proxy: proxy.clone(),
             status: "Not tested".to_string(),
+            whos_using: vec![],
         });
         utils::config::add_proxy(proxy);
     }

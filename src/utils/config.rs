@@ -140,3 +140,14 @@ pub fn set_use_alternate_server(use_alternate_server: bool) {
     let mut file = File::create("config.json").unwrap();
     file.write_all(j.as_bytes()).unwrap();
 }
+
+pub fn get_bot_use_proxy(username: String) -> bool {
+    let config = parse_config().unwrap();
+    for b in config.bots.iter() {
+        let payload = utils::textparse::parse_and_store_as_vec(&b.payload);
+        if payload[0] == username {
+            return b.use_proxy;
+        }
+    }
+    false
+}

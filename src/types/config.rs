@@ -20,6 +20,7 @@ pub struct BotConfig {
     pub login_method: ELoginMethod,
     pub token: String,
     pub data: String,
+    pub use_proxy: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

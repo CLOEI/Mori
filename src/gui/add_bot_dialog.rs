@@ -15,6 +15,7 @@ pub struct AddBotDialog {
     pub steam_pass: String,
     pub code: String,
     pub method: ELoginMethod,
+    pub use_proxy: bool,
     pub open: bool,
 }
 
@@ -71,6 +72,7 @@ impl AddBotDialog {
                                     );
                                 });
                             ui.end_row();
+                            ui.checkbox(&mut self.use_proxy, "Use proxy");
                         });
                     if ui.button("Add").clicked() {
                         let config;
@@ -81,6 +83,7 @@ impl AddBotDialog {
                                 login_method: self.method.clone(),
                                 token: "".to_string(),
                                 data: "".to_string(),
+                                use_proxy: self.use_proxy,
                             };
                         } else {
                             config = BotConfig {
@@ -89,6 +92,7 @@ impl AddBotDialog {
                                 login_method: self.method.clone(),
                                 token: "".to_string(),
                                 data: "".to_string(),
+                                use_proxy: self.use_proxy,
                             };
                         }
                         {
