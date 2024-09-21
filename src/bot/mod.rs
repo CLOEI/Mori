@@ -14,6 +14,7 @@ use inventory::Inventory;
 use paris::{error, info, warn};
 use std::sync::{Arc, Mutex, RwLock};
 use std::{collections::HashMap, thread, time::Duration, vec};
+use std::fmt::Debug;
 use std::mem::size_of;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::{self, FromStr};
@@ -717,6 +718,16 @@ pub fn punch(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
 
 pub fn wrench(bot: &Arc<Bot>, offset_x: i32, offset_y: i32) {
     place(bot, offset_x, offset_y, 32);
+}
+
+pub fn wear(bot: &Arc<Bot>, item_id: u32) {
+    let packet = TankPacket {
+        _type: ETankPacketType::NetGamePacketItemActivateRequest,
+        value: item_id,
+        ..Default::default()
+    };
+
+    send_packet_raw(bot, &packet);
 }
 
 pub fn warp(bot: &Arc<Bot>, world_name: String) {

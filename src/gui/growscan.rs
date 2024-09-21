@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::thread::spawn;
 use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
-use crate::bot::{drop_item, trash_item};
 use crate::utils;
 
 #[derive(Default)]
