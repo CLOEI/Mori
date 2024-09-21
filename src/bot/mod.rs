@@ -839,10 +839,11 @@ pub fn find_path(bot: &Arc<Bot>, x: u32, y: u32) {
     let delay = utils::config::get_findpath_delay();
     if let Some(paths) = paths {
         for node in paths {
+            let pos_y = get_coordinate_to_touch_ground(node.y as f32 * 32.0);
             {
                 let mut position = bot.position.write().unwrap();
                 position.x = node.x as f32 * 32.0;
-                position.y = node.y as f32 * 32.0;
+                position.y = pos_y;
             }
             walk(bot, node.x as i32, node.y as i32, true);
             thread::sleep(Duration::from_millis(delay as u64));
@@ -868,4 +869,11 @@ pub fn trash_item(bot: &Arc<Bot>, item_id: u32, amount: u32) {
     );
     thread::sleep(Duration::from_millis(100));
     bot.temporary_data.write().unwrap().trash = (item_id, amount);
+}
+
+pub fn get_coordinate_to_touch_ground(y: f32) -> f32 {
+    let colrect_bottom_center_y = y + 30.0;
+    let block_y = ((colrect_bottom_center_y / 32.0).floor() + 1.0) * 32.0;
+
+    block_y - 30.0
 }

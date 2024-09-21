@@ -9,7 +9,7 @@ use crate::utils::variant::VariantList;
 use crate::utils::{self, textparse};
 use paris::info;
 use std::sync::Arc;
-
+use egui::debug_text::print;
 use super::Bot;
 
 pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
@@ -46,22 +46,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             );
             bot.state.write().unwrap().is_redirecting = false;
         }
-        "OnCountryState" => {
-            let position = bot.position.read().unwrap().clone();
-            let mut pkt = TankPacket {
-                _type: ETankPacketType::NetGamePacketState,
-                flags: 4,
-                vector_x: position.x,
-                vector_y: position.y,
-                ..Default::default()
-            };
-            bot::send_packet_raw(bot, &pkt);
-            pkt.flags = 38;
-            bot::send_packet_raw(bot, &pkt);
-            pkt.flags = 34;
-            bot::send_packet_raw(bot, &pkt);
-            bot::send_packet_raw(bot, &pkt);
-        }
+        "OnCountryState" => {}
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
             info!("Received dialog request: {}", message);
@@ -119,9 +104,10 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
             info!("Received position: {:?}", pos);
+            let pos_y = bot::get_coordinate_to_touch_ground(pos.1);
             let mut position = bot.position.write().unwrap();
             position.x = pos.0;
-            position.y = pos.1;
+            position.y = pos_y;
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();
@@ -163,6 +149,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                         EPacketType::NetMessageGenericText,
                         "action|getDRAnimations\n".to_string(),
                     );
+                    let colrect = data.get("colrect");
                     return;
                 }
             } else {
