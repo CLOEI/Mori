@@ -1840,7 +1840,7 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#60cbdea8a1deb35964e76df2ed934320a72903db"
+source = "git+https://github.com/CLOEI/gtworld-r.git#3772adb266cbee4f98cdc1c4b8c17bfc99cafbca"
 dependencies = [
  "byteorder",
  "gtitem-r",
