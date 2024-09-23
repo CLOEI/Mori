@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
@@ -8,6 +7,7 @@ use crate::{bot, bot::warp, manager::bot_manager::BotManager, types::config::Bot
 use crate::bot::{leave, relog};
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
+use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
 
 #[derive(Default)]
@@ -19,6 +19,7 @@ pub struct BotMenu {
     pub world_map: WorldMap,
     pub inventory: Inventory,
     pub growscan: Growscan,
+    pub scripting: Scripting
 }
 
 impl BotMenu {
@@ -45,29 +46,34 @@ impl BotMenu {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                 ui.vertical(|ui| {
                     if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/info.png"),
+                        include_image!("../../assets/info.svg"),
                     )).clicked() {
                         self.current_menu = "bot_info".to_string();
                     }
                     if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/earth.png"),
+                        include_image!("../../assets/earth.svg"),
                     )).clicked() {
                         self.current_menu = "world_map".to_string();
                     }
                     if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/backpack.png"),
+                        include_image!("../../assets/backpack.svg"),
                     )).clicked() {
                         self.current_menu = "inventory".to_string();
                     }
                     if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/radar.png"),
+                        include_image!("../../assets/radar.svg"),
                     )).clicked() {
                         self.current_menu = "radar".to_string();
                     }
                     if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/blocks.png"),
+                        include_image!("../../assets/blocks.svg"),
                     )).clicked() {
                         self.current_menu = "features".to_string();
+                    }
+                    if ui.add_sized([30.0, 30.0], egui::Button::image(
+                        include_image!("../../assets/code.svg"),
+                    )).clicked() {
+                        self.current_menu = "scripting".to_string();
                     }
                 });
 
@@ -361,6 +367,10 @@ impl BotMenu {
                 } else if self.current_menu == "features" {
                     ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
                         ui.label("Not implemented yet");
+                    });
+                } else if self.current_menu == "scripting" {
+                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                        self.scripting.render(ui, &manager);
                     });
                 } else {
                     ui.label("How?");

@@ -23,7 +23,7 @@ impl Navbar {
             ui.separator();
             if ui
                 .add(egui::Button::image_and_text(
-                    egui::include_image!("../../assets/bot.png"),
+                    egui::include_image!("../../assets/bot.svg"),
                     "Bots",
                 ))
                 .clicked()
@@ -32,7 +32,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::image_and_text(
-                    include_image!("../../assets/database.png"),
+                    include_image!("../../assets/database.svg"),
                     "Item database",
                 ))
                 .clicked()
@@ -41,7 +41,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::image_and_text(
-                    include_image!("../../assets/waypoints.png"),
+                    include_image!("../../assets/waypoints.svg"),
                     "Proxy",
                 ))
                 .clicked()
@@ -50,7 +50,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::image_and_text(
-                    include_image!("../../assets/settings.png"),
+                    include_image!("../../assets/settings.svg"),
                     "Settings",
                 ))
                 .clicked()
@@ -60,7 +60,7 @@ impl Navbar {
             ui.separator();
             if ui
                 .add(egui::Button::image_and_text(
-                    include_image!("../../assets/plus.png"),
+                    include_image!("../../assets/plus.svg"),
                     "Add bot",
                 ))
                 .clicked()
@@ -69,7 +69,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::image_and_text(
-                    include_image!("../../assets/minus.png"),
+                    include_image!("../../assets/minus.svg"),
                     "Remove bot",
                 ))
                 .clicked()
