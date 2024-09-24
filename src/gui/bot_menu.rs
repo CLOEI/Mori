@@ -323,9 +323,9 @@ impl BotMenu {
                                                 ui.end_row();
                                                 ui.label("Position");
                                                 ui.horizontal(|ui| {
-                                                    ui.label((position.x / 32.0).to_string());
+                                                    ui.label((position.x / 32.0).floor().to_string());
                                                     ui.separator();
-                                                    ui.label((position.y / 32.0).to_string());
+                                                    ui.label((position.y / 32.0).floor().to_string());
                                                 });
                                                 ui.end_row();
                                             } else {
