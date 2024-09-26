@@ -1,4 +1,5 @@
 use std::sync::{Arc, RwLock};
+use std::thread;
 use eframe::egui::{self, Ui};
 use egui::include_image;
 use crate::manager::bot_manager::BotManager;
@@ -26,7 +27,12 @@ impl Scripting {
                     }
                 };
                 if let Some(bot) = bot {
-                    bot.lua.lock().unwrap().load(&self.code).exec().unwrap();
+                    let bot_clone = bot.clone();
+                    let code = self.code.clone();
+                    thread::spawn(move || {
+                        let lua = bot_clone.lua.lock().unwrap();
+                        lua.load(&code).exec().unwrap();
+                    });
                 }
             }
             if ui.add_sized([30.0, 30.0], egui::Button::image(
