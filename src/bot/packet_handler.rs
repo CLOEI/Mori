@@ -2,7 +2,6 @@ use std::{fs, sync::Arc};
 use std::io::Cursor;
 use std::time::Instant;
 use gtworld_r::TileType;
-use paris::{error, info, warn};
 use regex::Regex;
 use crate::{
     bot::{self, variant_handler},
@@ -11,7 +10,7 @@ use crate::{
     },
     utils,
 };
-use super::{inventory::InventoryItem, send_packet_raw, Bot};
+use super::{inventory::InventoryItem, log_error, log_info, log_warn, send_packet_raw, Bot};
 
 pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
@@ -38,7 +37,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
         EPacketType::NetMessageGenericText => {}
         EPacketType::NetMessageGameMessage => {
             let message = String::from_utf8_lossy(&data);
-            info!("Message: {}", message);
+            log_info(&bot, format!("Message: {}", message).as_str());
 
             if message.contains("logon_fail") {
                 {
@@ -82,7 +81,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 let re = Regex::new(r"\$V(\d+\.\d+)").unwrap();
                 if let Some(caps) = re.captures(&message) {
                     let version = caps.get(1).unwrap().as_str();
-                    warn!("Update required: {}, updating...", version);
+                    log_warn(&bot, format!("Update required: {}, updating...", version).as_str());
                     {
                         let mut info =bot.info.write().unwrap();
                         info.login_info.game_version = version.to_string();
@@ -95,7 +94,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
             Ok(tank_packet) => {
-                info!("Received: {:?}", tank_packet._type);
+                log_info(&bot, format!("Received: {:?}", tank_packet._type).as_str());
                 match tank_packet._type {
                     ETankPacketType::NetGamePacketState => {
                         let mut players = bot.players.write().unwrap();
@@ -123,7 +122,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         };
 
                         send_packet_raw(&bot, &packet);
-                        info!("Replied to ping request");
+                        log_info(&bot, "Replied to ping request");
                     }
                     ETankPacketType::NetGamePacketSendInventoryState => {
                         bot.inventory.write().unwrap().parse(&data[56..]);
@@ -198,7 +197,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     }
                     ETankPacketType::NetGamePacketItemChangeObject => {
                         let mut world = bot.world.write().unwrap();
-                        info!("ItemChangeObject: {:?}", tank_packet);
+                        log_info(&bot, format!("ItemChangeObject: {:?}", tank_packet).as_str());
 
                         if tank_packet.net_id == u32::MAX {
                             let item = gtworld_r::DroppedItem {
@@ -280,12 +279,12 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 }
             }
             Err(..) => {
-                error!("Failed to deserialize TankPacket: {:?}", data[0]);
+                log_error(&bot, format!("Failed to deserialize TankPacket: {:?}", data[0]).as_str());
             }
         },
         EPacketType::NetMessageClientLogRequest => {
             let message = String::from_utf8_lossy(&data);
-            info!("Message: {}", message);
+            log_info(&bot, format!("Message: {}", message).as_str());
         }
         EPacketType::NetMessageTrack => {
             let message = String::from_utf8_lossy(&data);

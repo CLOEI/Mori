@@ -80,6 +80,10 @@ struct App {
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut fonts = egui::FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        cc.egui_ctx.set_fonts(fonts);
+
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
         let mut bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
         let lua = Lua::new();

@@ -2,8 +2,9 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 
 use eframe::egui::{self, Ui};
-use egui::include_image;
-use crate::{bot, bot::warp, manager::bot_manager::BotManager, types::config::BotConfig, utils, Bot};
+use egui::{include_image, Color32};
+use egui::scroll_area::ScrollBarVisibility;
+use crate::{bot::warp, manager::bot_manager::BotManager, types::config::BotConfig, utils, Bot};
 use crate::bot::{leave, relog};
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
@@ -19,7 +20,7 @@ pub struct BotMenu {
     pub world_map: WorldMap,
     pub inventory: Inventory,
     pub growscan: Growscan,
-    pub scripting: Scripting
+    pub scripting: Scripting,
 }
 
 impl BotMenu {
@@ -74,6 +75,11 @@ impl BotMenu {
                         include_image!("../../assets/code.svg"),
                     )).clicked() {
                         self.current_menu = "scripting".to_string();
+                    }
+                    if ui.add_sized([30.0, 30.0], egui::Button::image(
+                        include_image!("../../assets/square-terminal.svg"),
+                    )).clicked() {
+                        self.current_menu = "terminal".to_string();
                     }
                 });
 
@@ -371,6 +377,54 @@ impl BotMenu {
                 } else if self.current_menu == "scripting" {
                     ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
                         self.scripting.render(ui, &manager);
+                    });
+                } else if self.current_menu == "terminal" {
+                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                        egui::ScrollArea::vertical()
+                            .scroll_bar_visibility(ScrollBarVisibility::AlwaysVisible)
+                            .auto_shrink(false)
+                            .stick_to_bottom(true)
+                            .show(ui, |ui| {
+                                let logs = {
+                                    let manager = manager.read().unwrap();
+
+                                    match manager.get_bot(&self.selected_bot) {
+                                        Some(bot) => {
+                                            let logs = bot.logs.lock().unwrap();
+                                            Some(logs.clone())
+                                        },
+                                        None => None,
+                                    }
+                                };
+
+                                ui.vertical(|ui| {
+                                    if let Some(logs) = logs {
+                                        for log in logs.iter() {
+                                            let data = log.split("|").collect::<Vec<&str>>();
+                                            ui.horizontal(|ui| {
+                                                match data[0] {
+                                                    "info" => {
+                                                        ui.label(egui::RichText::new(egui_phosphor::regular::INFO).color(Color32::from_rgb(0, 123, 255)).size(16.0));
+                                                        ui.add(egui::Label::new(data[1]).wrap());
+                                                    }
+                                                    "warn" => {
+                                                        ui.label(egui::RichText::new(egui_phosphor::regular::WARNING).color(Color32::from_rgb(255, 193, 7)).size(16.0));
+                                                        ui.add(egui::Label::new(data[1]).wrap());
+                                                    }
+                                                    "error" => {
+                                                        ui.label(egui::RichText::new(egui_phosphor::regular::BUG).color(Color32::from_rgb(220, 53, 69)).size(16.0));
+                                                        ui.add(egui::Label::new(data[1]).wrap());
+                                                    }
+                                                    _ => {
+                                                        ui.label(log);
+                                                    }
+                                                };
+                                            });
+                                        }
+                                    }
+                                    ui.add_space(10.0);
+                                });
+                            });
                     });
                 } else {
                     ui.label("How?");

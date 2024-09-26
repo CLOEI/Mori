@@ -32,4 +32,5 @@ thiserror = "1.0.63"
 mlua = { version = "0.9.9", features = ["lua54", "vendored"] }
 wait-timeout = "0.2.0"
 rust-otp = "2.0.0"
+egui-phosphor = "0.6.0"
 

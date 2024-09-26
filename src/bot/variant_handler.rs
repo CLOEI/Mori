@@ -1,5 +1,5 @@
 use crate::bot;
-use crate::bot::{disconnect, send_packet};
+use crate::bot::{disconnect, log_info, send_packet};
 use crate::types::epacket_type::EPacketType;
 use crate::types::player::Player;
 use crate::types::tank_packet::TankPacket;
@@ -13,7 +13,7 @@ use super::Bot;
 pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
     let variant = VariantList::deserialize(&data).unwrap();
     let function_call: String = variant.get(0).unwrap().as_string();
-    info!("Received function call: {}", function_call);
+    log_info(&bot, format!("Received function call: {}", function_call).as_str());
 
     match function_call.as_str() {
         "OnSendToServer" => {
@@ -48,7 +48,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnCountryState" => {}
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
-            info!("Received dialog request: {}", message);
+            log_info(&bot, format!("Received dialog request: {}", message).as_str());
             if message.contains("Gazette") {
                 send_packet(
                     bot,
@@ -92,7 +92,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
-            info!("Received console message: {}", message);
+            log_info(&bot, format!("Received console message: {}", message).as_str());
             if message.contains("wants to add you to") && message.contains("Wrench yourself to accept") {
                 send_packet(
                     bot,
@@ -103,7 +103,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
-            info!("Received position: {:?}", pos);
+            log_info(&bot, format!("Received position: {:?}", pos).as_str());
             let pos_y = bot::get_coordinate_to_touch_ground(pos.1);
             let mut position = bot.position.write().unwrap();
             position.x = pos.0;
@@ -125,10 +125,10 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let current_progress = variant.get(2).unwrap().as_int32();
             let total_progress = variant.get(3).unwrap().as_int32();
             let info = variant.get(4).unwrap().as_string();
-            info!(
+            log_info(&bot, format!(
                 "Received FTUE button data set: {} {} {} {}",
                 unknown_1, current_progress, total_progress, info
-            );
+            ).as_str());
 
             let mut ftue = bot.ftue.write().unwrap();
             ftue.current_progress = current_progress;
@@ -218,11 +218,11 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnTalkBubble" => {
             let message = variant.get(2).unwrap().as_string();
-            info!("Received talk bubble message: {}", message);
+            log_info(&bot, format!("Received talk bubble message: {}", message).as_str());
         }
         "OnClearTutorialArrow" => {
             let v1 = variant.get(1).unwrap().as_string();
-            info!("Received OnClearTutorialArrow: {} ", v1);
+            log_info(&bot, format!("Received OnClearTutorialArrow: {} ", v1).as_str());
         }
         "OnRequestWorldSelectMenu" => {
             bot.world.write().unwrap().reset();

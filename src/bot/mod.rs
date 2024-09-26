@@ -11,13 +11,14 @@ use byteorder::{ByteOrder, LittleEndian};
 use rusty_enet as enet;
 use gtitem_r::structs::ItemDatabase;
 use inventory::Inventory;
-use paris::{error, info, warn};
 use std::sync::{Arc, Mutex, RwLock};
 use std::{collections::HashMap, thread, time::Duration, vec};
 use std::fmt::Debug;
 use std::mem::size_of;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::{self, FromStr};
+use std::sync::mpsc::Sender;
+use std::thread::spawn;
 use urlencoding::encode;
 use socks::{Socks5Datagram};
 
@@ -39,7 +40,7 @@ use crate::{
 };
 use crate::bot::proxy::{SocketType, Socks5UdpSocket};
 use crate::manager::proxy_manager::ProxyManager;
-use crate::utils::config;
+use crate::utils::{config, logging};
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -59,6 +60,8 @@ pub struct Bot {
     pub ftue: Arc<RwLock<FTUE>>,
     pub item_database: Arc<ItemDatabase>,
     pub proxy_manager: Arc<RwLock<ProxyManager>>,
+    pub logs: Arc<Mutex<Vec<String>>>,
+    pub sender: Sender<String>
 }
 
 impl Bot {
@@ -67,6 +70,17 @@ impl Bot {
         item_database: Arc<ItemDatabase>,
         proxy_manager: Arc<RwLock<ProxyManager>>,
     ) -> Self {
+        let logs = Arc::new(Mutex::new(Vec::new()));
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let logs_clone = logs.clone();
+        spawn(move || {
+            loop {
+                let message = receiver.recv().unwrap();
+                let mut logs = logs_clone.lock().unwrap();
+                logs.push(message);
+            }
+        });
+
         let payload = utils::textparse::parse_and_store_as_vec(&bot_config.payload);
         let mut proxy_address: Option<SocketAddr> = None;
         let mut proxy_username = String::new();
@@ -85,11 +99,11 @@ impl Bot {
 
         let socket: SocketType = if let Some(proxy) = proxy_address {
             if proxy_username.is_empty() || proxy_password.is_empty() {
-                error!("Proxy username or password is empty");
+                logging::error("Proxy username or password is empty", &sender);
             }
             let udp_datagram = Socks5Datagram::bind_with_password(proxy, SocketAddr::from_str("0.0.0.0:0").unwrap(), &proxy_username, &proxy_password)
                 .expect("Failed to bind SOCKS5 datagram");
-            info!("Binded to proxy");
+            logging::info("Binded to proxy", &sender);
             SocketType::Socks5(Socks5UdpSocket::new(udp_datagram))
         } else {
             let udp_socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))
@@ -133,8 +147,25 @@ impl Bot {
             ftue: Arc::new(RwLock::new(FTUE::default())),
             item_database,
             proxy_manager,
+            logs,
+            sender,
         }
     }
+}
+
+pub fn log_info(bot: &Arc<Bot>, message: &str) {
+    let sender = bot.sender.clone();
+    logging::info(message, &sender);
+}
+
+pub fn log_warn(bot: &Arc<Bot>, message: &str) {
+    let sender = bot.sender.clone();
+    logging::warn(message, &sender);
+}
+
+pub fn log_error(bot: &Arc<Bot>, message: &str) {
+    let sender = bot.sender.clone();
+    logging::error(message, &sender);
 }
 
 pub fn logon(bot: &Arc<Bot>, data: String) {
@@ -180,10 +211,10 @@ pub fn reconnect(bot: &Arc<Bot>) -> bool {
             Ok(links) => {
                 let mut info = bot.info.write().unwrap();
                 info.oauth_links = links;
-                info!("Successfully got OAuth links for: apple, google and legacy");
+                log_info(&bot, "Successfully got OAuth links for: apple, google and legacy");
             }
             Err(err) => {
-                info!("Failed to get OAuth links: {}", err);
+                log_info(&bot, format!("Failed to get OAuth links: {}", err).as_str());
                 return false;
             }
         }
@@ -210,7 +241,7 @@ pub fn reconnect(bot: &Arc<Bot>) -> bool {
 }
 
 pub fn relog(bot: &Arc<Bot>) {
-    info!("Relogging bot");
+    log_info(&bot, "Relogging bot");
     {
         let mut state = bot.state.write().unwrap();
         state.is_running = false;
@@ -262,7 +293,7 @@ fn update_login_info(bot: &Arc<Bot>, data: String) {
 }
 
 fn token_still_valid(bot: &Arc<Bot>) -> bool {
-    info!("Checking if token is still valid");
+    log_info(&bot, "Checking if token is still valid");
     set_status(bot, "Checking refresh token");
 
     let (token, login_info) = {
@@ -282,7 +313,7 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
         match response {
             Ok(res) => {
                 if res.status() != 200 {
-                    error!("Failed to refresh token, retrying...");
+                    log_error(&bot, "Failed to refresh token, retrying...");
                     thread::sleep(Duration::from_secs(1));
                     continue;
                 }
@@ -296,19 +327,19 @@ fn token_still_valid(bot: &Arc<Bot>) -> bool {
                         .as_str()
                         .unwrap_or_default()
                         .to_string();
-                    info!("Token is still valid | new token: {}", new_token);
+                    log_info(&bot, format!("Token is still valid | new token: {}", new_token).as_str());
 
                     let mut info = bot.info.write().unwrap();
                     info.token = new_token;
 
                     true
                 } else {
-                    error!("Token is invalid");
+                    log_error(&bot, "Token is invalid");
                     false
                 }
             }
             Err(err) => {
-                error!("Request error: {}, retrying...", err);
+                log_error(&bot, format!("Request error: {}, retrying...", err).as_str());
                 thread::sleep(Duration::from_secs(1));
                 continue;
             }
@@ -347,7 +378,7 @@ pub fn get_token(bot: &Arc<Bot>) {
         return;
     }
 
-    info!("Getting token for bot");
+    log_info(&bot, "Getting token for bot");
     set_status(bot, "Getting token");
     let (payload, recovery_code, method, oauth_links) = {
         let info = bot.info.read().unwrap();
@@ -365,9 +396,9 @@ pub fn get_token(bot: &Arc<Bot>) {
                 Ok(res) => res,
                 Err(err) => {
                     if err.to_string().contains("too many people") {
-                        error!("Too many people trying to login");
+                        log_error(&bot, "Too many people trying to login");
                     } else {
-                        error!("Failed to get Google token: {}", err);
+                        log_error(&bot, format!("Failed to get Google token: {}", err).as_str());
                     }
                     return;
                 }
@@ -381,7 +412,7 @@ pub fn get_token(bot: &Arc<Bot>) {
             ) {
                 Ok(res) => res,
                 Err(err) => {
-                    error!("Failed to get legacy token: {}", err);
+                    log_error(&bot, format!("Failed to get legacy token: {}", err).as_str());
                     return;
                 }
             }
@@ -394,13 +425,13 @@ pub fn get_token(bot: &Arc<Bot>) {
             match login::get_ubisoft_token(&bot, &recovery_code, &payload[0], &payload[1], &payload[2], &payload[3]) {
                 Ok(res) => res,
                 Err(err) => {
-                    error!("Failed to get Ubisoft token: {}", err);
+                    log_error(&bot, format!("Failed to get Ubisoft token: {}", err).as_str());
                     return;
                 }
             }
         }
         _ => {
-            warn!("Invalid login method");
+            log_warn(&bot, "Invalid login method");
             return;
         }
     };
@@ -408,12 +439,12 @@ pub fn get_token(bot: &Arc<Bot>) {
     if token_result.len() > 0 {
         let mut info = bot.info.write().unwrap();
         info.token = token_result;
-        info!("Received the token: {}", info.token);
+        log_info(&bot, format!("Received the token: {}", info.token).as_str());
     }
 }
 
 pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
-    info!("Getting OAuth links");
+    log_info(&bot, "Getting OAuth links");
     set_status(bot, "Getting OAuth links");
     loop {
         let res = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
@@ -423,7 +454,7 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
         match res {
             Ok(res) => {
                 if res.status() != 200 {
-                    warn!("Failed to get OAuth links");
+                    log_warn(&bot, "Failed to get OAuth links");
                     sleep(bot);
                 } else {
                     let body = res.into_string()?;
@@ -438,7 +469,7 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
                 }
             }
             Err(err) => {
-                error!("Request error: {}, retrying...", err);
+                log_error(&bot, format!("Request error: {}, retrying...", err).as_str());
                 sleep(bot);
             }
         }
@@ -446,7 +477,7 @@ pub fn get_oauth_links(bot: &Arc<Bot>) -> Result<Vec<String>, ureq::Error> {
 }
 
 pub fn spoof(bot: &Arc<Bot>) {
-    info!("Spoofing bot data");
+    log_info(&bot, "Spoofing bot data");
     set_status(bot, "Spoofing bot data");
     let mut info = bot.info.write().unwrap();
     info.login_info.klv = proton::generate_klv(
@@ -461,7 +492,7 @@ pub fn spoof(bot: &Arc<Bot>) {
 }
 
 pub fn to_http(bot: &Arc<Bot>) {
-    info!("Fetching server data");
+    log_info(&bot, "Fetching server data");
     let server = if config::get_use_alternate_server() {
         "https://www.growtopia2.com/growtopia/server_data.php"
     } else {
@@ -478,14 +509,14 @@ pub fn to_http(bot: &Arc<Bot>) {
         let res = match res {
             Ok(res) => res,
             Err(err) => {
-                error!("Request error: {}, retrying...", err);
+                log_error(&bot, format!("Request error: {}, retrying...", err).as_str());
                 sleep(bot);
                 continue;
             }
         };
 
         if res.status() != 200 {
-            warn!("Failed to fetch server data");
+            log_warn(&bot, "Failed to fetch server data");
             sleep(bot);
         } else {
             let body = res.into_string().unwrap();
@@ -496,7 +527,7 @@ pub fn to_http(bot: &Arc<Bot>) {
 }
 
 pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
-    info!("Parsing server data");
+    log_info(&bot, "Parsing server data");
     set_status(bot, "Parsing server data");
     let mut info = bot.info.write().unwrap();
     info.server_data = data
@@ -512,12 +543,12 @@ pub fn parse_server_data(bot: &Arc<Bot>, data: String) {
 }
 
 fn connect_to_server(bot: &Arc<Bot>, ip: String, port: String) {
-    info!("Connecting to the server {}:{}", ip, port);
+    log_info(&bot, format!("Connecting to the server {}:{}", ip, port).as_str());
     set_status(&bot, "Connecting to the server");
 
     let host_result = bot.host.lock();
     if host_result.is_err() {
-        error!("Host lock poisoned, attempting to recover");
+        log_error(&bot, "Host lock poisoned, attempting to recover");
         let mut host = host_result.unwrap_or_else(|poisoned| poisoned.into_inner());
         host.connect(
             SocketAddr::from_str(format!("{}:{}", ip, port).as_str()).unwrap(),
@@ -568,7 +599,7 @@ fn process_events(bot: &Arc<Bot>) {
         }
 
         if is_redirecting {
-            info!("Redirecting to the server {}:{}", ip, port);
+            log_info(&bot, format!("Redirecting to server {}:{}", ip, port).as_str());
             connect_to_server(bot, ip, port);
         } else {
             if !reconnect(bot) {
@@ -591,7 +622,7 @@ fn process_events(bot: &Arc<Bot>) {
             if let Some(event) = event.clone() {
                 match event {
                     enet::EventNoRef::Connect { peer, .. } => {
-                        info!("Connected to the server");
+                        log_info(&bot, "Connected to the server");
                         set_status(bot, "Connected");
                         {
                             let mut peer_id = bot.peer_id.write().unwrap();
@@ -599,7 +630,7 @@ fn process_events(bot: &Arc<Bot>) {
                         }
                     }
                     enet::EventNoRef::Disconnect { .. } => {
-                        warn!("Disconnected from the server");
+                        log_warn(&bot, "Disconnected from the server");
                         set_status(bot, "Disconnected");
                         break;
                     }
@@ -640,7 +671,7 @@ pub fn send_packet(bot: &Arc<Bot>, packet_type: EPacketType, message: String) {
     match peer.send(0, &pkt) {
         Ok(_) => {}
         Err(err) => {
-            error!("Failed to send packet: {}", err);
+            log_error(&bot, format!("Failed to send packet: {}", err).as_str());
         }
     }
 }
@@ -666,7 +697,7 @@ pub fn send_packet_raw(bot: &Arc<Bot>, packet: &TankPacket) {
     match peer.send(0, &enet_packet) {
         Ok(_) => {}
         Err(err) => {
-            error!("Failed to send packet: {}", err);
+            log_error(&bot, format!("Failed to send packet: {}", err).as_str());
         }
     }
 }
@@ -721,7 +752,7 @@ pub fn collect(bot: &Arc<Bot>) {
                 pkt.vector_y = obj.y;
                 pkt.value = obj.uid;
                 send_packet_raw(bot, &pkt);
-                info!("Collect packet sent");
+                log_info(&bot, "Collect packet sent");
             }
         }
     }
@@ -782,7 +813,7 @@ pub fn warp(bot: &Arc<Bot>, world_name: String) {
     if bot.state.read().unwrap().is_not_allowed_to_warp {
         return;
     }
-    info!("Warping to world: {}", world_name);
+    log_info(&bot, format!("Warping to world: {}", world_name).as_str());
     send_packet(
         bot,
         EPacketType::NetMessageGameMessage,
