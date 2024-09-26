@@ -106,4 +106,20 @@ pub fn register(lua: &Lua, bot: &Arc<Bot>) {
         Ok(LuaValue::Table(world_data))
     }).unwrap();
     lua.globals().set("get_world", get_world).unwrap();
+
+    let bot_clone = bot.clone();
+    let get_local = lua.create_function(move |lua, ()| -> LuaResult<LuaValue> {
+        let local_data = lua.create_table()?;
+        let position = bot_clone.position.read().unwrap();
+        let state = bot_clone.state.read().unwrap();
+
+        local_data.set("x", position.x)?;
+        local_data.set("y", position.y)?;
+        local_data.set("net_id", state.net_id)?;
+        local_data.set("level", state.level)?;
+        local_data.set("gems", state.gems)?;
+
+        Ok(LuaValue::Table(local_data))
+    }).unwrap();
+    lua.globals().set("get_local", get_local).unwrap();
 }
