@@ -29,7 +29,7 @@ egui = "0.28.1"
 socks = "0.3.4"
 steamworks = "0.11.0"
 thiserror = "1.0.63"
-mlua = { version = "0.9.9", features = ["lua54", "vendored"] }
+mlua = { version = "0.9.9", features = ["lua54", "vendored", "send"] }
 wait-timeout = "0.2.0"
 rust-otp = "2.0.0"
 egui-phosphor = "0.6.0"

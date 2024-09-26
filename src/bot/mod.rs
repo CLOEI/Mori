@@ -19,12 +19,14 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::{self, FromStr};
 use std::sync::mpsc::Sender;
 use std::thread::spawn;
+use mlua::ffi::lua_register;
+use mlua::prelude::*;
 use urlencoding::encode;
 use socks::{Socks5Datagram};
 
 use crate::types::bot_info::{TemporaryData, FTUE};
 use crate::types::{etank_packet_type::ETankPacketType, player::Player};
-use crate::{types, types::{tank_packet::TankPacket}, utils};
+use crate::{lua_register, types, types::{tank_packet::TankPacket}, utils};
 use crate::{
     types::{
         bot_info::{Info, Server, State},
@@ -61,7 +63,8 @@ pub struct Bot {
     pub item_database: Arc<ItemDatabase>,
     pub proxy_manager: Arc<RwLock<ProxyManager>>,
     pub logs: Arc<Mutex<Vec<String>>>,
-    pub sender: Sender<String>
+    pub sender: Sender<String>,
+    pub lua: Mutex<Lua>,
 }
 
 impl Bot {
@@ -70,6 +73,7 @@ impl Bot {
         item_database: Arc<ItemDatabase>,
         proxy_manager: Arc<RwLock<ProxyManager>>,
     ) -> Self {
+        let lua = Mutex::new(Lua::new());
         let logs = Arc::new(Mutex::new(Vec::new()));
         let (sender, receiver) = std::sync::mpsc::channel();
         let logs_clone = logs.clone();
@@ -149,6 +153,7 @@ impl Bot {
             proxy_manager,
             logs,
             sender,
+            lua
         }
     }
 }
@@ -169,6 +174,10 @@ pub fn log_error(bot: &Arc<Bot>, message: &str) {
 }
 
 pub fn logon(bot: &Arc<Bot>, data: String) {
+    {
+        let lua = bot.lua.lock().unwrap();
+        lua_register::register(&lua, &bot);
+    }
     set_status(bot, "Logging in...");
     if data.is_empty() {
         spoof(&bot);

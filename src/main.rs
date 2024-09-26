@@ -75,7 +75,6 @@ struct App {
     proxy_list: ProxyList,
     settings: Settings,
     bot_menu: BotMenu,
-    lua: Lua,
 }
 
 impl App {
@@ -86,13 +85,10 @@ impl App {
 
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
         let mut bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
-        let lua = Lua::new();
         let bots = utils::config::get_bots();
         for bot in bots.clone() {
             bot_manager.write().unwrap().add_bot(bot);
         }
-
-        lua_register::register(&lua, &bot_manager);
 
         Self {
             navbar: Default::default(),
@@ -108,7 +104,6 @@ impl App {
             },
             proxy_manager,
             bot_manager,
-            lua,
         }
     }
 }

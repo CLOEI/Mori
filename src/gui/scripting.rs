@@ -2,18 +2,33 @@ use std::sync::{Arc, RwLock};
 use eframe::egui::{self, Ui};
 use egui::include_image;
 use crate::manager::bot_manager::BotManager;
+use crate::utils;
 
 #[derive(Default)]
 pub struct Scripting {
+    pub selected_bot: String,
     pub code: String,
 }
 
 impl Scripting {
     pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>) {
+        self.selected_bot = utils::config::get_selected_bot();
         ui.vertical(|ui| {
             if ui.add_sized([30.0, 30.0], egui::Button::image(
                 include_image!("../../assets/play.svg"),
-            )).clicked() {}
+            )).clicked() {
+                let bot = {
+                    let manager = manager.read().unwrap();
+
+                    match manager.get_bot(&self.selected_bot) {
+                        Some(bot) => Some(bot.clone()),
+                        None => None,
+                    }
+                };
+                if let Some(bot) = bot {
+                    bot.lua.lock().unwrap().load(&self.code).exec().unwrap();
+                }
+            }
             if ui.add_sized([30.0, 30.0], egui::Button::image(
                 include_image!("../../assets/square.svg"),
             )).clicked() {}

@@ -41,8 +41,8 @@ Any contribution would help alot.
 - [x] Ubisoft-steam login - (Build steamtoken and place it in the project root directory)
 - [x] Auto link ubisoft account to steam account
 - [x] Configureable delay
-- [ ] Embedded scripting
-- [ ] Bot terminal view
+- [x] Embedded scripting
+- [x] Bot terminal view
 - [ ] Better world map preview with texture
 - [ ] NPC
 - [ ] Auto rotation
