@@ -151,4 +151,30 @@ pub fn register(lua: &Lua, bot: &Arc<Bot>) {
         Ok(LuaValue::Table(inventory_data))
     }).unwrap();
     lua.globals().set("get_inventory", get_inventory).unwrap();
+
+    let bot_clone = bot.clone();
+    let get_tile = lua.create_function(move |lua, (x, y): (u32, u32)| -> LuaResult<LuaValue> {
+        let tile_data = lua.create_table()?;
+        let world = bot_clone.world.read().unwrap();
+        let tile = world.get_tile(x, y).unwrap();
+        let tile_clone = tile.clone();
+        let bot_clone = bot_clone.clone();
+
+        tile_data.set("fg", tile.foreground_item_id)?;
+        tile_data.set("bg", tile.background_item_id)?;
+        tile_data.set("pbi", tile.parent_block_index)?;
+        tile_data.set("flags", tile.flags)?;
+        tile_data.set("x", tile.x)?;
+        tile_data.set("y", tile.y)?;
+
+        let tile_harvestable_func = lua.create_function(move |_, ()| -> LuaResult<bool> {
+            let world = bot_clone.world.read().unwrap();
+            let harvestable = world.is_tile_harvestable(&tile_clone);
+            Ok(harvestable)
+        })?;
+
+        tile_data.set("harvestable", tile_harvestable_func)?;
+        Ok(LuaValue::Table(tile_data))
+    }).unwrap();
+    lua.globals().set("get_tile", get_tile).unwrap();
 }
