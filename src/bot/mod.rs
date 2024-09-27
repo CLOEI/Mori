@@ -833,7 +833,7 @@ pub fn warp(bot: &Arc<Bot>, world_name: String) {
 pub fn talk(bot: &Arc<Bot>, message: String) {
     send_packet(
         bot,
-        EPacketType::NetMessageGameMessage,
+        EPacketType::NetMessageGenericText,
         format!("action|input\n|text|{}\n", message),
     );
 }
