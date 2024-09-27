@@ -71,13 +71,21 @@ pub fn register(lua: &Lua, bot: &Arc<Bot>) {
 
         let tiles_table = lua.create_table()?;
         for (i, tile) in world.tiles.clone().into_iter().enumerate() {
+            let tile_clone = tile.clone();
+            let bot_clone = bot_clone.clone();
             let tile_table = lua.create_table()?;
+            let tile_harvestable_func = lua.create_function(move |_, ()| -> LuaResult<bool> {
+                let world = bot_clone.world.read().unwrap();
+                let harvestable = world.is_tile_harvestable(&tile_clone);
+                Ok(harvestable)
+            })?;
             tile_table.set("fg", tile.foreground_item_id)?;
             tile_table.set("bg", tile.background_item_id)?;
             tile_table.set("pbi", tile.parent_block_index)?;
             tile_table.set("flags", tile.flags)?;
             tile_table.set("x", tile.x)?;
             tile_table.set("y", tile.y)?;
+            tile_table.set("harvestable", tile_harvestable_func)?;
             tiles_table.set(i + 1, tile_table)?;
         }
         world_data.set("tiles", tiles_table)?;
