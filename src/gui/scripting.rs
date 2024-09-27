@@ -30,8 +30,16 @@ impl Scripting {
                     let bot_clone = bot.clone();
                     let code = self.code.clone();
                     thread::spawn(move || {
-                        let lua = bot_clone.lua.lock().unwrap();
-                        lua.load(&code).exec().unwrap();
+                        let lua = bot_clone.lua.lock();
+                        match lua {
+                            Ok(lua) => {
+                                lua.load(&code).exec().unwrap();
+                            }
+                            Err(poisoned) => {
+                                let lua = poisoned.into_inner();
+                                lua.load(&code).exec().unwrap();
+                            }
+                        }
                     });
                 }
             }

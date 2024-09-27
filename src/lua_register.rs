@@ -122,4 +122,25 @@ pub fn register(lua: &Lua, bot: &Arc<Bot>) {
         Ok(LuaValue::Table(local_data))
     }).unwrap();
     lua.globals().set("get_local", get_local).unwrap();
+
+    let bot_clone = bot.clone();
+    let get_inventory = lua.create_function(move |lua, ()| -> LuaResult<LuaValue> {
+        let inventory_data = lua.create_table()?;
+        let inventory = bot_clone.inventory.read().unwrap();
+
+        inventory_data.set("size", inventory.size)?;
+        inventory_data.set("item_count", inventory.item_count)?;
+
+        let items_table = lua.create_table()?;
+        for (_, (key, item)) in inventory.items.clone().into_iter().enumerate() {
+            let item_table = lua.create_table()?;
+            item_table.set("id", item.id)?;
+            item_table.set("amount", item.amount)?;
+            items_table.set(key, item_table)?;
+        }
+        inventory_data.set("items", items_table)?;
+
+        Ok(LuaValue::Table(inventory_data))
+    }).unwrap();
+    lua.globals().set("get_inventory", get_inventory).unwrap();
 }
