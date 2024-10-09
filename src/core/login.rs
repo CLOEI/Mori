@@ -11,7 +11,7 @@ use ureq::Agent;
 use urlencoding::encode;
 use crate::utils::error;
 use wait_timeout::ChildExt;
-use crate::bot::Bot;
+use crate::core::Bot;
 use crate::utils;
 
 static USER_AGENT: &str =
@@ -84,7 +84,7 @@ pub fn get_ubisoft_game_token(agent: &Agent, token: &str) -> Result<(String, Str
 
 pub fn get_ubisoft_session(
     agent: &Agent,
-    bot: &Arc<Bot>,
+    bot: &Bot,
     email: &str,
     password: &str,
     recovery_code: &str,
@@ -145,13 +145,13 @@ fn link_ubisoft_to_steam(agent: &Agent, session_ticket: &str, profile_id: &str, 
     Ok(())
 }
 
-pub fn get_ubisoft_token(bot: &Arc<Bot>, recovery_code: &str, email: &str, password: &str, steamuser: &str, steampassword: &str) -> Result<String, error::CustomError> {
+pub fn get_ubisoft_token(bot: &Bot, recovery_code: &str, email: &str, password: &str, steamuser: &str, steampassword: &str) -> Result<String, error::CustomError> {
     let info = {
         let data = bot.info.read().unwrap().login_info.to_string();
         data.clone()
     };
     let agent = ureq::AgentBuilder::new().redirects(5).build();
-    let (session, profile_id) = match get_ubisoft_session(&agent, &bot, email, password, recovery_code) {
+    let (session, profile_id) = match get_ubisoft_session(&agent, bot, email, password, recovery_code) {
         Ok(res) => res,
         Err(err) => {
             return Err(error::CustomError::Other(format!("Failed to get ubisoft session: {}", err)));

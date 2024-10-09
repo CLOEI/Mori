@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 use std::thread;
 use crate::{
-    bot::{self},
+    core::{self},
     manager::bot_manager::BotManager,
     types::config::BotConfig,
     utils,
@@ -9,7 +9,7 @@ use crate::{
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use gtworld_r::TileType;
 use paris::info;
-use crate::bot::features;
+use crate::core::features;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -173,7 +173,7 @@ impl WorldMap {
                                 info!("Clicked on tile: {}|{}", x, y);
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    bot::find_path(&bot_clone, x, y);
+                                    bot_clone.find_path(x, y);
                                 });
                             }
                         }
@@ -186,38 +186,38 @@ impl WorldMap {
                             if ui.button("Up").clicked() {
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    bot::walk(&bot_clone, 0, -1, false);
+                                    bot_clone.walk(0, -1, false);
                                 });
                             }
                             if ui.button("Down").clicked() {
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    bot::walk(&bot_clone, 0, 1, false);
+                                    bot_clone.walk(0, 1, false);
                                 });
                             }
                             if ui.button("Left").clicked() {
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    bot::walk(&bot_clone, -1, 0, false);
+                                    bot_clone.walk(-1, 0, false);
                                 });
                             }
                             if ui.button("Right").clicked() {
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    bot::walk(&bot_clone, 1, 0, false);
+                                    bot_clone.walk(1, 0, false);
                                 });
                             }
                             if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    features::auto_tutorial::lock_the_world(&bot_clone);
+                                    // features::auto_tutorial::lock_the_world(&bot_clone);
                                 });
                             }
                             if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
                                     loop {
-                                        bot::punch(&bot_clone, 0, 1);
+                                        bot_clone.punch(0, 1);
                                         thread::sleep(std::time::Duration::from_millis(350));
                                     }
                                 });

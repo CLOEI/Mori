@@ -5,7 +5,7 @@ use std::{
     io::Write,
 };
 use std::sync::{Arc, RwLock};
-use bot::Bot;
+use core::Bot;
 use eframe::egui::ViewportBuilder;
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
@@ -21,7 +21,7 @@ use crate::manager::bot_manager::BotManager;
 use crate::manager::proxy_manager::ProxyManager;
 use crate::utils::config;
 
-mod bot;
+mod core;
 mod gui;
 mod manager;
 mod types;

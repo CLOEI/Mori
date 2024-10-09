@@ -2,7 +2,6 @@ use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
-use crate::bot::{drop_item, trash_item, wear};
 use crate::utils;
 
 #[derive(Default)]
@@ -48,19 +47,19 @@ impl Inventory {
                                     if ui.add_enabled(!wear_disabled, egui::Button::new("Wear")).clicked() {
                                         let bot_clone = bot.clone();
                                         spawn(move || {
-                                            wear(&bot_clone, id as u32);
+                                            bot_clone.wear(id as u32);
                                         });
                                     }
                                     if ui.button("Drop").clicked() {
                                         let bot_clone = bot.clone();
                                         spawn(move || {
-                                            drop_item(&bot_clone, id as u32, 1);
+                                            bot_clone.drop_item(id as u32, 1);
                                         });
                                     }
                                     if ui.button("Trash").clicked() {
                                         let bot_clone = bot.clone();
                                         spawn(move || {
-                                            trash_item(&bot_clone, id as u32, 1);
+                                            bot_clone.trash_item(id as u32, 1);
                                         });
                                     }
                                 });

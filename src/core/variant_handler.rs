@@ -1,19 +1,16 @@
-use crate::bot;
-use crate::bot::{disconnect, log_info, send_packet};
+use crate::core;
 use crate::types::epacket_type::EPacketType;
 use crate::types::player::Player;
 use crate::types::tank_packet::TankPacket;
 use crate::types::vector::Vector2;
 use crate::utils::variant::VariantList;
 use crate::utils::{self, textparse};
-use paris::info;
-use std::sync::Arc;
 use super::Bot;
 
-pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
+pub fn handle(bot: &Bot, _: &TankPacket, data: &[u8]) {
     let variant = VariantList::deserialize(&data).unwrap();
     let function_call: String = variant.get(0).unwrap().as_string();
-    log_info(&bot, format!("Received function call: {}", function_call).as_str());
+    bot.log_info(format!("Received function call: {}", function_call).as_str());
 
     match function_call.as_str() {
         "OnSendToServer" => {
@@ -34,11 +31,10 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             info.login_info.user = user_id.to_string();
             info.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
             info.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
-            disconnect(bot);
+            bot.disconnect();
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
-            send_packet(
-                bot,
+            bot.send_packet(
                 EPacketType::NetMessageGenericText,
                 "action|enter_game\n".to_string(),
             );
@@ -48,10 +44,9 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnCountryState" => {}
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
-            log_info(&bot, format!("Received dialog request: {}", message).as_str());
+            bot.log_info(format!("Received dialog request: {}", message).as_str());
             if message.contains("Gazette") {
-                send_packet(
-                    bot,
+                bot.send_packet(
                     EPacketType::NetMessageGenericText,
                     "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string(),
                 );
@@ -61,8 +56,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     let temp_data = bot.temporary_data.read().unwrap();
                     temp_data.trash
                 };
-                send_packet(
-                    bot,
+                bot.send_packet(
                     EPacketType::NetMessageGenericText,
                     format!(
                         "action|dialog_return\ndialog_name|trash_item\nitemID|{}|\ncount|{}\n",
@@ -75,8 +69,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     let temp_data = bot.temporary_data.read().unwrap();
                     temp_data.drop
                 };
-                send_packet(
-                    bot,
+                bot.send_packet(
                     EPacketType::NetMessageGenericText,
                     format!(
                         "action|dialog_return\ndialog_name|drop_item\nitemID|{}|\ncount|{}\n",
@@ -92,10 +85,9 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
-            log_info(&bot, format!("Received console message: {}", message).as_str());
+            bot.log_info(format!("Received console message: {}", message).as_str());
             if message.contains("wants to add you to") && message.contains("Wrench yourself to accept") {
-                send_packet(
-                    bot,
+                bot.send_packet(
                     EPacketType::NetMessageGenericText,
                     format!("action|wrench\n|netid|{}\n", bot.state.read().unwrap().net_id),
                 );
@@ -103,8 +95,8 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
-            log_info(&bot, format!("Received position: {:?}", pos).as_str());
-            let pos_y = bot::get_coordinate_to_touch_ground(pos.1);
+            bot.log_info(format!("Received position: {:?}", pos).as_str());
+            let pos_y = core::get_coordinate_to_touch_ground(pos.1);
             let mut position = bot.position.write().unwrap();
             position.x = pos.0;
             position.y = pos_y;
@@ -125,7 +117,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let current_progress = variant.get(2).unwrap().as_int32();
             let total_progress = variant.get(3).unwrap().as_int32();
             let info = variant.get(4).unwrap().as_string();
-            log_info(&bot, format!(
+            bot.log_info(format!(
                 "Received FTUE button data set: {} {} {} {}",
                 unknown_1, current_progress, total_progress, info
             ).as_str());
@@ -144,8 +136,7 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     state.is_ingame = true;
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
 
-                    send_packet(
-                        bot,
+                    bot.send_packet(
                         EPacketType::NetMessageGenericText,
                         "action|getDRAnimations\n".to_string(),
                     );
@@ -218,11 +209,11 @@ pub fn handle(bot: &Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnTalkBubble" => {
             let message = variant.get(2).unwrap().as_string();
-            log_info(&bot, format!("Received talk bubble message: {}", message).as_str());
+            bot.log_info(format!("Received talk bubble message: {}", message).as_str());
         }
         "OnClearTutorialArrow" => {
             let v1 = variant.get(1).unwrap().as_string();
-            log_info(&bot, format!("Received OnClearTutorialArrow: {} ", v1).as_str());
+            bot.log_info(format!("Received OnClearTutorialArrow: {} ", v1).as_str());
         }
         "OnRequestWorldSelectMenu" => {
             bot.world.write().unwrap().reset();

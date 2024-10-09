@@ -67,7 +67,7 @@ impl AStar {
         self.grid.clear();
     }
 
-    pub fn update(&mut self, bot: &Arc<Bot>) {
+    pub fn update(&mut self, bot: &Bot) {
         self.reset();
         let world = bot.world.read().unwrap();
         self.width = world.width;

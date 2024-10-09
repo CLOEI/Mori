@@ -4,8 +4,7 @@ use std::thread;
 use eframe::egui::{self, Ui};
 use egui::{include_image, Color32};
 use egui::scroll_area::ScrollBarVisibility;
-use crate::{bot::warp, manager::bot_manager::BotManager, types::config::BotConfig, utils, Bot};
-use crate::bot::{leave, relog};
+use crate::{ manager::bot_manager::BotManager, types::config::BotConfig, utils };
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
 use crate::gui::scripting::Scripting;
@@ -133,7 +132,7 @@ impl BotMenu {
                                                 ui.label(timeout.to_string());
                                                 ui.end_row();
                                                 // if ui.button("Relog").clicked() {
-                                                //     let bot_clone = bot.clone();
+                                                //     let bot_clone = core.clone();
                                                 //     thread::spawn(move || {
                                                 //         relog(&bot_clone);
                                                 //     });
@@ -176,7 +175,7 @@ impl BotMenu {
                                         if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
                                             let bot_clone = bot.clone();
                                             thread::spawn(move || {
-                                                leave(&bot_clone);
+                                                bot_clone.leave();
                                             });
                                         }
                                     }
@@ -185,7 +184,7 @@ impl BotMenu {
                                             let bot_clone = bot.clone();
                                             let world_name = self.warp_name.clone();
                                             thread::spawn(move || {
-                                                warp(&bot_clone, world_name);
+                                                bot_clone.warp(world_name);
                                             });
                                         }
                                     }

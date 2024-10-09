@@ -1,8 +1,7 @@
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use crate::bot;
-use crate::bot::{find_path, punch, Bot};
+use crate::core::{Bot};
 
 static CAVE_BACKGROUND: u16 = 14;
 static BEDROCK: u16 = 8;
@@ -18,7 +17,7 @@ pub fn start(bot: &Arc<Bot>) {
             let position = bot.position.read().unwrap();
             position.clone()
         };
-        while bot::is_inworld(&bot) {
+        while bot.is_inworld() {
             let (foreground_id, background_id) = {
                 let world = bot.world.read().unwrap();
                 let tile = world.get_tile((position.x / 32.0) as u32, (position.y / 32.0 + 2.0) as u32).unwrap();
@@ -28,14 +27,14 @@ pub fn start(bot: &Arc<Bot>) {
             if background_id != CAVE_BACKGROUND || foreground_id == BEDROCK {
                 break;
             }
-            punch(&bot, 0, 2);
+            bot.punch(0, 2);
             thread::sleep(Duration::from_millis(350));
         }
     }
 
     for y in 23..world_height - 6 {
         for x in 0..world_width {
-            while bot::is_inworld(&bot) {
+            while bot.is_inworld() {
                 let (foreground_id, background_id) = {
                     let world = bot.world.read().unwrap();
                     if let Some(tile) = world.get_tile(x, y) {
@@ -48,9 +47,9 @@ pub fn start(bot: &Arc<Bot>) {
                 if background_id != CAVE_BACKGROUND || foreground_id == BEDROCK {
                     break;
                 }
-                find_path(&bot, x, y - 1);
+                bot.find_path(x, y - 1);
                 thread::sleep(Duration::from_millis(100));
-                punch(&bot, 0, 1);
+                bot.punch(0, 1);
                 thread::sleep(Duration::from_millis(350));
             }
         }

@@ -4,15 +4,15 @@ use std::time::Instant;
 use gtworld_r::TileType;
 use regex::Regex;
 use crate::{
-    bot::{self, variant_handler},
+    core::{self, variant_handler},
     types::{
         epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
     },
     utils,
 };
-use super::{inventory::InventoryItem, log_error, log_info, log_warn, send_packet_raw, Bot};
+use super::{inventory::InventoryItem, Bot};
 
-pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
+pub fn handle(bot: &Bot, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
             let is_redirecting = bot.state.read().unwrap().is_redirecting;
@@ -24,66 +24,66 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         info.login_info.uuid, info.login_info.protocol, info.login_info.fhash, info.login_info.mac, info.login_info.requested_name, info.login_info.hash2, info.login_info.fz, info.login_info.f, info.login_info.player_age, info.login_info.game_version, info.login_info.lmode, info.login_info.cbits, info.login_info.rid, info.login_info.gdpr, info.login_info.hash, info.login_info.category, info.login_info.token, info.login_info.total_playtime, info.login_info.door_id, info.login_info.klv, info.login_info.meta, info.login_info.platform_id, info.login_info.device_version, info.login_info.zf, info.login_info.country, info.login_info.user, info.login_info.wk
                     )
                 };
-                bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
+                bot.send_packet(EPacketType::NetMessageGenericText, message);
             } else {
                 let token = bot.info.read().unwrap().token.clone();
                 let message = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
                     209, token, "0,1,1"
                 );
-                bot::send_packet(&bot, EPacketType::NetMessageGenericText, message);
+                bot.send_packet(EPacketType::NetMessageGenericText, message);
             }
         }
         EPacketType::NetMessageGenericText => {}
         EPacketType::NetMessageGameMessage => {
             let message = String::from_utf8_lossy(&data);
-            log_info(&bot, format!("Message: {}", message).as_str());
+            bot.log_info(format!("Message: {}", message).as_str());
 
             if message.contains("logon_fail") {
                 {
                     let mut state = bot.state.write().unwrap();
                     state.is_redirecting = false;
                 }
-                bot::disconnect(bot);
+                bot.disconnect();
             }
             if message.contains("currently banned") {
                 let mut state = bot.state.write().unwrap();
                 state.is_running = false;
                 state.is_banned = true;
-                bot::disconnect(bot);
+                bot.disconnect();
             }
             if message.contains("Advanced Account Protection") {
                 {
                     let mut state = bot.state.write().unwrap();
                     state.is_running = false;
                 }
-                bot::disconnect(bot);
+                bot.disconnect();
             }
             if message.contains("temporarily suspended") {
                 {
                     let mut state = bot.state.write().unwrap();
                     state.is_running = false;
                 }
-                bot::disconnect(bot);
+                bot.disconnect();
             }
             if message.contains("has been suspended") {
                 let mut state = bot.state.write().unwrap();
                 state.is_running = false;
                 state.is_banned = true;
-                bot::disconnect(bot);
+                bot.disconnect();
             }
             if message.contains("Growtopia is not quite ready for users") {
                 let mut info = bot.info.write().unwrap();
                 info.timeout = 60;
-                bot::sleep(bot);
+                bot.sleep();
             }
             if message.contains("UPDATE REQUIRED") {
                 let re = Regex::new(r"\$V(\d+\.\d+)").unwrap();
                 if let Some(caps) = re.captures(&message) {
                     let version = caps.get(1).unwrap().as_str();
-                    log_warn(&bot, format!("Update required: {}, updating...", version).as_str());
+                    bot.log_warn(format!("Update required: {}, updating...", version).as_str());
                     {
-                        let mut info =bot.info.write().unwrap();
+                        let mut info = bot.info.write().unwrap();
                         info.login_info.game_version = version.to_string();
                     }
                     utils::config::set_game_version(version.to_string());
@@ -94,7 +94,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
         }
         EPacketType::NetMessageGamePacket => match bincode::deserialize::<TankPacket>(&data) {
             Ok(tank_packet) => {
-                log_info(&bot, format!("Received: {:?}", tank_packet._type).as_str());
+                bot.log_info(format!("Received: {:?}", tank_packet._type).as_str());
                 match tank_packet._type {
                     ETankPacketType::NetGamePacketState => {
                         let mut players = bot.players.write().unwrap();
@@ -121,8 +121,8 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             ..Default::default()
                         };
 
-                        send_packet_raw(&bot, &packet);
-                        log_info(&bot, "Replied to ping request");
+                        bot.send_packet_raw(&packet);
+                        bot.log_info("Replied to ping request");
                     }
                     ETankPacketType::NetGamePacketSendInventoryState => {
                         bot.inventory.write().unwrap().parse(&data[56..]);
@@ -134,8 +134,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             world.parse(&data[56..]);
                         }
                         bot.astar.write().unwrap().update(bot);
-                        bot::send_packet(
-                            bot,
+                        bot.send_packet(
                             EPacketType::NetMessageGenericText,
                             "action|getDRAnimations\n".to_string(),
                         );
@@ -197,7 +196,7 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     }
                     ETankPacketType::NetGamePacketItemChangeObject => {
                         let mut world = bot.world.write().unwrap();
-                        log_info(&bot, format!("ItemChangeObject: {:?}", tank_packet).as_str());
+                        bot.log_info(format!("ItemChangeObject: {:?}", tank_packet).as_str());
 
                         if tank_packet.net_id == u32::MAX {
                             let item = gtworld_r::DroppedItem {
@@ -279,12 +278,12 @@ pub fn handle(bot: &Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 }
             }
             Err(..) => {
-                log_error(&bot, format!("Failed to deserialize TankPacket: {:?}", data[0]).as_str());
+                bot.log_error(format!("Failed to deserialize TankPacket: {:?}", data[0]).as_str());
             }
         },
         EPacketType::NetMessageClientLogRequest => {
             let message = String::from_utf8_lossy(&data);
-            log_info(&bot, format!("Message: {}", message).as_str());
+            bot.log_info(format!("Message: {}", message).as_str());
         }
         EPacketType::NetMessageTrack => {
             let message = String::from_utf8_lossy(&data);

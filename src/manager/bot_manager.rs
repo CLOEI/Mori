@@ -1,4 +1,4 @@
-use crate::bot::{self, Bot};
+use crate::core::{self, Bot};
 use crate::types::config::BotConfig;
 use gtitem_r::structs::ItemDatabase;
 use paris::{error, info};
@@ -42,11 +42,11 @@ impl BotManager {
         let items_database_clone = Arc::clone(&self.items_database);
         let proxy_manager_clone = Arc::clone(&self.proxy_manager);
 
-        let new_bot = Arc::new(Bot::new(bot.clone(), items_database_clone, proxy_manager_clone));
+        let new_bot = Bot::new(bot.clone(), items_database_clone, proxy_manager_clone);
         let newbot_clone = Arc::clone(&new_bot);
 
         let handle = spawn(move || {
-            bot::logon(&newbot_clone, bot.data.clone());
+            newbot_clone.logon(bot.data.clone());
         });
         self.bots.push((new_bot, handle));
     }
@@ -66,7 +66,7 @@ impl BotManager {
                         let mut state = bot_clone.state.write().unwrap();
                         state.is_running = false;
                     }
-                    bot::disconnect(&bot_clone);
+                    bot_clone.disconnect();
                 }
             });
             self.bots.retain(|(b, _)| b.info.read().unwrap().payload[0] != username);

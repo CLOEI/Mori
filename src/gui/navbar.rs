@@ -61,7 +61,7 @@ impl Navbar {
             if ui
                 .add(egui::Button::image_and_text(
                     include_image!("../../assets/plus.svg"),
-                    "Add bot",
+                    "Add core",
                 ))
                 .clicked()
             {
@@ -70,7 +70,7 @@ impl Navbar {
             if ui
                 .add(egui::Button::image_and_text(
                     include_image!("../../assets/minus.svg"),
-                    "Remove bot",
+                    "Remove core",
                 ))
                 .clicked()
             {
