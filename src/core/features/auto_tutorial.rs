@@ -1,53 +1,53 @@
-// /*
-// 1.  `oLock the World``|Open inventory and place a `2My First World Lock``.|1|interface/tutorial/tut_npc.rttex|Open inventory and place a `2My First World Lock``.|1
-// 2.  `oBreak Dirt Blocks``|Select the `2Fist`` and break some `2Dirt``!|2|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Dirt``!|1
-// 3.  `oCollect Dirt Seeds``|Break the `2Dirt`` to collect `2Dirt Seeds``.|3|interface/tutorial/tut_npc.rttex|Break the `2Dirt`` to collect `2Dirt Seeds``.|1
-// 4.  `oPlant Dirt Seeds``|Plant `2Dirt Seeds`` on the ground to grow a `2Dirt Tree``.|4|interface/tutorial/tut_npc.rttex|Plant `2Dirt Seeds`` on the ground to grow a `2Dirt Tree``.|1
-// 5.  `oHarvest Dirt Trees``|Harvest the `2Dirt Tree`` that you planted!|5|interface/tutorial/tut_npc.rttex|Harvest the `2Dirt Tree`` that you planted!|1
-// 6.  `oBreak Rock Blocks``|Select the `2Fist`` and break some `2Rock``!|19|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Rock``!|1
-// 7.  `oCollect Rock Seeds``|Break the `2Rock`` to collect `2Rock Seeds``.|6|interface/tutorial/tut_npc.rttex|Break the `2Rock`` to collect `2Rock Seeds``.|1
-// 8.  `oBreak Cave Backgrounds``|Select the `2Fist`` and break some `2Cave Background``!|20|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Cave Background``!|1
-// 9.  `oCollect Cave Background Seeds``|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|14|interface/tutorial/tut_npc.rttex|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|1
-// 10. `oSplice Rock and Cave Background Seeds``|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|15|interface/tutorial/tut_npc.rttex|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|1
-// 11. `oPlace a Sign in the World``|Collect the `2Sign`` block that you have grown in the world.|16|interface/tutorial/tut_npc.rttex|Collect the `2Sign`` block that you have grown in the world.|1
-// 12. `oWrench the Sign that you placed``|Wrench the `2Sign`` to change what it says!|17|interfae/tutorial/tut_npc.rttex|Wrench the `2Sign`` to change what it says!|1c
-// 13. `oBreak Lava Blocks``|Select the `2Fist`` and break some `2Lava``!|21|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Lava``!|1
-// 14. `oCollect Lava Seeds``|Break the `2Lava`` until Lava Seeds fall out!|7|interface/tutorial/tut_npc.rttex|Break the `2Lava`` until Lava Seeds fall out!|1
-// 15. `oSplice Lava and Dirt Seeds``|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|8|interface/tutorial/tut_npc.rttex|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|1
-// 16. `oBuild Wood Blocks``|Collect the `2Wood Blocks`` that you have grown in the world.|9|interface/tutorial/tut_npc.rttex|Collect the `2Wood Blocks`` that you have grown in the world.|1
-// 17.
-// 18.
-//  */
-// use std::sync::Arc;
-// use std::thread;
-// use crate::core;
-// use crate::core::Bot;
-// use crate::types::epacket_type::EPacketType;
-//
-// static DIRT: u16 = 2;
-// static ROCK: u16 = 10;
-// static CAVE_BACKGROUND: u16 = 14;
-// static SIGN: u16 = 20;
-// static LAVA: u16 = 4;
-// static WOOD_BLOCK: u16 = 100;
-// static DIRT_SEEDS: u16 = 3;
-// static ROCK_SEED: u16 = 11;
-// static CAVE_BACKGROUND_SEED: u16 = 15;
-// static SIGN_SEED: u16 = 21;
-// static LAVA_SEED: u16 = 5;
-// static WOOD_BLOCK_SEED: u16 = 101;
-//
-// pub fn lock_the_world(bot: &Arc<Bot>) {
-//     if !is_current_task(bot, "`oLock the World`") {
-//         return;
-//     }
-//
-//     core::send_packet(&bot, EPacketType::NetMessageGenericText, "ftue_start_popup_close`".to_string());
-//     thread::sleep(std::time::Duration::from_millis(1000));
-//     core::place(&bot, 0, -1, 9640);
-//     thread::sleep(std::time::Duration::from_millis(250));
-// }
-//
+/*
+1.  `oLock the World``|Open inventory and place a `2My First World Lock``.|1|interface/tutorial/tut_npc.rttex|Open inventory and place a `2My First World Lock``.|1
+2.  `oBreak Dirt Blocks``|Select the `2Fist`` and break some `2Dirt``!|2|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Dirt``!|1
+3.  `oCollect Dirt Seeds``|Break the `2Dirt`` to collect `2Dirt Seeds``.|3|interface/tutorial/tut_npc.rttex|Break the `2Dirt`` to collect `2Dirt Seeds``.|1
+4.  `oPlant Dirt Seeds``|Plant `2Dirt Seeds`` on the ground to grow a `2Dirt Tree``.|4|interface/tutorial/tut_npc.rttex|Plant `2Dirt Seeds`` on the ground to grow a `2Dirt Tree``.|1
+5.  `oHarvest Dirt Trees``|Harvest the `2Dirt Tree`` that you planted!|5|interface/tutorial/tut_npc.rttex|Harvest the `2Dirt Tree`` that you planted!|1
+6.  `oBreak Rock Blocks``|Select the `2Fist`` and break some `2Rock``!|19|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Rock``!|1
+7.  `oCollect Rock Seeds``|Break the `2Rock`` to collect `2Rock Seeds``.|6|interface/tutorial/tut_npc.rttex|Break the `2Rock`` to collect `2Rock Seeds``.|1
+8.  `oBreak Cave Backgrounds``|Select the `2Fist`` and break some `2Cave Background``!|20|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Cave Background``!|1
+9.  `oCollect Cave Background Seeds``|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|14|interface/tutorial/tut_npc.rttex|Break the `2Cave Background`` to collect `2Cave Background Seeds``.|1
+10. `oSplice Rock and Cave Background Seeds``|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|15|interface/tutorial/tut_npc.rttex|Splice `2Rock`` and `2Cave Background`` Seeds by planting them both on the same tile.|1
+11. `oPlace a Sign in the World``|Collect the `2Sign`` block that you have grown in the world.|16|interface/tutorial/tut_npc.rttex|Collect the `2Sign`` block that you have grown in the world.|1
+12. `oWrench the Sign that you placed``|Wrench the `2Sign`` to change what it says!|17|interfae/tutorial/tut_npc.rttex|Wrench the `2Sign`` to change what it says!|1c
+13. `oBreak Lava Blocks``|Select the `2Fist`` and break some `2Lava``!|21|interface/tutorial/tut_npc.rttex|Select the `2Fist`` and break some `2Lava``!|1
+14. `oCollect Lava Seeds``|Break the `2Lava`` until Lava Seeds fall out!|7|interface/tutorial/tut_npc.rttex|Break the `2Lava`` until Lava Seeds fall out!|1
+15. `oSplice Lava and Dirt Seeds``|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|8|interface/tutorial/tut_npc.rttex|Splice `2Lava Seeds`` and `2Dirt Seeds`` together by planting them both on the same tile.|1
+16. `oBuild Wood Blocks``|Collect the `2Wood Blocks`` that you have grown in the world.|9|interface/tutorial/tut_npc.rttex|Collect the `2Wood Blocks`` that you have grown in the world.|1
+17.
+18.
+ */
+use std::sync::Arc;
+use std::thread;
+use crate::core;
+use crate::core::Bot;
+use crate::types::epacket_type::EPacketType;
+
+static DIRT: u16 = 2;
+static ROCK: u16 = 10;
+static CAVE_BACKGROUND: u16 = 14;
+static SIGN: u16 = 20;
+static LAVA: u16 = 4;
+static WOOD_BLOCK: u16 = 100;
+static DIRT_SEEDS: u16 = 3;
+static ROCK_SEED: u16 = 11;
+static CAVE_BACKGROUND_SEED: u16 = 15;
+static SIGN_SEED: u16 = 21;
+static LAVA_SEED: u16 = 5;
+static WOOD_BLOCK_SEED: u16 = 101;
+
+pub fn lock_the_world(bot: &Arc<Bot>) {
+    if !is_current_task(bot, "`oLock the World`") {
+        return;
+    }
+
+    bot.send_packet(EPacketType::NetMessageGenericText, "ftue_start_popup_close`".to_string());
+    thread::sleep(std::time::Duration::from_millis(1000));
+    bot.place(0, -1, 9640);
+    thread::sleep(std::time::Duration::from_millis(250));
+}
+
 // pub fn break_dirt_block(bot: &Arc<Bot>) {
 //     while is_current_task(&bot, "`oBreak Dirt Blocks`") {
 //         let tiles = {
@@ -524,10 +524,10 @@
 //     }
 // }
 //
-// fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
-//     let ftue = bot.ftue.read().unwrap();
-//     ftue.info.contains(task)
-// }
+fn is_current_task(bot: &Arc<Bot>, task: &str) -> bool {
+    let ftue = bot.ftue.read().unwrap();
+    ftue.info.contains(task)
+}
 //
 // pub fn start(bot: &Arc<Bot>) {
 //     lock_the_world(&bot);

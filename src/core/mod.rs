@@ -1,5 +1,3 @@
-// src/core/mod.rs
-
 mod astar;
 pub mod features;
 mod inventory;
@@ -190,7 +188,7 @@ impl Bot {
     pub fn logon(self: Arc<Self>, data: String) {
         {
             let lua = self.lua.lock().unwrap();
-            lua_register::register(&lua, &self);
+            let _ = lua_register::register(&lua, &self);
         }
         self.set_status("Logging in...");
         if data.is_empty() {
