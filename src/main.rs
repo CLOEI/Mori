@@ -6,7 +6,7 @@ use std::{
 };
 use std::sync::{Arc, RwLock};
 use eframe::egui::ViewportBuilder;
-use egui::{CentralPanel, ViewportCommand, UiBuilder, Id, Sense, Align2, FontId, vec2, PointerButton, Button, RichText};
+use egui::{CentralPanel, ViewportCommand, UiBuilder, Id, Sense, vec2, PointerButton, Button, RichText};
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
@@ -85,7 +85,7 @@ impl App {
 
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
         let mut bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
-        let bots = utils::config::get_bots();
+        let bots = config::get_bots();
         for bot in bots.clone() {
             bot_manager.write().unwrap().add_bot(bot);
         }
@@ -110,7 +110,7 @@ impl App {
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint();
 
         if self.settings.dark_mode {
@@ -182,7 +182,7 @@ impl eframe::App for App {
                     if ui
                         .add(Button::new(RichText::new(egui_remixicon::icons::SHUT_DOWN_LINE).size(button_height)))
                         .on_hover_text("Close the app").clicked() {
-                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                        ui.ctx().send_viewport_cmd(ViewportCommand::Close);
                     }
 
                     if ui

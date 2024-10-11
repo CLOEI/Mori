@@ -23,7 +23,7 @@ impl AddBotDialog {
     pub fn render(&mut self, manager: &Arc<RwLock<BotManager>>, ctx: &egui::Context) {
         if self.open {
             let mut close_dialog = false;
-            egui::Window::new("Add core")
+            egui::Window::new("Add bot")
                 .resizable(false)
                 .open(&mut self.open)
                 .show(ctx, |ui| {

@@ -2,9 +2,9 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 
 use eframe::egui::{self, Ui};
-use egui::{include_image, Color32};
+use egui::{include_image, Color32, UiBuilder};
 use egui::scroll_area::ScrollBarVisibility;
-use crate::{ manager::bot_manager::BotManager, types::config::BotConfig, utils };
+use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
 use crate::gui::scripting::Scripting;
@@ -26,24 +26,28 @@ impl BotMenu {
     pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
-        ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                egui::Grid::new("bots_grid")
-                    .min_col_width(150.0)
-                    .max_col_width(150.0)
-                    .show(ui, |ui| {
-                        for bot in self.bots.clone() {
-                            let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
-                            if ui.add_sized(ui.available_size(), egui::Button::new(payload[0].clone()).truncate()).clicked() {
-                                self.selected_bot = payload[0].clone();
-                                utils::config::set_selected_bot(self.selected_bot.clone());
-                            }
-                            ui.end_row();
-                        }
-                    })
-            });
-            ui.separator();
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+        ui.add_space(4.0);
+        ui.allocate_new_ui(
+            UiBuilder::new()
+                .layout(egui::Layout::left_to_right(egui::Align::Min)),
+            |ui| {
+                ui.allocate_ui(
+                    egui::vec2(ui.available_width() * 0.18, ui.available_height()),
+                    |ui| {
+                        egui::ScrollArea::vertical().id_salt("bot_list").show(ui, |ui| {
+                            ui.vertical(|ui| {
+                                for bot in self.bots.clone() {
+                                    let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
+                                    if ui.add_sized([ui.available_width(), 0.0], egui::Button::new(payload[0].clone()).truncate()).clicked() {
+                                        self.selected_bot = payload[0].clone();
+                                        utils::config::set_selected_bot(self.selected_bot.clone());
+                                    }
+                                }
+                            });
+                        });
+                    },
+                );
+                ui.separator();
                 ui.vertical(|ui| {
                     if ui.add_sized([30.0, 30.0], egui::Button::image(
                         include_image!("../../assets/info.svg"),
@@ -81,12 +85,8 @@ impl BotMenu {
                         self.current_menu = "terminal".to_string();
                     }
                 });
-
-                let available_width = ui.available_width();
-                // 9 is the pixel from the window border
-                let half_width = (available_width - 9.0) / 2.0;
                 if self.current_menu.is_empty() || self.current_menu == "bot_info" {
-                    ui.allocate_ui(egui::vec2(half_width, ui.available_height()), |ui| {
+                    ui.allocate_ui(egui::vec2(ui.available_width() / 2.0, ui.available_height()), |ui| {
                         ui.vertical(|ui| {
                             ui.group(|ui| {
                                 ui.vertical(|ui| {
@@ -159,7 +159,7 @@ impl BotMenu {
                                         });
                                 });
                             });
-                            ui.allocate_space(egui::vec2(half_width, 5.0));
+                            ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
                             ui.group(|ui| {
                                 ui.label("Warp");
                                 ui.separator();
@@ -190,7 +190,7 @@ impl BotMenu {
                                     }
                                 });
                             });
-                            ui.allocate_space(egui::vec2(half_width, 5.0));
+                            ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
                             ui.group(|ui| {
                                 ui.vertical(|ui| {
                                     ui.label("Server");
@@ -232,153 +232,150 @@ impl BotMenu {
                             });
                         });
                     });
+                    ui.vertical(|ui| {
+                        ui.group(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label("Login info");
+                                ui.separator();
+                                egui::Grid::new("login_info")
+                                    .min_col_width(120.0)
+                                    .max_col_width(120.0)
+                                    .show(ui, |ui| {
+                                        let bot = {
+                                            let manager = manager.read().unwrap();
 
-                    ui.allocate_ui(egui::vec2(half_width, ui.available_height()), |ui| {
-                        ui.vertical(|ui| {
-                            ui.group(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label("Login info");
-                                    ui.separator();
-                                    egui::Grid::new("login_info")
-                                        .min_col_width(120.0)
-                                        .max_col_width(120.0)
-                                        .show(ui, |ui| {
-                                            let bot = {
-                                                let manager = manager.read().unwrap();
-
-                                                match manager.get_bot(&self.selected_bot) {
-                                                    Some(bot) => Some(bot.clone()),
-                                                    None => None,
-                                                }
-                                            };
-                                            if let Some(bot) = bot {
-                                                let (payload, code, method) = {
-                                                    let info = bot.info.read().unwrap();
-                                                    (
-                                                        info.payload.clone(),
-                                                        info.recovery_code.clone(),
-                                                        info.login_method.clone(),
-                                                    )
-                                                };
-                                                ui.label("Username");
-                                                ui.add(egui::Label::new(&payload[0]).truncate());
-                                                ui.end_row();
-                                                ui.label("Password");
-                                                ui.label(&payload[1]);
-                                                ui.end_row();
-                                                ui.label("2FA Code");
-                                                ui.label(code);
-                                                ui.end_row();
-                                                ui.label("Login Method");
-                                                ui.label(format!("{:?}", method));
-                                                ui.end_row();
-                                            } else {
-                                                ui.label("Username");
-                                                ui.add(egui::Label::new("EMPTY").truncate());
-                                                ui.end_row();
-                                                ui.label("Password");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                                ui.label("2FA Code");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                                ui.label("Login Method");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                            };
-                                        });
-                                });
-                            });
-                            ui.allocate_space(egui::vec2(half_width, 5.0));
-                            ui.group(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label("State");
-                                    ui.separator();
-                                    egui::Grid::new("bot_state")
-                                        .min_col_width(120.0)
-                                        .max_col_width(120.0)
-                                        .show(ui, |ui| {
-                                            let bot = {
-                                                let manager = manager.read().unwrap();
-
-                                                match manager.get_bot(&self.selected_bot) {
-                                                    Some(bot) => Some(bot.clone()),
-                                                    None => None,
-                                                }
-                                            };
-                                            if let Some(bot) = bot {
-                                                let net_id = bot.state.read().unwrap().net_id.clone();
-                                                let token = bot.info.read().unwrap().token.clone();
-                                                let is_banned = bot.state.read().unwrap().is_banned.clone();
-                                                let position = bot.position.read().unwrap().clone();
-                                                ui.label("NetID");
-                                                ui.label(net_id.to_string());
-                                                ui.end_row();
-                                                ui.label("Token");
-                                                ui.add(egui::Label::new(token).truncate());
-                                                ui.end_row();
-                                                ui.label("Is Banned");
-                                                ui.label(is_banned.to_string());
-                                                ui.end_row();
-                                                ui.label("Level");
-                                                ui.label(bot.state.read().unwrap().level.to_string());
-                                                ui.end_row();
-                                                ui.label("Gems");
-                                                ui.label(bot.state.read().unwrap().gems.to_string());
-                                                ui.end_row();
-                                                ui.label("Position");
-                                                ui.horizontal(|ui| {
-                                                    ui.label((position.x / 32.0).floor().to_string());
-                                                    ui.separator();
-                                                    ui.label((position.y / 32.0).floor().to_string());
-                                                });
-                                                ui.end_row();
-                                            } else {
-                                                ui.label("NetID");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                                ui.label("Token");
-                                                ui.add(egui::Label::new("EMPTY").truncate());
-                                                ui.end_row();
-                                                ui.label("Is Banned");
-                                                ui.label("False");
-                                                ui.end_row();
-                                                ui.label("Position");
-                                                ui.horizontal(|ui| {
-                                                    ui.label("0");
-                                                    ui.separator();
-                                                    ui.label("0");
-                                                });
-                                                ui.end_row();
+                                            match manager.get_bot(&self.selected_bot) {
+                                                Some(bot) => Some(bot.clone()),
+                                                None => None,
                                             }
-                                        });
-                                });
-                                ui.add_space(ui.available_height());
+                                        };
+                                        if let Some(bot) = bot {
+                                            let (payload, code, method) = {
+                                                let info = bot.info.read().unwrap();
+                                                (
+                                                    info.payload.clone(),
+                                                    info.recovery_code.clone(),
+                                                    info.login_method.clone(),
+                                                )
+                                            };
+                                            ui.label("Username");
+                                            ui.add(egui::Label::new(&payload[0]).truncate());
+                                            ui.end_row();
+                                            ui.label("Password");
+                                            ui.label(&payload[1]);
+                                            ui.end_row();
+                                            ui.label("2FA Code");
+                                            ui.label(code);
+                                            ui.end_row();
+                                            ui.label("Login Method");
+                                            ui.label(format!("{:?}", method));
+                                            ui.end_row();
+                                        } else {
+                                            ui.label("Username");
+                                            ui.add(egui::Label::new("EMPTY").truncate());
+                                            ui.end_row();
+                                            ui.label("Password");
+                                            ui.label("EMPTY");
+                                            ui.end_row();
+                                            ui.label("2FA Code");
+                                            ui.label("EMPTY");
+                                            ui.end_row();
+                                            ui.label("Login Method");
+                                            ui.label("EMPTY");
+                                            ui.end_row();
+                                        };
+                                    });
                             });
+                        });
+                        ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
+                        ui.group(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label("State");
+                                ui.separator();
+                                egui::Grid::new("bot_state")
+                                    .min_col_width(120.0)
+                                    .max_col_width(120.0)
+                                    .show(ui, |ui| {
+                                        let bot = {
+                                            let manager = manager.read().unwrap();
+
+                                            match manager.get_bot(&self.selected_bot) {
+                                                Some(bot) => Some(bot.clone()),
+                                                None => None,
+                                            }
+                                        };
+                                        if let Some(bot) = bot {
+                                            let net_id = bot.state.read().unwrap().net_id.clone();
+                                            let token = bot.info.read().unwrap().token.clone();
+                                            let is_banned = bot.state.read().unwrap().is_banned.clone();
+                                            let position = bot.position.read().unwrap().clone();
+                                            ui.label("NetID");
+                                            ui.label(net_id.to_string());
+                                            ui.end_row();
+                                            ui.label("Token");
+                                            ui.add(egui::Label::new(token).truncate());
+                                            ui.end_row();
+                                            ui.label("Is Banned");
+                                            ui.label(is_banned.to_string());
+                                            ui.end_row();
+                                            ui.label("Level");
+                                            ui.label(bot.state.read().unwrap().level.to_string());
+                                            ui.end_row();
+                                            ui.label("Gems");
+                                            ui.label(bot.state.read().unwrap().gems.to_string());
+                                            ui.end_row();
+                                            ui.label("Position");
+                                            ui.horizontal(|ui| {
+                                                ui.label((position.x / 32.0).floor().to_string());
+                                                ui.separator();
+                                                ui.label((position.y / 32.0).floor().to_string());
+                                            });
+                                            ui.end_row();
+                                        } else {
+                                            ui.label("NetID");
+                                            ui.label("EMPTY");
+                                            ui.end_row();
+                                            ui.label("Token");
+                                            ui.add(egui::Label::new("EMPTY").truncate());
+                                            ui.end_row();
+                                            ui.label("Is Banned");
+                                            ui.label("False");
+                                            ui.end_row();
+                                            ui.label("Position");
+                                            ui.horizontal(|ui| {
+                                                ui.label("0");
+                                                ui.separator();
+                                                ui.label("0");
+                                            });
+                                            ui.end_row();
+                                        }
+                                    });
+                            });
+                            ui.add_space(ui.available_height());
                         });
                     });
                 } else if self.current_menu == "world_map" {
-                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.world_map.render(ui, &manager);
                     });
                 } else if self.current_menu == "inventory" {
-                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.inventory.render(ui, &manager);
                     });
                 } else if self.current_menu == "radar" {
-                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.growscan.render(ui, &manager);
                     });
                 } else if self.current_menu == "features" {
-                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         ui.label("Not implemented yet");
                     });
                 } else if self.current_menu == "scripting" {
-                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.scripting.render(ui, &manager);
                     });
                 } else if self.current_menu == "terminal" {
-                    ui.allocate_ui(egui::vec2(available_width, ui.available_height()), |ui| {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         egui::ScrollArea::vertical()
                             .scroll_bar_visibility(ScrollBarVisibility::AlwaysVisible)
                             .auto_shrink(false)
@@ -391,7 +388,7 @@ impl BotMenu {
                                         Some(bot) => {
                                             let logs = bot.logs.lock().unwrap();
                                             Some(logs.clone())
-                                        },
+                                        }
                                         None => None,
                                     }
                                 };
@@ -428,7 +425,7 @@ impl BotMenu {
                 } else {
                     ui.label("How?");
                 }
-            });
-        });
+            },
+        );
     }
 }
