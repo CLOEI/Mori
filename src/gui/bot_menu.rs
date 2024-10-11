@@ -131,13 +131,6 @@ impl BotMenu {
                                                 ui.label("Timeout");
                                                 ui.label(timeout.to_string());
                                                 ui.end_row();
-                                                // if ui.button("Relog").clicked() {
-                                                //     let bot_clone = core.clone();
-                                                //     thread::spawn(move || {
-                                                //         relog(&bot_clone);
-                                                //     });
-                                                //     ui.end_row();
-                                                // }
                                             } else {
                                                 ui.label("GrowID");
                                                 ui.label("EMPTY");
@@ -171,6 +164,14 @@ impl BotMenu {
                                     );
                                 });
                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                                    // if ui.button("Relog").clicked() {
+                                    //     if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                    //         let bot_clone = bot.clone();
+                                    //         thread::spawn(move || {
+                                    //             bot_clone.relog();
+                                    //         });
+                                    //     }
+                                    // }
                                     if ui.button("Leave").clicked() {
                                         if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
                                             let bot_clone = bot.clone();
