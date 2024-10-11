@@ -19,8 +19,6 @@ impl Default for Navbar {
 impl Navbar {
     pub fn render(&mut self, ui: &mut egui::Ui, add_bot_dialog: &mut AddBotDialog, manager: &Arc<RwLock<BotManager>>) {
         ui.horizontal(|ui| {
-            ui.heading("Mori");
-            ui.separator();
             if ui
                 .add(egui::Button::image_and_text(
                     egui::include_image!("../../assets/bot.svg"),

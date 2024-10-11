@@ -22,15 +22,14 @@ serde = { version = "1.0.208", features = ["derive"] }
 serde_repr = "0.1.19"
 gtitem-r = { git = "https://github.com/CLOEI/gtitem-r.git" }
 gtworld-r = { git = "https://github.com/CLOEI/gtworld-r.git" }
-eframe = "0.28.1"
-egui_extras = { version = "*", features = ["svg", "syntect"] }
+eframe = "0.29.1"
+egui_extras = { version = "0.29.1", features = ["svg", "syntect"] }
 image = { version = "0.25.2", features = ["png"] }
-egui = "0.28.1"
+egui = "0.29.1"
 socks = "0.3.4"
-steamworks = "0.11.0"
 thiserror = "1.0.63"
 mlua = { version = "0.9.9", features = ["lua54", "vendored", "send"] }
 wait-timeout = "0.2.0"
 rust-otp = "2.0.0"
-egui-phosphor = "0.6.0"
+egui-remixicon = "0.29.1"
 

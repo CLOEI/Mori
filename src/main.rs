@@ -5,8 +5,8 @@ use std::{
     io::Write,
 };
 use std::sync::{Arc, RwLock};
-use core::Bot;
 use eframe::egui::ViewportBuilder;
+use egui::{CentralPanel, ViewportCommand, UiBuilder, Id, Sense, Align2, FontId, vec2, PointerButton, Button, RichText};
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
@@ -58,9 +58,8 @@ fn main() {
                     .expect("Failed to load icon"),
             )
             .with_inner_size([800.0, 400.0])
-            .with_resizable(false)
-            .with_fullscreen(false)
-            .with_maximize_button(false),
+            .with_decorations(false)
+            .with_transparent(true),
         ..Default::default()
     };
     let _ = eframe::run_native("Mori", options, Box::new(|cc| Ok(Box::new(App::new(cc)))));
@@ -81,7 +80,7 @@ struct App {
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut fonts = egui::FontDefinitions::default();
-        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        egui_remixicon::add_to_fonts(&mut fonts);
         cc.egui_ctx.set_fonts(fonts);
 
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
@@ -121,25 +120,99 @@ impl eframe::App for App {
         }
 
         egui_extras::install_image_loaders(ctx);
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            self.navbar
-                .render(ui, &mut self.add_bot_dialog, &self.bot_manager);
-        });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            if self.navbar.current_menu == "bots" {
-                self.bot_menu.render(ui, &self.bot_manager);
-            } else if self.navbar.current_menu == "item_database" {
-                self.item_database.render(ui, &self.bot_manager, ctx);
-            } else if self.navbar.current_menu == "proxy_list" {
-                self.proxy_list.render(ui, &self.proxy_manager, &mut self.add_proxy_dialog, ctx);
-            } else if self.navbar.current_menu == "settings" {
-                self.settings.render(ui, ctx);
-            } else {
-                ui.label("Not implemented yet");
+        let panel_frame = egui::Frame {
+            fill: ctx.style().visuals.window_fill(),
+            rounding: 5.0.into(),
+            outer_margin: 0.5.into(),
+            ..Default::default()
+        };
+
+        CentralPanel::default().frame(panel_frame).show(ctx, |ui| {
+            let app_rect = ui.max_rect();
+
+            let title_bar_height = 40.0;
+            let title_bar_rect = {
+                let mut rect = app_rect;
+                rect.max.y = rect.min.y + title_bar_height;
+                rect
+            };
+
+            let painter = ui.painter();
+            let title_bar_response = ui.interact(
+                title_bar_rect,
+                Id::new("title_bar"),
+                Sense::click_and_drag(),
+            );
+
+            painter.line_segment(
+                [
+                    title_bar_rect.left_bottom() + vec2(1.0, 0.0),
+                    title_bar_rect.right_bottom() + vec2(-1.0, 0.0),
+                ],
+                ui.visuals().widgets.noninteractive.bg_stroke,
+            );
+
+            if title_bar_response.drag_started_by(PointerButton::Primary) {
+                ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
             }
+
+            ui.allocate_new_ui(
+                UiBuilder::new()
+                    .max_rect(title_bar_rect)
+                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                |ui| {
+                    ui.add_space(8.0);
+                    ui.heading("Mori");
+                    ui.separator();
+                    self.navbar.render(ui, &mut self.add_bot_dialog, &self.bot_manager);
+                },
+            );
+
+            ui.allocate_new_ui(
+                UiBuilder::new()
+                    .max_rect(title_bar_rect)
+                    .layout(egui::Layout::right_to_left(egui::Align::Center)),
+                |ui| {
+                    let button_height = 12.0;
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    ui.visuals_mut().button_frame = false;
+                    ui.add_space(8.0);
+
+                    if ui
+                        .add(Button::new(RichText::new(egui_remixicon::icons::SHUT_DOWN_LINE).size(button_height)))
+                        .on_hover_text("Close the app").clicked() {
+                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+
+                    if ui
+                        .add(Button::new(RichText::new(egui_remixicon::icons::ARROW_DROP_DOWN_LINE).size(button_height)))
+                        .on_hover_text("Minimize the window").clicked() {
+                        ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
+                    }
+                },
+            );
+
+            let content_rect = {
+                let mut rect = app_rect;
+                rect.min.y = title_bar_rect.max.y;
+                rect
+            }.shrink(4.0);
+
+            let mut content_ui = ui.new_child(UiBuilder::new().max_rect(content_rect));
+            match self.navbar.current_menu.as_str() {
+                "bots" => self.bot_menu.render(&mut content_ui, &self.bot_manager),
+                "item_database" => self.item_database.render(&mut content_ui, &self.bot_manager, ctx),
+                "proxy_list" => self.proxy_list.render(&mut content_ui, &self.proxy_manager, &mut self.add_proxy_dialog, ctx),
+                "settings" => self.settings.render(&mut content_ui, ctx),
+                _ => {}
+            }
+            self.add_bot_dialog.render(&mut self.bot_manager, ctx);
+            self.add_proxy_dialog.render(&mut self.proxy_manager, ctx);
         });
-        self.add_bot_dialog.render(&mut self.bot_manager, ctx);
-        self.add_proxy_dialog.render(&mut self.proxy_manager, ctx);
+    }
+
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        egui::Rgba::TRANSPARENT.to_array()
     }
 }

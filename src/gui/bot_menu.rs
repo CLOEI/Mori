@@ -403,15 +403,15 @@ impl BotMenu {
                                             ui.horizontal(|ui| {
                                                 match data[0] {
                                                     "info" => {
-                                                        ui.label(egui::RichText::new(egui_phosphor::regular::INFO).color(Color32::from_rgb(0, 123, 255)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_remixicon::icons::INFORMATION_LINE).color(Color32::from_rgb(0, 123, 255)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     "warn" => {
-                                                        ui.label(egui::RichText::new(egui_phosphor::regular::WARNING).color(Color32::from_rgb(255, 193, 7)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_remixicon::icons::ERROR_WARNING_LINE).color(Color32::from_rgb(255, 193, 7)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     "error" => {
-                                                        ui.label(egui::RichText::new(egui_phosphor::regular::BUG).color(Color32::from_rgb(220, 53, 69)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_remixicon::icons::BUG_LINE).color(Color32::from_rgb(220, 53, 69)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     _ => {
