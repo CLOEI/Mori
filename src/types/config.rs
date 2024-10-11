@@ -11,6 +11,7 @@ pub struct Config {
     pub selected_bot: String,
     pub game_version: String,
     pub use_alternate_server: bool,
+    pub dark_mode: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

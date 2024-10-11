@@ -39,6 +39,7 @@ fn init_config() {
             selected_bot: "".to_string(),
             game_version: "4.65".to_string(),
             use_alternate_server: false,
+            dark_mode: true,
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
@@ -101,6 +102,7 @@ impl App {
                 use_alternate: config::get_use_alternate_server(),
                 timeout_delay: config::get_timeout(),
                 findpath_delay: config::get_findpath_delay(),
+                dark_mode: config::get_dark_mode(),
             },
             proxy_manager,
             bot_manager,
@@ -111,6 +113,13 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         ctx.request_repaint();
+
+        if self.settings.dark_mode {
+            ctx.set_visuals(egui::Visuals::dark());
+        } else {
+            ctx.set_visuals(egui::Visuals::light());
+        }
+
         egui_extras::install_image_loaders(ctx);
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.navbar

@@ -151,3 +151,16 @@ pub fn get_bot_use_proxy(username: String) -> bool {
     }
     false
 }
+
+pub fn set_dark_mode(dark_mode: bool) {
+    let mut config = parse_config().unwrap();
+    config.dark_mode = dark_mode;
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
+}
+
+pub fn get_dark_mode() -> bool {
+    let config = parse_config().unwrap();
+    config.dark_mode
+}
