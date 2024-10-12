@@ -43,6 +43,13 @@ pub enum ETankPacketType {
     NetGamePacketActiveArrowToItem,
     NetGamePacketSelectTileIndex,
     NetGamePacketSendPlayerTributeData,
+    NetGamePacketFTUESetItemToQuickInventory,
+    NetGamePacketPVENpc,
+    NetGamePacketPVPCardBattle,
+    NetGamePacketPVEApplyPlayerDamage,
+    NetGamePacketPVENPCPositionUpdate,
+    NetGamePacketSetExtraMods,
+    NetGamePacketOnStepTileMod,
 }
 
 impl Default for ETankPacketType {
@@ -94,6 +101,13 @@ impl From<u8> for ETankPacketType {
             37 => ETankPacketType::NetGamePacketActiveArrowToItem,
             38 => ETankPacketType::NetGamePacketSelectTileIndex,
             39 => ETankPacketType::NetGamePacketSendPlayerTributeData,
+            40 => ETankPacketType::NetGamePacketFTUESetItemToQuickInventory,
+            41 => ETankPacketType::NetGamePacketPVENpc,
+            42 => ETankPacketType::NetGamePacketPVPCardBattle,
+            43 => ETankPacketType::NetGamePacketPVEApplyPlayerDamage,
+            44 => ETankPacketType::NetGamePacketPVENPCPositionUpdate,
+            45 => ETankPacketType::NetGamePacketSetExtraMods,
+            46 => ETankPacketType::NetGamePacketOnStepTileMod,
             _ => ETankPacketType::NetGamePacketState,
         }
     }
