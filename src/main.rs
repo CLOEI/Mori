@@ -36,8 +36,9 @@ fn init_config() {
             proxy: Vec::new(),
             timeout: 5,
             findpath_delay: 30,
+            auto_collect: true,
             selected_bot: "".to_string(),
-            game_version: "4.65".to_string(),
+            game_version: "4.68".to_string(),
             use_alternate_server: false,
             dark_mode: true,
         };
@@ -101,6 +102,7 @@ impl App {
                 use_alternate: config::get_use_alternate_server(),
                 timeout_delay: config::get_timeout(),
                 findpath_delay: config::get_findpath_delay(),
+                auto_collect: config::get_auto_collect(),
                 dark_mode: config::get_dark_mode(),
             },
             proxy_manager,

@@ -914,7 +914,9 @@ fn poll(bot: Arc<Bot>) {
                     break;
                 }
             }
-            bot_clone.collect();
+            if config::get_auto_collect() {
+                bot_clone.collect();
+            }
             bot_clone.set_ping();
             thread::sleep(Duration::from_millis(100));
         }

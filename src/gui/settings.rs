@@ -5,6 +5,7 @@ use crate::utils::config;
 #[derive(Default)]
 pub struct Settings {
     pub use_alternate: bool,
+    pub auto_collect: bool,
     pub dark_mode: bool,
     pub timeout_delay: u32,
     pub findpath_delay: u32,
@@ -20,6 +21,9 @@ impl Settings {
                 ui.vertical(|ui| {
                     if ui.checkbox(&mut self.use_alternate, "Use alternate server").changed() {
                         config::set_use_alternate_server(self.use_alternate);
+                    }
+                    if ui.checkbox(&mut self.auto_collect, "Use auto collect").changed() {
+                        config::set_auto_collect(self.auto_collect);
                     }
                     if ui.checkbox(&mut self.dark_mode, "Use dark mode").changed() {
                         if self.dark_mode {

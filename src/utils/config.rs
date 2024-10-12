@@ -164,3 +164,16 @@ pub fn get_dark_mode() -> bool {
     let config = parse_config().unwrap();
     config.dark_mode
 }
+
+pub fn set_auto_collect(auto_collect: bool) {
+    let mut config = parse_config().unwrap();
+    config.auto_collect = auto_collect;
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
+}
+
+pub fn get_auto_collect() -> bool {
+    let config = parse_config().unwrap();
+    config.auto_collect
+}
