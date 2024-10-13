@@ -390,7 +390,7 @@ impl Bot {
             return;
         }
 
-        self.log_info("Getting token for core");
+        self.log_info("Getting token for bot");
         self.set_status("Getting token");
         let (payload, recovery_code, method, oauth_links) = {
             let info = self.info.read().unwrap();

@@ -161,7 +161,7 @@ pub fn get_ubisoft_token(bot: &Bot, recovery_code: &str, email: &str, password: 
     let current_dir = env::current_dir().expect("Failed to get current directory");
     // TODO: Add support for linux and mac
     let executable_path = current_dir.join("steamtoken.exe");
-    let timeout = Duration::from_secs(5);
+    let timeout = Duration::from_secs(10);
 
     loop {
         let mut child = Command::new(&executable_path)
@@ -186,7 +186,8 @@ pub fn get_ubisoft_token(bot: &Bot, recovery_code: &str, email: &str, password: 
                         .set("user-agent", USER_AGENT)
                         .send_string(format!("{}steamToken%7C{}.240", formated, steam_token.trim_end()).as_str())?;
 
-                    let json: Value = match body.into_json() {
+                    let body_str = body.into_string().unwrap();
+                    let json: Value = match serde_json::from_str(&body_str) {
                         Ok(json) => json,
                         Err(err) => {
                             return Err(error::CustomError::Other(format!("Failed to parse json: {}", err)));
