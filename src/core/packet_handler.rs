@@ -234,12 +234,13 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                         } else {
                                             let mut inventory = bot.inventory.write().unwrap();
                                             if let Some(item) = inventory.items.get_mut(&obj.id) {
-                                                let temp = item.amount + obj.count as u16;
+                                                let temp = item.amount + obj.count;
                                                 item.amount = if temp > 200 { 200 } else { temp };
                                             } else {
                                                 let item = InventoryItem {
                                                     id: obj.id,
-                                                    amount: obj.count as u16,
+                                                    amount: obj.count,
+                                                    flag: 0,
                                                 };
                                                 inventory.items.insert(obj.id, item);
                                             }
@@ -264,7 +265,7 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     ETankPacketType::NetGamePacketModifyItemInventory => {
                         let mut inventory = bot.inventory.write().unwrap();
                         if let Some(item) = inventory.items.get_mut(&(tank_packet.value as u16)) {
-                            item.amount -= tank_packet.unk2 as u16;
+                            item.amount -= tank_packet.unk2;
                         }
                     }
                     ETankPacketType::NetGamePacketSendTileUpdateData => {

@@ -13,7 +13,8 @@ pub struct Inventory {
 #[derive(Debug, Clone)]
 pub struct InventoryItem {
     pub id: u16,
-    pub amount: u16,
+    pub amount: u8,
+    pub flag: u8,
 }
 
 impl Inventory {
@@ -33,8 +34,9 @@ impl Inventory {
         self.item_count = data.read_u16::<LittleEndian>().unwrap();
         for _ in 0..self.item_count {
             let id = data.read_u16::<LittleEndian>().unwrap();
-            let amount = data.read_u16::<LittleEndian>().unwrap();
-            self.items.insert(id, InventoryItem { id, amount });
+            let amount = data.read_u8().unwrap();
+            let flag = data.read_u8().unwrap();
+            self.items.insert(id, InventoryItem { id, amount, flag });
         }
     }
 

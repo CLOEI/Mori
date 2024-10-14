@@ -25,7 +25,7 @@ Any contribution would help alot.
 - [x] Auto update following the game client (version & items.dat)
 - [x] Adding multi bot
 - [x] Item database
-- [x] Inventory (There's a bug, item count is not accurate)
+- [x] Inventory
 - [x] World map preview
 - [x] Growscan
 - [x] Bot movement + findpath
