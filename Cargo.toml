@@ -32,4 +32,5 @@ mlua = { version = "0.9.9", features = ["lua54", "vendored", "send"] }
 wait-timeout = "0.2.0"
 rust-otp = "2.0.0"
 egui-remixicon = "0.29.1"
+flate2 = "1.0.34"
 

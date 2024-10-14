@@ -22,7 +22,7 @@ Any contribution would help alot.
 
 - [x] GUI (If you prefer to use a GUI)
 - [ ] Web GUI
-- [x] Auto update following the game client
+- [x] Auto update following the game client (version & items.dat)
 - [x] Adding multi bot
 - [x] Item database
 - [x] Inventory (There's a bug, item count is not accurate)

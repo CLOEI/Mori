@@ -43,7 +43,7 @@ impl Growscan {
                                 .min_col_width(ui.available_width())
                                 .show(ui, |ui| {
                                     for (id, count) in sorted_items {
-                                        if let Some(item_data) = bot.item_database.get_item(&(*id as u32)) {
+                                        if let Some(item_data) = bot.item_database.read().unwrap().get_item(&(*id as u32)) {
                                             let item_name = &item_data.name;
                                             ui.label(format!("{} {}", count, item_name));
                                             ui.end_row();
@@ -77,7 +77,7 @@ impl Growscan {
                                 .min_col_width(ui.available_width())
                                 .show(ui, |ui| {
                                     for (id, count) in sorted_tiles {
-                                        if let Some(item_data) = bot.item_database.get_item(&(*id as u32)) {
+                                        if let Some(item_data) = bot.item_database.read().unwrap().get_item(&(*id as u32)) {
                                             let item_name = &item_data.name;
                                             ui.label(format!("{} {}", count, item_name));
                                             ui.end_row();

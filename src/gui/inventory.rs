@@ -36,7 +36,7 @@ impl Inventory {
                         .show(ui, |ui| {
                             for (id, inventory_item) in inventory_items {
                                 let (item, wear_disabled) = {
-                                    let item = manager.read().unwrap().items_database.get_item(&(id as u32)).unwrap();
+                                    let item = manager.read().unwrap().items_database.read().unwrap().get_item(&(id as u32)).unwrap();
                                     (item.clone(), item.action_type != 20)
                                 };
                                 ui.horizontal(|ui| {

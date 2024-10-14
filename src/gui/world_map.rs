@@ -61,15 +61,17 @@ impl WorldMap {
                             continue;
                         }
                         let tile = world.get_tile(x, y).unwrap();
-                        let item = bot
-                            .item_database
-                            .get_item(&(tile.foreground_item_id as u32))
-                            .unwrap();
+                        let item = {
+                            let item_database = bot.item_database.read().unwrap();
+                            item_database
+                                .get_item(&(tile.foreground_item_id as u32))
+                                .unwrap()
+                        };
 
                         if item.id == 0 {
                             if tile.background_item_id != 0 {
-                                let item = bot
-                                    .item_database
+                                let item_database = bot.item_database.read().unwrap();
+                                let item = item_database
                                     .get_item(&((tile.background_item_id + 1) as u32))
                                     .unwrap();
                                 let color = item.base_color;
@@ -84,8 +86,8 @@ impl WorldMap {
                                 );
                             }
                         } else {
-                            let color = bot
-                                .item_database
+                            let items_database = bot.item_database.read().unwrap();
+                            let color = items_database
                                 .get_item(&((tile.foreground_item_id + 1) as u32))
                                 .unwrap()
                                 .base_color;

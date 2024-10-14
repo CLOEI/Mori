@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::thread;
 use crate::core;
 use crate::types::epacket_type::EPacketType;
 use crate::types::player::Player;
@@ -7,7 +9,7 @@ use crate::utils::variant::VariantList;
 use crate::utils::{self, textparse};
 use super::Bot;
 
-pub fn handle(bot: &Bot, _: &TankPacket, data: &[u8]) {
+pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
     let variant = VariantList::deserialize(&data).unwrap();
     let function_call: String = variant.get(0).unwrap().as_string();
     bot.log_info(format!("Received function call: {}", function_call).as_str());
@@ -34,12 +36,40 @@ pub fn handle(bot: &Bot, _: &TankPacket, data: &[u8]) {
             bot.disconnect();
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
-            bot.send_packet(
-                EPacketType::NetMessageGenericText,
-                "action|enter_game\n".to_string(),
-            );
-            let mut state = bot.state.write().unwrap();
-            state.is_redirecting = false;
+            let item_database_loaded = {
+                let item_database = bot.item_database.read().unwrap();
+                item_database.loaded
+            };
+            if !item_database_loaded {
+                bot.send_packet(EPacketType::NetMessageGenericText, "action|refresh_item_data\n".to_string());
+                let item_database_clone = bot.item_database.clone();
+                let bot_clone = Arc::clone(&bot);
+                thread::spawn(move || {
+                    loop {
+                        let item_database_loaded = {
+                            let item_database = item_database_clone.read().unwrap();
+                            item_database.loaded
+                        };
+                        if item_database_loaded {
+                            break;
+                        }
+                        thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                    bot_clone.send_packet(
+                        EPacketType::NetMessageGenericText,
+                        "action|enter_game\n".to_string(),
+                    );
+                    let mut state = bot_clone.state.write().unwrap();
+                    state.is_redirecting = false;
+                });
+            } else {
+                bot.send_packet(
+                    EPacketType::NetMessageGenericText,
+                    "action|enter_game\n".to_string(),
+                );
+                let mut state = bot.state.write().unwrap();
+                state.is_redirecting = false;
+            }
         }
         "OnCountryState" => {}
         "OnDialogRequest" => {

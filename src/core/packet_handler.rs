@@ -1,6 +1,8 @@
 use std::{fs, sync::Arc};
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{Cursor, Read, Write};
 use std::time::Instant;
+use flate2::read::{GzDecoder, ZlibDecoder};
 use gtworld_r::TileType;
 use regex::Regex;
 use crate::{
@@ -12,7 +14,7 @@ use crate::{
 };
 use super::{inventory::InventoryItem, Bot};
 
-pub fn handle(bot: &Bot, packet_type: EPacketType, data: &[u8]) {
+pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
         EPacketType::NetMessageServerHello => {
             let is_redirecting = bot.state.read().unwrap().is_redirecting;
@@ -133,7 +135,7 @@ pub fn handle(bot: &Bot, packet_type: EPacketType, data: &[u8]) {
                             let mut world = bot.world.write().unwrap();
                             world.parse(&data[56..]);
                         }
-                        bot.astar.write().unwrap().update(bot);
+                        bot.astar.write().unwrap().update(&bot);
                         bot.send_packet(
                             EPacketType::NetMessageGenericText,
                             "action|getDRAnimations\n".to_string(),
@@ -172,12 +174,12 @@ pub fn handle(bot: &Bot, packet_type: EPacketType, data: &[u8]) {
                                         tile.background_item_id = 0;
                                     }
                                 } else {
-                                    if let Some(item) = bot.item_database.items.get(&tank_packet.value) {
+                                    if let Some(item) = bot.item_database.read().unwrap().items.get(&tank_packet.value) {
                                         if item.action_type == 22 || item.action_type == 28 || item.action_type == 18 {
                                             tile.background_item_id = tank_packet.value as u16;
                                         } else {
                                             tile.foreground_item_id = tank_packet.value as u16;
-                                            let item = bot.item_database.get_item(&tank_packet.value).unwrap();
+                                            let item = bot.item_database.read().unwrap().get_item(&tank_packet.value).unwrap();
                                             if item.name.contains("Seed") {
                                                 tile.tile_type = TileType::Seed {
                                                     ready_to_harvest: false,
@@ -192,7 +194,7 @@ pub fn handle(bot: &Bot, packet_type: EPacketType, data: &[u8]) {
                             }
                         }
 
-                        bot.astar.write().unwrap().update(bot);
+                        bot.astar.write().unwrap().update(&bot);
                     }
                     ETankPacketType::NetGamePacketItemChangeObject => {
                         let mut world = bot.world.write().unwrap();
@@ -273,6 +275,14 @@ pub fn handle(bot: &Bot, packet_type: EPacketType, data: &[u8]) {
                         let data = &data[56..];
                         let mut cursor = Cursor::new(data);
                         bot.world.write().unwrap().update_tile(tile, &mut cursor, true);
+                    }
+                    ETankPacketType::NetGamePacketSendItemDatabaseData => {
+                        let data = &data[56..];
+                        let mut decoder = ZlibDecoder::new(data);
+                        let mut data = Vec::new();
+                        decoder.read_to_end(&mut data).unwrap();
+                        let mut item_database = bot.item_database.write().unwrap();
+                        *item_database = gtitem_r::load_from_memory(&data).unwrap();
                     }
                     _ => {}
                 }

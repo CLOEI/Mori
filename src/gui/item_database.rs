@@ -13,7 +13,8 @@ impl ItemDatabase {
         ui.horizontal(|ui| {
             let (item_database_version, item_database_item_count) = {
                 let manager = manager.read().unwrap();
-                (manager.items_database.version.clone(), manager.items_database.item_count)
+                let items_database = manager.items_database.read().unwrap();
+                (items_database.version.clone(), items_database.item_count)
             };
 
             ui.label("Database version:");
@@ -27,7 +28,7 @@ impl ItemDatabase {
         ui.separator();
 
         let mut filtered_items: Vec<u32> = {
-            manager.read().unwrap().items_database.items.iter()
+            manager.read().unwrap().items_database.read().unwrap().items.iter()
                 .filter_map(|(&id, item)| {
                     if item.name.to_lowercase().contains(&self.search_query.to_lowercase()) {
                         Some(id)
@@ -60,7 +61,8 @@ impl ItemDatabase {
                                         let item_id = filtered_items[i];
                                         let item = {
                                             let manager = manager.read().unwrap();
-                                            manager.items_database.get_item(&item_id).unwrap()
+                                            let items_database = manager.items_database.read().unwrap();
+                                            items_database.get_item(&item_id).unwrap()
                                         };
                                         if ui
                                             .selectable_label(
@@ -88,7 +90,8 @@ impl ItemDatabase {
                         if let Some(selected_index) = self.selected_item_index {
                             let selected_item = {
                                 let manager = manager.read().unwrap();
-                                manager.items_database.get_item(&selected_index).unwrap().clone()
+                                let items_database = manager.items_database.read().unwrap();
+                                items_database.get_item(&selected_index).unwrap().clone()
                             };
                             ui.label(format!("Name: {}", selected_item.name));
 

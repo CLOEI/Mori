@@ -3,7 +3,7 @@ use std::{
     collections::{BinaryHeap, HashMap, HashSet},
     sync::Arc,
 };
-
+use std::sync::RwLock;
 use gtitem_r::structs::ItemDatabase;
 
 use super::Bot;
@@ -12,7 +12,7 @@ pub struct AStar {
     pub width: u32,
     pub height: u32,
     pub grid: Vec<Node>,
-    pub item_database: Arc<ItemDatabase>,
+    pub item_database: Arc<RwLock<ItemDatabase>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,7 +52,7 @@ impl PartialOrd for Node {
 }
 
 impl AStar {
-    pub fn new(item_database: Arc<ItemDatabase>) -> AStar {
+    pub fn new(item_database: Arc<RwLock<ItemDatabase>>) -> AStar {
         AStar {
             width: 0,
             height: 0,
@@ -75,8 +75,8 @@ impl AStar {
         for i in 0..world.tiles.len() {
             let x = (i as u32) % world.width;
             let y = (i as u32) / world.width;
-            let item = self
-                .item_database
+            let item_database = self.item_database.read().unwrap();
+            let item = item_database
                 .get_item(&(world.tiles[i].foreground_item_id as u32))
                 .unwrap();
             let collision_type = item.collision_type;

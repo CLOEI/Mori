@@ -64,7 +64,7 @@ pub struct Bot {
     pub players: RwLock<Vec<Player>>,
     pub astar: RwLock<AStar>,
     pub ftue: RwLock<FTUE>,
-    pub item_database: Arc<ItemDatabase>,
+    pub item_database: Arc<RwLock<ItemDatabase>>,
     pub proxy_manager: Arc<RwLock<ProxyManager>>,
     pub logs: Arc<Mutex<Vec<String>>>,
     pub sender: Sender<String>,
@@ -74,7 +74,7 @@ pub struct Bot {
 impl Bot {
     pub fn new(
         bot_config: types::config::BotConfig,
-        item_database: Arc<ItemDatabase>,
+        item_database: Arc<RwLock<ItemDatabase>>,
         proxy_manager: Arc<RwLock<ProxyManager>>,
     ) -> Arc<Self> {
         let lua = Mutex::new(Lua::new());
@@ -586,7 +586,7 @@ impl Bot {
         }
     }
 
-    fn process_events(&self) {
+    fn process_events(self: Arc<Self>) {
         loop {
             let (is_running, is_redirecting, ip, port) = {
                 let state = self.state.read().unwrap();
@@ -639,7 +639,8 @@ impl Bot {
                             }
                             let packet_id = LittleEndian::read_u32(&data[0..4]);
                             let packet_type = EPacketType::from(packet_id);
-                            packet_handler::handle(self, packet_type, &data[4..]);
+                            let bot_clone = Arc::clone(&self);
+                            packet_handler::handle(bot_clone, packet_type, &data[4..]);
                         }
                     }
                 }
