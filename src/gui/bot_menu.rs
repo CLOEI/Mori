@@ -36,11 +36,18 @@ impl BotMenu {
                     |ui| {
                         egui::ScrollArea::vertical().id_salt("bot_list").show(ui, |ui| {
                             ui.vertical(|ui| {
-                                for bot in self.bots.clone() {
-                                    let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
-                                    if ui.add_sized([ui.available_width(), 0.0], egui::Button::new(payload[0].clone()).truncate()).clicked() {
-                                        self.selected_bot = payload[0].clone();
-                                        utils::config::set_selected_bot(self.selected_bot.clone());
+                                let bots_clone = self.bots.clone();
+                                if bots_clone.is_empty() {
+                                    ui.centered_and_justified(|ui| {
+                                        ui.add_sized([ui.available_width(), 0.0], egui::Label::new("No bots added"));
+                                    });
+                                } else {
+                                    for bot in self.bots.clone() {
+                                        let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
+                                        if ui.add_sized([ui.available_width(), 0.0], egui::Button::new(payload[0].clone()).truncate()).clicked() {
+                                            self.selected_bot = payload[0].clone();
+                                            utils::config::set_selected_bot(self.selected_bot.clone());
+                                        }
                                     }
                                 }
                             });

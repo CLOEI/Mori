@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-
+use crate::utils;
 use super::elogin_method::ELoginMethod;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -13,6 +13,13 @@ pub struct Config {
     pub game_version: String,
     pub use_alternate_server: bool,
     pub dark_mode: bool,
+    pub captcha: Captcha,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Captcha {
+    pub api_key: String,
+    pub provider: utils::captcha::CaptchaProvider,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

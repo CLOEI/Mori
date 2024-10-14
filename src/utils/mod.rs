@@ -5,3 +5,4 @@ pub mod textparse;
 pub mod variant;
 pub mod error;
 pub mod logging;
+pub mod captcha;

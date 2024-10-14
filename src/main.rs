@@ -41,6 +41,7 @@ fn init_config() {
             game_version: "4.68".to_string(),
             use_alternate_server: false,
             dark_mode: true,
+            captcha: Default::default(),
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
