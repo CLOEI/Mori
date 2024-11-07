@@ -1,32 +1,32 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{
-    fs::{self, File},
-    io::Write,
-};
-use std::sync::{Arc, RwLock};
-use eframe::egui::ViewportBuilder;
-use egui::{CentralPanel, ViewportCommand, UiBuilder, Id, Sense, vec2, PointerButton, Button, RichText};
-use gui::{
-    add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
-};
-use types::{
-    config::{Config},
-};
-use mlua::prelude::*;
 use crate::gui::add_proxy_dialog::AddProxyDialog;
 use crate::gui::proxy_list::ProxyList;
 use crate::gui::settings::Settings;
 use crate::manager::bot_manager::BotManager;
 use crate::manager::proxy_manager::ProxyManager;
 use crate::utils::config;
+use eframe::egui::ViewportBuilder;
+use egui::{
+    vec2, Button, CentralPanel, Id, PointerButton, RichText, Sense, UiBuilder, ViewportCommand,
+};
+use gui::{
+    add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
+};
+use mlua::prelude::*;
+use std::sync::{Arc, RwLock};
+use std::{
+    fs::{self, File},
+    io::Write,
+};
+use types::config::Config;
 
 mod core;
 mod gui;
+mod lua_register;
 mod manager;
 mod types;
 mod utils;
-mod lua_register;
 
 fn init_config() {
     if !fs::metadata("config.json").is_ok() {
@@ -38,7 +38,7 @@ fn init_config() {
             findpath_delay: 30,
             auto_collect: true,
             selected_bot: "".to_string(),
-            game_version: "4.68".to_string(),
+            game_version: "4.70".to_string(),
             use_alternate_server: false,
             dark_mode: true,
             captcha: Default::default(),
@@ -168,7 +168,8 @@ impl eframe::App for App {
                     ui.add_space(8.0);
                     ui.heading("Mori");
                     ui.separator();
-                    self.navbar.render(ui, &mut self.add_bot_dialog, &self.bot_manager);
+                    self.navbar
+                        .render(ui, &mut self.add_bot_dialog, &self.bot_manager);
                 },
             );
 
@@ -183,14 +184,24 @@ impl eframe::App for App {
                     ui.add_space(8.0);
 
                     if ui
-                        .add(Button::new(RichText::new(egui_remixicon::icons::SHUT_DOWN_LINE).size(button_height)))
-                        .on_hover_text("Close the app").clicked() {
+                        .add(Button::new(
+                            RichText::new(egui_remixicon::icons::SHUT_DOWN_LINE)
+                                .size(button_height),
+                        ))
+                        .on_hover_text("Close the app")
+                        .clicked()
+                    {
                         ui.ctx().send_viewport_cmd(ViewportCommand::Close);
                     }
 
                     if ui
-                        .add(Button::new(RichText::new(egui_remixicon::icons::ARROW_DROP_DOWN_LINE).size(button_height)))
-                        .on_hover_text("Minimize the window").clicked() {
+                        .add(Button::new(
+                            RichText::new(egui_remixicon::icons::ARROW_DROP_DOWN_LINE)
+                                .size(button_height),
+                        ))
+                        .on_hover_text("Minimize the window")
+                        .clicked()
+                    {
                         ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
                     }
                 },
@@ -200,13 +211,22 @@ impl eframe::App for App {
                 let mut rect = app_rect;
                 rect.min.y = title_bar_rect.max.y;
                 rect
-            }.shrink(4.0);
+            }
+            .shrink(4.0);
 
             let mut content_ui = ui.new_child(UiBuilder::new().max_rect(content_rect));
             match self.navbar.current_menu.as_str() {
                 "bots" => self.bot_menu.render(&mut content_ui, &self.bot_manager),
-                "item_database" => self.item_database.render(&mut content_ui, &self.bot_manager, ctx),
-                "proxy_list" => self.proxy_list.render(&mut content_ui, &self.proxy_manager, &mut self.add_proxy_dialog, ctx),
+                "item_database" => {
+                    self.item_database
+                        .render(&mut content_ui, &self.bot_manager, ctx)
+                }
+                "proxy_list" => self.proxy_list.render(
+                    &mut content_ui,
+                    &self.proxy_manager,
+                    &mut self.add_proxy_dialog,
+                    ctx,
+                ),
                 "settings" => self.settings.render(&mut content_ui, ctx),
                 _ => {}
             }
