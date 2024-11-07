@@ -1,7 +1,6 @@
 use crate::manager::bot_manager::BotManager;
 use crate::utils;
 use eframe::egui::{self, Ui};
-use egui::include_image;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
