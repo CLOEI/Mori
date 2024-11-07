@@ -13,7 +13,6 @@ use egui::{
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
-use mlua::prelude::*;
 use std::sync::{Arc, RwLock};
 use std::{
     fs::{self, File},
@@ -59,7 +58,7 @@ fn main() {
                 eframe::icon_data::from_png_bytes(&include_bytes!("../assets/logo.png")[..])
                     .expect("Failed to load icon"),
             )
-            .with_inner_size([800.0, 400.0])
+            .with_inner_size([850.0, 450.0])
             .with_decorations(false)
             .with_transparent(true),
         ..Default::default()
@@ -86,7 +85,7 @@ impl App {
         cc.egui_ctx.set_fonts(fonts);
 
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
-        let mut bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
+        let bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
         let bots = config::get_bots();
         for bot in bots.clone() {
             bot_manager.write().unwrap().add_bot(bot);
@@ -117,16 +116,16 @@ impl eframe::App for App {
         ctx.request_repaint();
 
         if self.settings.dark_mode {
-            ctx.set_visuals(egui::Visuals::dark());
+            catppuccin_egui::set_theme(ctx, catppuccin_egui::MACCHIATO);
         } else {
-            ctx.set_visuals(egui::Visuals::light());
+            catppuccin_egui::set_theme(ctx, catppuccin_egui::LATTE);
         }
 
         egui_extras::install_image_loaders(ctx);
 
         let panel_frame = egui::Frame {
             fill: ctx.style().visuals.window_fill(),
-            rounding: 5.0.into(),
+            rounding: 6.0.into(),
             outer_margin: 0.5.into(),
             ..Default::default()
         };

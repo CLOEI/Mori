@@ -1,14 +1,14 @@
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-use eframe::egui::{self, Ui};
-use egui::{include_image, Color32, UiBuilder};
-use egui::scroll_area::ScrollBarVisibility;
-use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
 use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
+use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
+use eframe::egui::{self, Ui};
+use egui::scroll_area::ScrollBarVisibility;
+use egui::{include_image, Color32, UiBuilder};
 
 #[derive(Default)]
 pub struct BotMenu {
@@ -56,38 +56,38 @@ impl BotMenu {
                 );
                 ui.separator();
                 ui.vertical(|ui| {
-                    if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/info.svg"),
+                    if ui.add_sized([30.0, 30.0], egui::Button::new(
+                        egui::RichText::new(egui_remixicon::icons::INFORMATION_FILL),
                     )).clicked() {
                         self.current_menu = "bot_info".to_string();
                     }
-                    if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/earth.svg"),
+                    if ui.add_sized([30.0, 30.0], egui::Button::new(
+                        egui::RichText::new(egui_remixicon::icons::GLOBAL_FILL)
                     )).clicked() {
                         self.current_menu = "world_map".to_string();
                     }
-                    if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/backpack.svg"),
+                    if ui.add_sized([30.0, 30.0], egui::Button::new(
+                        egui::RichText::new(egui_remixicon::icons::ARCHIVE_FILL),
                     )).clicked() {
                         self.current_menu = "inventory".to_string();
                     }
-                    if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/radar.svg"),
+                    if ui.add_sized([30.0, 30.0], egui::Button::new(
+                        egui::RichText::new(egui_remixicon::icons::RADAR_FILL),
                     )).clicked() {
                         self.current_menu = "radar".to_string();
                     }
-                    if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/blocks.svg"),
+                    if ui.add_sized([30.0, 30.0], egui::Button::new(
+                        egui::RichText::new(egui_remixicon::icons::LAYOUT_GRID_FILL),
                     )).clicked() {
                         self.current_menu = "features".to_string();
                     }
-                    if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/code.svg"),
+                    if ui.add_sized([30.0, 30.0], egui::Button::new(
+                        egui::RichText::new(egui_remixicon::icons::CODE_FILL),
                     )).clicked() {
                         self.current_menu = "scripting".to_string();
                     }
-                    if ui.add_sized([30.0, 30.0], egui::Button::image(
-                        include_image!("../../assets/square-terminal.svg"),
+                    if ui.add_sized([30.0, 30.0], egui::Button::new(
+                        egui::RichText::new(egui_remixicon::icons::TERMINAL_BOX_FILL),
                     )).clicked() {
                         self.current_menu = "terminal".to_string();
                     }
@@ -408,15 +408,15 @@ impl BotMenu {
                                             ui.horizontal(|ui| {
                                                 match data[0] {
                                                     "info" => {
-                                                        ui.label(egui::RichText::new(egui_remixicon::icons::INFORMATION_LINE).color(Color32::from_rgb(0, 123, 255)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_remixicon::icons::INFORMATION_FILL).color(Color32::from_rgb(0, 123, 255)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     "warn" => {
-                                                        ui.label(egui::RichText::new(egui_remixicon::icons::ERROR_WARNING_LINE).color(Color32::from_rgb(255, 193, 7)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_remixicon::icons::ERROR_WARNING_FILL).color(Color32::from_rgb(255, 193, 7)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     "error" => {
-                                                        ui.label(egui::RichText::new(egui_remixicon::icons::BUG_LINE).color(Color32::from_rgb(220, 53, 69)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_remixicon::icons::BUG_FILL).color(Color32::from_rgb(220, 53, 69)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     _ => {
