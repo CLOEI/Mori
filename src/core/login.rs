@@ -1,23 +1,26 @@
+use crate::core::Bot;
+use crate::utils;
+use crate::utils::error;
+use base64::engine::general_purpose;
+use base64::Engine;
+use egui::TextBuffer;
 use paris::{error, info, warn};
 use regex::Regex;
 use serde_json::Value;
-use std::{env, io, process::Command, time::Duration};
 use std::process::Stdio;
 use std::sync::Arc;
-use base64::Engine;
-use base64::engine::general_purpose;
-use egui::TextBuffer;
+use std::{env, io, process::Command, time::Duration};
 use ureq::Agent;
 use urlencoding::encode;
-use crate::utils::error;
 use wait_timeout::ChildExt;
-use crate::core::Bot;
-use crate::utils;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
-pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<(String, String), ureq::Error> {
+pub fn post_ubisoft_rememberme(
+    agent: &Agent,
+    ticket: &str,
+) -> Result<(String, String), ureq::Error> {
     let body = agent
         .post("https://public-ubiservices.ubi.com/v3/profiles/sessions")
         .set("User-Agent", USER_AGENT)
@@ -25,14 +28,15 @@ pub fn post_ubisoft_rememberme(agent: &Agent, ticket: &str) -> Result<(String, S
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Authorization", &format!("rm_v1 t={}", ticket))
         .set("Content-Type", "application/json")
-        .send_json(
-            ureq::json!({
-                "rememberMe": true,
-            }),
-        )?;
+        .send_json(ureq::json!({
+            "rememberMe": true,
+        }))?;
 
     let json: Value = body.into_json()?;
-    Ok((json["ticket"].as_str().unwrap().to_string(), json["profileId"].as_str().unwrap().to_string()))
+    Ok((
+        json["ticket"].as_str().unwrap().to_string(),
+        json["profileId"].as_str().unwrap().to_string(),
+    ))
 }
 
 pub fn post_ubisoft_2fa_ticket(
@@ -48,11 +52,9 @@ pub fn post_ubisoft_2fa_ticket(
         .set("Ubi-2faCode", &format!("{}", token))
         .set("Authorization", &format!("ubi_2fa_v1 t={}", ticket))
         .set("Content-Type", "application/json")
-        .send_json(
-            ureq::json!({
-                "rememberMe": true,
-            }),
-        )?;
+        .send_json(ureq::json!({
+            "rememberMe": true,
+        }))?;
 
     let json: Value = body.into_json()?;
     let ticket = &json["ticket"];
@@ -61,7 +63,10 @@ pub fn post_ubisoft_2fa_ticket(
         let ticket = post_ubisoft_rememberme(&agent, &remember_me_ticket)?;
         return Ok(ticket);
     }
-    Ok((ticket.as_str().unwrap().to_string(), json["profileId"].as_str().unwrap().to_string()))
+    Ok((
+        ticket.as_str().unwrap().to_string(),
+        json["profileId"].as_str().unwrap().to_string(),
+    ))
 }
 
 pub fn get_ubisoft_game_token(agent: &Agent, token: &str) -> Result<(String, String), ureq::Error> {
@@ -72,14 +77,15 @@ pub fn get_ubisoft_game_token(agent: &Agent, token: &str) -> Result<(String, Str
         .set("Ubi-AppId", "f2f8f582-6b7b-4d87-9a19-c72f07fccf99")
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Content-Type", "application/json")
-        .send_json(
-            ureq::json!({
-                "rememberMe": true,
-            }),
-        )?;
+        .send_json(ureq::json!({
+            "rememberMe": true,
+        }))?;
 
     let json: Value = body.into_json()?;
-    Ok((json["ticket"].as_str().unwrap().to_string(), json["profileId"].as_str().unwrap().to_string()))
+    Ok((
+        json["ticket"].as_str().unwrap().to_string(),
+        json["profileId"].as_str().unwrap().to_string(),
+    ))
 }
 
 pub fn get_ubisoft_session(
@@ -97,21 +103,19 @@ pub fn get_ubisoft_session(
         .set("Ubi-AppId", "afb4b43c-f1f7-41b7-bcef-a635d8c83822")
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Content-Type", "application/json")
-        .send_json(
-            ureq::json!({
-               "rememberMe": true,
-           }),
-        )?;
+        .send_json(ureq::json!({
+            "rememberMe": true,
+        }))?;
 
     let json: Value = body.into_json()?;
-    if json.get("twoFactorAuthenticationTicket").is_some()
-    {
-        let ticket = &json["twoFactorAuthenticationTicket"].as_str().unwrap().to_string();
+    if json.get("twoFactorAuthenticationTicket").is_some() {
+        let ticket = &json["twoFactorAuthenticationTicket"]
+            .as_str()
+            .unwrap()
+            .to_string();
         let token = rust_otp::make_totp(&recovery_code.to_ascii_uppercase(), 30, 0).unwrap();
         match post_ubisoft_2fa_ticket(&agent, ticket, &token.to_string()) {
-            Ok(res) => {
-                Ok(res)
-            }
+            Ok(res) => Ok(res),
             Err(err) => {
                 {
                     let mut state = bot.state.write().unwrap();
@@ -123,40 +127,69 @@ pub fn get_ubisoft_session(
             }
         }
     } else {
-        let game_token = get_ubisoft_game_token(agent, json["ticket"].as_str().unwrap().to_string().as_str())?;
+        let game_token =
+            get_ubisoft_game_token(agent, json["ticket"].as_str().unwrap().to_string().as_str())?;
         Ok(game_token)
     }
 }
 
-fn link_ubisoft_to_steam(agent: &Agent, session_ticket: &str, profile_id: &str, steam_ticket: &str) -> Result<(), ureq::Error> {
+fn link_ubisoft_to_steam(
+    agent: &Agent,
+    session_ticket: &str,
+    profile_id: &str,
+    steam_ticket: &str,
+) -> Result<(), ureq::Error> {
     agent
-        .post(format!("https://public-ubiservices.ubi.com/v2/users/{}/profiles", &profile_id).to_string().as_str())
+        .post(
+            format!(
+                "https://public-ubiservices.ubi.com/v2/users/{}/profiles",
+                &profile_id
+            )
+            .to_string()
+            .as_str(),
+        )
         .set("User-Agent", USER_AGENT)
-        .set("Authorization", &format!("steam t={}", &steam_ticket.trim()))
+        .set(
+            "Authorization",
+            &format!("steam t={}", &steam_ticket.trim()),
+        )
         .set("Ubi-AppId", "afb4b43c-f1f7-41b7-bcef-a635d8c83822")
         .set("Ubi-RequestedPlatformType", "uplay")
         .set("Content-Type", "application/json")
-        .send_json(
-            ureq::json!({
-               "otherTicket": &session_ticket,
-           }),
-        )?;
+        .send_json(ureq::json!({
+            "otherTicket": &session_ticket,
+        }))?;
 
     Ok(())
 }
 
-pub fn get_ubisoft_token(bot: &Bot, recovery_code: &str, email: &str, password: &str, steamuser: &str, steampassword: &str) -> Result<String, error::CustomError> {
+pub fn get_ubisoft_token(
+    bot: &Bot,
+    recovery_code: &str,
+    email: &str,
+    password: &str,
+    steamuser: &str,
+    steampassword: &str,
+) -> Result<String, error::CustomError> {
     let info = {
         let data = bot.info.read().unwrap().login_info.to_string();
         data.clone()
     };
     let agent = ureq::AgentBuilder::new().redirects(5).build();
-    let (session, profile_id) = match get_ubisoft_session(&agent, bot, email, password, recovery_code) {
-        Ok(res) => res,
-        Err(err) => {
-            return Err(error::CustomError::Other(format!("Failed to get ubisoft session: {}", err)));
-        }
-    };
+    let (session, profile_id) =
+        match get_ubisoft_session(&agent, bot, email, password, recovery_code) {
+            Ok(res) => res,
+            Err(err) => {
+                if err.to_string().contains("code 401") {
+                    bot.state.write().unwrap().is_running = false;
+                    bot.info.write().unwrap().status = "Unauthorized".to_string();
+                }
+                return Err(error::CustomError::Other(format!(
+                    "Failed to get ubisoft session: {}",
+                    err
+                )));
+            }
+        };
 
     let current_dir = env::current_dir().expect("Failed to get current directory");
     // TODO: Add support for linux and mac
@@ -180,7 +213,8 @@ pub fn get_ubisoft_token(bot: &Bot, recovery_code: &str, email: &str, password: 
                     let data = output_str.split("\n").collect::<Vec<&str>>();
                     let steam_token = utils::textparse::format_string_as_steam_token(&data[0]);
 
-                    let formated = encode(format!("UbiTicket|{}{}\n", &session, info).as_str()).to_string();
+                    let formated =
+                        encode(format!("UbiTicket|{}{}\n", &session, info).as_str()).to_string();
                     let body = agent
                         .post("https://login.growtopiagame.com/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726")
                         .set("user-agent", USER_AGENT)
@@ -190,26 +224,37 @@ pub fn get_ubisoft_token(bot: &Bot, recovery_code: &str, email: &str, password: 
                     let json: Value = match serde_json::from_str(&body_str) {
                         Ok(json) => json,
                         Err(err) => {
-                            return Err(error::CustomError::Other(format!("Failed to parse json: {}", err)));
+                            return Err(error::CustomError::Other(format!(
+                                "Failed to parse json: {}",
+                                err
+                            )));
                         }
                     };
 
                     if json.get("message").is_some() {
                         let message = json["message"].as_str().unwrap().to_string();
-                        if message.contains("Please try login with Steam account connected with Ubisoft Connect.") {
+                        if message.contains(
+                            "Please try login with Steam account connected with Ubisoft Connect.",
+                        ) {
                             warn!("Linking Ubisoft to Steam");
-                            return match link_ubisoft_to_steam(&agent, &session, &profile_id, &data[1]) {
+                            return match link_ubisoft_to_steam(
+                                &agent,
+                                &session,
+                                &profile_id,
+                                &data[1],
+                            ) {
                                 Ok(_token) => {
                                     info!("Successfully linked Ubisoft to Steam");
                                     Ok("".to_string())
                                 }
-                                Err(err) => {
-                                    Err(error::CustomError::Other(format!("Failed to link Ubisoft to Steam: {}", err)))
-                                }
-                            }
+                                Err(err) => Err(error::CustomError::Other(format!(
+                                    "Failed to link Ubisoft to Steam: {}",
+                                    err
+                                ))),
+                            };
                         }
                     }
-                    return Ok(json["token"].to_string())
+                    return Ok(json["token"].to_string());
                 }
             }
             None => {
