@@ -192,8 +192,11 @@ pub fn get_ubisoft_token(
         };
 
     let current_dir = env::current_dir().expect("Failed to get current directory");
-    // TODO: Add support for linux and mac
-    let executable_path = current_dir.join("steamtoken.exe");
+    let executable_path = if cfg!(windows) {
+        current_dir.join("steamtoken.exe")
+    } else {
+        current_dir.join("steamtoken")
+    };
     let timeout = Duration::from_secs(10);
 
     loop {
