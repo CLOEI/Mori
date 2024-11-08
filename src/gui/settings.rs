@@ -1,6 +1,5 @@
-use crate::utils::config;
+use crate::utils::{captcha::CaptchaProvider, config};
 use eframe::egui::{self, Ui};
-use egui::include_image;
 
 #[derive(Default)]
 pub struct Settings {
@@ -9,6 +8,8 @@ pub struct Settings {
     pub dark_mode: bool,
     pub timeout_delay: u32,
     pub findpath_delay: u32,
+    pub captcha_provider: CaptchaProvider,
+    pub captcha_api_key: String,
 }
 
 impl Settings {
@@ -63,6 +64,35 @@ impl Settings {
                     {
                         config::set_findpath_delay(self.findpath_delay);
                     }
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        ui.label("Captcha provider:");
+                        if ui
+                            .selectable_value(
+                                &mut self.captcha_provider,
+                                CaptchaProvider::TwoCaptcha,
+                                "2Captcha",
+                            )
+                            .changed()
+                        {
+                            config::set_captcha_provider(self.captcha_provider.clone());
+                        };
+                        if ui
+                            .selectable_value(
+                                &mut self.captcha_provider,
+                                CaptchaProvider::CapSolver,
+                                "CapSolver",
+                            )
+                            .changed()
+                        {
+                            config::set_captcha_provider(self.captcha_provider.clone());
+                        };
+                    });
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        ui.label("Captcha API key:");
+                        ui.text_edit_singleline(&mut self.captcha_api_key);
+                    });
                 });
                 ui.vertical(|ui| {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {

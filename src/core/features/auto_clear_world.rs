@@ -1,7 +1,7 @@
+use crate::core::Bot;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use crate::core::{Bot};
 
 static CAVE_BACKGROUND: u16 = 14;
 static BEDROCK: u16 = 8;
@@ -20,7 +20,9 @@ pub fn start(bot: &Arc<Bot>) {
         while bot.is_inworld() {
             let (foreground_id, background_id) = {
                 let world = bot.world.read().unwrap();
-                let tile = world.get_tile((position.x / 32.0) as u32, (position.y / 32.0 + 2.0) as u32).unwrap();
+                let tile = world
+                    .get_tile((position.x / 32.0) as u32, (position.y / 32.0 + 2.0) as u32)
+                    .unwrap();
                 (tile.foreground_item_id, tile.background_item_id)
             };
 

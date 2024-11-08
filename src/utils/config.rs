@@ -6,6 +6,8 @@ use std::{
 use crate::types::config::{BotConfig, Config};
 use crate::utils;
 
+use super::captcha::CaptchaProvider;
+
 pub fn parse_config() -> Result<Config, ()> {
     if fs::metadata("config.json").is_ok() {
         let mut f = File::open("config.json").unwrap();
@@ -176,4 +178,30 @@ pub fn set_auto_collect(auto_collect: bool) {
 pub fn get_auto_collect() -> bool {
     let config = parse_config().unwrap();
     config.auto_collect
+}
+
+pub fn get_captcha_provider() -> CaptchaProvider {
+    let config = parse_config().unwrap();
+    config.captcha.provider
+}
+
+pub fn get_captcha_api_key() -> String {
+    let config = parse_config().unwrap();
+    config.captcha.api_key
+}
+
+pub fn set_captcha_provider(provider: CaptchaProvider) {
+    let mut config = parse_config().unwrap();
+    config.captcha.provider = provider;
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
+}
+
+pub fn set_captcha_api_key(api_key: String) {
+    let mut config = parse_config().unwrap();
+    config.captcha.api_key = api_key;
+    let j = serde_json::to_string_pretty(&config).unwrap();
+    let mut file = File::create("config.json").unwrap();
+    file.write_all(j.as_bytes()).unwrap();
 }

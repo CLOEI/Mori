@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 pub mod capsolver;
 pub mod twocaptcha;
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Clone)]
 pub enum CaptchaProvider {
     #[default]
     CapSolver,

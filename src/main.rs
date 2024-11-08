@@ -104,6 +104,8 @@ impl App {
                 findpath_delay: config::get_findpath_delay(),
                 auto_collect: config::get_auto_collect(),
                 dark_mode: config::get_dark_mode(),
+                captcha_provider: config::get_captcha_provider(),
+                captcha_api_key: config::get_captcha_api_key(),
             },
             proxy_manager,
             bot_manager,
