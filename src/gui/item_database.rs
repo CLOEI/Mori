@@ -1,6 +1,6 @@
-use std::sync::{Arc, RwLock};
 use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
+use std::sync::{Arc, RwLock};
 
 #[derive(Default)]
 pub struct ItemDatabase {
@@ -28,9 +28,20 @@ impl ItemDatabase {
         ui.separator();
 
         let mut filtered_items: Vec<u32> = {
-            manager.read().unwrap().items_database.read().unwrap().items.iter()
+            manager
+                .read()
+                .unwrap()
+                .items_database
+                .read()
+                .unwrap()
+                .items
+                .iter()
                 .filter_map(|(&id, item)| {
-                    if item.name.to_lowercase().contains(&self.search_query.to_lowercase()) {
+                    if item
+                        .name
+                        .to_lowercase()
+                        .contains(&self.search_query.to_lowercase())
+                    {
                         Some(id)
                     } else {
                         None
@@ -47,38 +58,33 @@ impl ItemDatabase {
 
             egui::ScrollArea::vertical()
                 .id_source("item_list_scroll_area")
-                .show_rows(
-                    ui,
-                    row_height,
-                    filtered_items.len(),
-                    |ui, row_range| {
-                        ui.vertical(|ui| {
-                            egui::Grid::new("item_database_grid")
-                                .min_col_width(300.0)
-                                .max_col_width(300.0)
-                                .show(ui, |ui| {
-                                    for i in row_range {
-                                        let item_id = filtered_items[i];
-                                        let item = {
-                                            let manager = manager.read().unwrap();
-                                            let items_database = manager.items_database.read().unwrap();
-                                            items_database.get_item(&item_id).unwrap()
-                                        };
-                                        if ui
-                                            .selectable_label(
-                                                self.selected_item_index == Some(item_id),
-                                                &item.name,
-                                            )
-                                            .clicked()
-                                        {
-                                            self.selected_item_index = Some(item_id);
-                                        }
-                                        ui.end_row();
+                .show_rows(ui, row_height, filtered_items.len(), |ui, row_range| {
+                    ui.vertical(|ui| {
+                        egui::Grid::new("item_database_grid")
+                            .min_col_width(300.0)
+                            .max_col_width(300.0)
+                            .show(ui, |ui| {
+                                for i in row_range {
+                                    let item_id = filtered_items[i];
+                                    let item = {
+                                        let manager = manager.read().unwrap();
+                                        let items_database = manager.items_database.read().unwrap();
+                                        items_database.get_item(&item_id).unwrap()
+                                    };
+                                    if ui
+                                        .selectable_label(
+                                            self.selected_item_index == Some(item_id),
+                                            &item.name,
+                                        )
+                                        .clicked()
+                                    {
+                                        self.selected_item_index = Some(item_id);
                                     }
-                                });
-                        })
-                    },
-                );
+                                    ui.end_row();
+                                }
+                            });
+                    })
+                });
 
             ui.separator();
 
@@ -108,13 +114,19 @@ impl ItemDatabase {
                                 ui.label(format!("Material: {}", selected_item.material));
                             }
                             if !selected_item.texture_file_name.is_empty() {
-                                ui.label(format!("Texture File: {}", selected_item.texture_file_name));
+                                ui.label(format!(
+                                    "Texture File: {}",
+                                    selected_item.texture_file_name
+                                ));
                             }
                             if selected_item.texture_hash != 0 {
                                 ui.label(format!("Texture Hash: {}", selected_item.texture_hash));
                             }
                             if selected_item.cooking_ingredient != 0 {
-                                ui.label(format!("Cooking Ingredient: {}", selected_item.cooking_ingredient));
+                                ui.label(format!(
+                                    "Cooking Ingredient: {}",
+                                    selected_item.cooking_ingredient
+                                ));
                             }
                             if selected_item.visual_effect != 0 {
                                 ui.label(format!("Visual Effect: {}", selected_item.visual_effect));
@@ -129,10 +141,16 @@ impl ItemDatabase {
                                 ui.label(format!("Render Type: {}", selected_item.render_type));
                             }
                             if selected_item.is_stripey_wallpaper != 0 {
-                                ui.label(format!("Stripey Wallpaper: {}", selected_item.is_stripey_wallpaper));
+                                ui.label(format!(
+                                    "Stripey Wallpaper: {}",
+                                    selected_item.is_stripey_wallpaper
+                                ));
                             }
                             if selected_item.collision_type != 0 {
-                                ui.label(format!("Collision Type: {}", selected_item.collision_type));
+                                ui.label(format!(
+                                    "Collision Type: {}",
+                                    selected_item.collision_type
+                                ));
                             }
                             if selected_item.block_health != 0 {
                                 ui.label(format!("Block Health: {}", selected_item.block_health));
@@ -171,16 +189,28 @@ impl ItemDatabase {
                                 ui.label(format!("Pet Ability: {}", selected_item.pet_ability));
                             }
                             if selected_item.seed_base_sprite != 0 {
-                                ui.label(format!("Seed Base Sprite: {}", selected_item.seed_base_sprite));
+                                ui.label(format!(
+                                    "Seed Base Sprite: {}",
+                                    selected_item.seed_base_sprite
+                                ));
                             }
                             if selected_item.seed_overlay_sprite != 0 {
-                                ui.label(format!("Seed Overlay Sprite: {}", selected_item.seed_overlay_sprite));
+                                ui.label(format!(
+                                    "Seed Overlay Sprite: {}",
+                                    selected_item.seed_overlay_sprite
+                                ));
                             }
                             if selected_item.tree_base_sprite != 0 {
-                                ui.label(format!("Tree Base Sprite: {}", selected_item.tree_base_sprite));
+                                ui.label(format!(
+                                    "Tree Base Sprite: {}",
+                                    selected_item.tree_base_sprite
+                                ));
                             }
                             if selected_item.tree_overlay_sprite != 0 {
-                                ui.label(format!("Tree Overlay Sprite: {}", selected_item.tree_overlay_sprite));
+                                ui.label(format!(
+                                    "Tree Overlay Sprite: {}",
+                                    selected_item.tree_overlay_sprite
+                                ));
                             }
                             if selected_item.base_color != 0 {
                                 ui.label(format!("Base Color: {}", selected_item.base_color));
@@ -201,10 +231,16 @@ impl ItemDatabase {
                                 ui.label(format!("Extra Options: {}", selected_item.extra_options));
                             }
                             if !selected_item.texture_path_2.is_empty() {
-                                ui.label(format!("Texture Path 2: {}", selected_item.texture_path_2));
+                                ui.label(format!(
+                                    "Texture Path 2: {}",
+                                    selected_item.texture_path_2
+                                ));
                             }
                             if !selected_item.extra_option2.is_empty() {
-                                ui.label(format!("Extra Option 2: {}", selected_item.extra_option2));
+                                ui.label(format!(
+                                    "Extra Option 2: {}",
+                                    selected_item.extra_option2
+                                ));
                             }
                             if !selected_item.punch_option.is_empty() {
                                 ui.label(format!("Punch Option: {}", selected_item.punch_option));
@@ -217,4 +253,3 @@ impl ItemDatabase {
         });
     }
 }
-

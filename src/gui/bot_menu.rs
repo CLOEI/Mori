@@ -31,6 +31,14 @@ impl BotMenu {
             UiBuilder::new()
                 .layout(egui::Layout::left_to_right(egui::Align::Min)),
             |ui| {
+                let bot = {
+                    let manager = manager.read().unwrap();
+
+                    match manager.get_bot(&self.selected_bot) {
+                        Some(bot) => Some(bot.clone()),
+                        None => None,
+                    }
+                };
                 ui.allocate_ui(
                     egui::vec2(ui.available_width() * 0.18, ui.available_height()),
                     |ui| {
@@ -55,63 +63,57 @@ impl BotMenu {
                     },
                 );
                 ui.separator();
-                ui.vertical(|ui| {
-                    if ui.add_sized([30.0, 30.0], egui::Button::new(
-                        egui::RichText::new(egui_remixicon::icons::INFORMATION_FILL),
-                    )).clicked() {
-                        self.current_menu = "bot_info".to_string();
-                    }
-                    if ui.add_sized([30.0, 30.0], egui::Button::new(
-                        egui::RichText::new(egui_remixicon::icons::GLOBAL_FILL)
-                    )).clicked() {
-                        self.current_menu = "world_map".to_string();
-                    }
-                    if ui.add_sized([30.0, 30.0], egui::Button::new(
-                        egui::RichText::new(egui_remixicon::icons::ARCHIVE_FILL),
-                    )).clicked() {
-                        self.current_menu = "inventory".to_string();
-                    }
-                    if ui.add_sized([30.0, 30.0], egui::Button::new(
-                        egui::RichText::new(egui_remixicon::icons::RADAR_FILL),
-                    )).clicked() {
-                        self.current_menu = "radar".to_string();
-                    }
-                    if ui.add_sized([30.0, 30.0], egui::Button::new(
-                        egui::RichText::new(egui_remixicon::icons::LAYOUT_GRID_FILL),
-                    )).clicked() {
-                        self.current_menu = "features".to_string();
-                    }
-                    if ui.add_sized([30.0, 30.0], egui::Button::new(
-                        egui::RichText::new(egui_remixicon::icons::CODE_FILL),
-                    )).clicked() {
-                        self.current_menu = "scripting".to_string();
-                    }
-                    if ui.add_sized([30.0, 30.0], egui::Button::new(
-                        egui::RichText::new(egui_remixicon::icons::TERMINAL_BOX_FILL),
-                    )).clicked() {
-                        self.current_menu = "terminal".to_string();
-                    }
-                });
+                if let Some(_) = bot {
+                    ui.vertical(|ui| {
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::INFORMATION_FILL),
+                        )).clicked() {
+                            self.current_menu = "bot_info".to_string();
+                        }
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::GLOBAL_FILL)
+                        )).clicked() {
+                            self.current_menu = "world_map".to_string();
+                        }
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::ARCHIVE_FILL),
+                        )).clicked() {
+                            self.current_menu = "inventory".to_string();
+                        }
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::RADAR_FILL),
+                        )).clicked() {
+                            self.current_menu = "radar".to_string();
+                        }
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::LAYOUT_GRID_FILL),
+                        )).clicked() {
+                            self.current_menu = "features".to_string();
+                        }
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::CODE_FILL),
+                        )).clicked() {
+                            self.current_menu = "scripting".to_string();
+                        }
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::TERMINAL_BOX_FILL),
+                        )).clicked() {
+                            self.current_menu = "terminal".to_string();
+                        }
+                    });
+                }
                 if self.current_menu.is_empty() || self.current_menu == "bot_info" {
-                    ui.allocate_ui(egui::vec2(ui.available_width() / 2.0, ui.available_height()), |ui| {
-                        ui.vertical(|ui| {
-                            ui.group(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label("Bot info");
-                                    ui.separator();
-                                    egui::Grid::new("bot_info")
-                                        .min_col_width(120.0)
-                                        .max_col_width(120.0)
-                                        .show(ui, |ui| {
-                                            let bot = {
-                                                let manager = manager.read().unwrap();
-
-                                                match manager.get_bot(&self.selected_bot) {
-                                                    Some(bot) => Some(bot.clone()),
-                                                    None => None,
-                                                }
-                                            };
-                                            if let Some(bot) = bot {
+                    if let Some(bot) = bot {
+                        ui.allocate_ui(egui::vec2(ui.available_width() / 2.0, ui.available_height()), |ui| {
+                            ui.vertical(|ui| {
+                                ui.group(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label("Bot info");
+                                        ui.separator();
+                                        egui::Grid::new("bot_info")
+                                            .min_col_width(120.0)
+                                            .max_col_width(120.0)
+                                            .show(ui, |ui| {
                                                 let (username, status, ping, world_name, timeout) = {
                                                     let info = bot.info.read().unwrap();
                                                     let world = bot.world.read().unwrap();
@@ -138,84 +140,54 @@ impl BotMenu {
                                                 ui.label("Timeout");
                                                 ui.label(timeout.to_string());
                                                 ui.end_row();
-                                            } else {
-                                                ui.label("GrowID");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                                ui.label("Status");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                                ui.label("Ping");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                                ui.label("World");
-                                                ui.label("EXIT");
-                                                ui.end_row();
-                                                ui.label("Timeout");
-                                                ui.label("0");
-                                                ui.end_row();
-                                                // ui.add_enabled(false, egui::Button::new("Relog"));
-                                            }
-                                        });
+                                                
+                                            });
+                                    });
                                 });
-                            });
-                            ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
-                            ui.group(|ui| {
-                                ui.label("Warp");
-                                ui.separator();
-                                ui.horizontal(|ui| {
-                                    ui.label("World name");
-                                    ui.add_sized(
-                                        ui.available_size(),
-                                        egui::TextEdit::singleline(&mut self.warp_name),
-                                    );
-                                });
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                                    // if ui.button("Relog").clicked() {
-                                    //     if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
-                                    //         let bot_clone = bot.clone();
-                                    //         thread::spawn(move || {
-                                    //             bot_clone.relog();
-                                    //         });
-                                    //     }
-                                    // }
-                                    if ui.button("Leave").clicked() {
-                                        if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
+                                ui.group(|ui| {
+                                    ui.label("Warp");
+                                    ui.separator();
+                                    ui.horizontal(|ui| {
+                                        ui.label("World name");
+                                        ui.add_sized(
+                                            ui.available_size(),
+                                            egui::TextEdit::singleline(&mut self.warp_name),
+                                        );
+                                    });
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                                        // if ui.button("Relog").clicked() {
+                                        //     if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                        //         let bot_clone = bot.clone();
+                                        //         thread::spawn(move || {
+                                        //             bot_clone.relog();
+                                        //         });
+                                        //     }
+                                        // }
+                                        if ui.button("Leave").clicked() {
                                             let bot_clone = bot.clone();
                                             thread::spawn(move || {
                                                 bot_clone.leave();
                                             });
                                         }
-                                    }
-                                    if ui.button("Warp").clicked() {
-                                        if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                        if ui.button("Warp").clicked() {
                                             let bot_clone = bot.clone();
                                             let world_name = self.warp_name.clone();
                                             thread::spawn(move || {
                                                 bot_clone.warp(world_name);
                                             });
                                         }
-                                    }
+                                    });
                                 });
-                            });
-                            ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
-                            ui.group(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label("Server");
-                                    ui.separator();
-                                    egui::Grid::new("bot_server")
-                                        .min_col_width(120.0)
-                                        .max_col_width(120.0)
-                                        .show(ui, |ui| {
-                                            let bot = {
-                                                let manager = manager.read().unwrap();
-
-                                                match manager.get_bot(&self.selected_bot) {
-                                                    Some(bot) => Some(bot.clone()),
-                                                    None => None,
-                                                }
-                                            };
-                                            if let Some(bot) = bot {
+                                ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
+                                ui.group(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.label("Server");
+                                        ui.separator();
+                                        egui::Grid::new("bot_server")
+                                            .min_col_width(120.0)
+                                            .max_col_width(120.0)
+                                            .show(ui, |ui| {
                                                 let (ip, port) = {
                                                     let server = bot.server.read().unwrap();
                                                     (server.ip.clone(), server.port.clone().to_string())
@@ -226,38 +198,21 @@ impl BotMenu {
                                                 ui.label("Port");
                                                 ui.label(port);
                                                 ui.end_row();
-                                            } else {
-                                                ui.label("IP");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                                ui.label("Port");
-                                                ui.label("EMPTY");
-                                                ui.end_row();
-                                            }
-                                        });
+                                            });
+                                    });
+                                    ui.add_space(ui.available_height());
                                 });
-                                ui.add_space(ui.available_height());
                             });
                         });
-                    });
-                    ui.vertical(|ui| {
-                        ui.group(|ui| {
-                            ui.vertical(|ui| {
-                                ui.label("Login info");
-                                ui.separator();
-                                egui::Grid::new("login_info")
-                                    .min_col_width(120.0)
-                                    .max_col_width(120.0)
-                                    .show(ui, |ui| {
-                                        let bot = {
-                                            let manager = manager.read().unwrap();
-
-                                            match manager.get_bot(&self.selected_bot) {
-                                                Some(bot) => Some(bot.clone()),
-                                                None => None,
-                                            }
-                                        };
-                                        if let Some(bot) = bot {
+                        ui.vertical(|ui| {
+                            ui.group(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label("Login info");
+                                    ui.separator();
+                                    egui::Grid::new("login_info")
+                                        .min_col_width(120.0)
+                                        .max_col_width(120.0)
+                                        .show(ui, |ui| {
                                             let (payload, code, method) = {
                                                 let info = bot.info.read().unwrap();
                                                 (
@@ -278,41 +233,18 @@ impl BotMenu {
                                             ui.label("Login Method");
                                             ui.label(format!("{:?}", method));
                                             ui.end_row();
-                                        } else {
-                                            ui.label("Username");
-                                            ui.add(egui::Label::new("EMPTY").truncate());
-                                            ui.end_row();
-                                            ui.label("Password");
-                                            ui.label("EMPTY");
-                                            ui.end_row();
-                                            ui.label("2FA Code");
-                                            ui.label("EMPTY");
-                                            ui.end_row();
-                                            ui.label("Login Method");
-                                            ui.label("EMPTY");
-                                            ui.end_row();
-                                        };
-                                    });
+                                        });
+                                });
                             });
-                        });
-                        ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
-                        ui.group(|ui| {
-                            ui.vertical(|ui| {
-                                ui.label("State");
-                                ui.separator();
-                                egui::Grid::new("bot_state")
-                                    .min_col_width(120.0)
-                                    .max_col_width(120.0)
-                                    .show(ui, |ui| {
-                                        let bot = {
-                                            let manager = manager.read().unwrap();
-
-                                            match manager.get_bot(&self.selected_bot) {
-                                                Some(bot) => Some(bot.clone()),
-                                                None => None,
-                                            }
-                                        };
-                                        if let Some(bot) = bot {
+                            ui.allocate_space(egui::vec2(ui.available_width(), 5.0));
+                            ui.group(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label("State");
+                                    ui.separator();
+                                    egui::Grid::new("bot_state")
+                                        .min_col_width(120.0)
+                                        .max_col_width(120.0)
+                                        .show(ui, |ui| {
                                             let net_id = bot.state.read().unwrap().net_id.clone();
                                             let token = bot.info.read().unwrap().token.clone();
                                             let is_banned = bot.state.read().unwrap().is_banned.clone();
@@ -339,29 +271,21 @@ impl BotMenu {
                                                 ui.label((position.y / 32.0).floor().to_string());
                                             });
                                             ui.end_row();
-                                        } else {
-                                            ui.label("NetID");
-                                            ui.label("EMPTY");
-                                            ui.end_row();
-                                            ui.label("Token");
-                                            ui.add(egui::Label::new("EMPTY").truncate());
-                                            ui.end_row();
-                                            ui.label("Is Banned");
-                                            ui.label("False");
-                                            ui.end_row();
-                                            ui.label("Position");
-                                            ui.horizontal(|ui| {
-                                                ui.label("0");
-                                                ui.separator();
-                                                ui.label("0");
-                                            });
-                                            ui.end_row();
-                                        }
-                                    });
+                                        });
+                                });
+                                ui.add_space(ui.available_height());
                             });
-                            ui.add_space(ui.available_height());
                         });
-                    });
+                    } else {
+                        ui.with_layout(egui::Layout::top_down_justified(egui::Align::Center), |ui| {
+                            ui.add_space(ui.available_height() / 2.0 - 25.0);
+                            ui.vertical_centered(|ui| {
+                                ui.add(egui::Label::new(egui::RichText::new(egui_remixicon::icons::ROBOT_2_FILL).size(50.0)));
+                                ui.label("Select a bot to view info");
+                            });
+                            ui.add_space(ui.available_height() / 2.0 - 25.0);
+                        });
+                    }
                 } else if self.current_menu == "world_map" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.world_map.render(ui, &manager);
