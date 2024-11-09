@@ -8,7 +8,7 @@ use crate::gui::world_map::WorldMap;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Ui};
 use egui::scroll_area::ScrollBarVisibility;
-use egui::{include_image, Color32, UiBuilder};
+use egui::{Color32, UiBuilder};
 
 #[derive(Default)]
 pub struct BotMenu {

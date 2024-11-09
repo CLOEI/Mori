@@ -1,5 +1,4 @@
-use std::sync::{Arc, RwLock};
-use std::thread;
+use crate::core::features;
 use crate::{
     core::{self},
     manager::bot_manager::BotManager,
@@ -9,7 +8,8 @@ use crate::{
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use gtworld_r::TileType;
 use paris::info;
-use crate::core::features;
+use std::sync::{Arc, RwLock};
+use std::thread;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -39,7 +39,7 @@ impl WorldMap {
                 let min = Pos2::new(p.x, p.y);
                 let max = Pos2::new(p.x + size.x, p.y + size.y);
                 let rect = Rect::from_min_max(min, max);
-                draw_list.rect_filled(rect, 0.0, Color32::from_rgb(27, 27, 27));
+                draw_list.rect_filled(rect, 0.0, Color32::from_rgb(96, 215, 242));
 
                 let world = bot.world.read().unwrap();
                 let cell_width = size.x / world.width as f32;
@@ -79,8 +79,10 @@ impl WorldMap {
                                 let g = ((color >> 16) & 0xFF) as u8;
                                 let b = ((color >> 8) & 0xFF) as u8;
                                 draw_list.rect_filled(
-                                    Rect::from_min_max(Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
-                                                       Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0)),
+                                    Rect::from_min_max(
+                                        Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
+                                        Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
+                                    ),
                                     0.0,
                                     Color32::from_rgb(b, g, r),
                                 );
@@ -96,21 +98,24 @@ impl WorldMap {
                             let b = ((color >> 8) & 0xFF) as u8;
                             if item.name == "Bedrock" {
                                 draw_list.rect_filled(
-                                    Rect::from_min_max(Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
-                                                       Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0)),
+                                    Rect::from_min_max(
+                                        Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
+                                        Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
+                                    ),
                                     0.0,
                                     Color32::from_rgb(105, 105, 105),
                                 );
                             } else {
                                 draw_list.rect_filled(
-                                    Rect::from_min_max(Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
-                                                       Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0)),
+                                    Rect::from_min_max(
+                                        Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
+                                        Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
+                                    ),
                                     0.0,
                                     Color32::from_rgb(b, g, r),
                                 );
                             }
                         }
-
 
                         for player in bot.players.read().unwrap().clone() {
                             if (player.position.x / 32.0).floor() == (x as f32)
@@ -137,7 +142,12 @@ impl WorldMap {
 
                         if ui.rect_contains_pointer(Rect::from_min_max(cell_min, cell_max)) {
                             let mut data;
-                            if let TileType::Seed { ready_to_harvest, timer, .. } = &tile.tile_type {
+                            if let TileType::Seed {
+                                ready_to_harvest,
+                                timer,
+                                ..
+                            } = &tile.tile_type
+                            {
                                 let elapsed = timer.elapsed().as_secs();
                                 let ready_to_harvest = if *ready_to_harvest {
                                     "Yes"
@@ -164,10 +174,7 @@ impl WorldMap {
                                 ui.layer_id(),
                                 egui::Id::new("tile_info"),
                                 |ui| {
-                                    ui.label(
-                                        egui::RichText::new(data)
-                                            .monospace(),
-                                    );
+                                    ui.label(egui::RichText::new(data).monospace());
                                 },
                             );
 
@@ -182,63 +189,64 @@ impl WorldMap {
                     }
                 }
 
-                egui::Window::new("Movement")
-                    .show(ui.ctx(), |ui| {
-                        ui.horizontal(|ui| {
-                            if ui.button("Up").clicked() {
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || {
-                                    bot_clone.walk(0, -1, false);
-                                });
-                            }
-                            if ui.button("Down").clicked() {
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || {
-                                    bot_clone.walk(0, 1, false);
-                                });
-                            }
-                            if ui.button("Left").clicked() {
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || {
-                                    bot_clone.walk(-1, 0, false);
-                                });
-                            }
-                            if ui.button("Right").clicked() {
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || {
-                                    bot_clone.walk(1, 0, false);
-                                });
-                            }
-                            if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || {
-                                    // features::auto_tutorial::lock_the_world(&bot_clone);
-                                });
-                            }
-                            if ui.button("Dev button").clicked() { // this button used only for dev purpose, change it to your needs
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || {
-                                    loop {
-                                        bot_clone.punch(0, 1);
-                                        thread::sleep(std::time::Duration::from_millis(350));
-                                    }
-                                });
-                            }
-                        });
+                egui::Window::new("Movement").show(ui.ctx(), |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Up").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot_clone.walk(0, -1, false);
+                            });
+                        }
+                        if ui.button("Down").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot_clone.walk(0, 1, false);
+                            });
+                        }
+                        if ui.button("Left").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot_clone.walk(-1, 0, false);
+                            });
+                        }
+                        if ui.button("Right").clicked() {
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                bot_clone.walk(1, 0, false);
+                            });
+                        }
+                        if ui.button("Dev button").clicked() {
+                            // this button used only for dev purpose, change it to your needs
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || {
+                                // features::auto_tutorial::lock_the_world(&bot_clone);
+                            });
+                        }
+                        if ui.button("Dev button").clicked() {
+                            // this button used only for dev purpose, change it to your needs
+                            let bot_clone = bot.clone();
+                            thread::spawn(move || loop {
+                                bot_clone.punch(0, 1);
+                                thread::sleep(std::time::Duration::from_millis(350));
+                            });
+                        }
                     });
+                });
 
-                egui::Window::new("FTUE")
-                    .show(ui.ctx(), |ui| {
-                        ui.vertical(|ui| {
-                            let ftue = {
-                                let ftue = bot.ftue.read().unwrap();
-                                ftue.clone()
-                            };
+                egui::Window::new("FTUE").show(ui.ctx(), |ui| {
+                    ui.vertical(|ui| {
+                        let ftue = {
+                            let ftue = bot.ftue.read().unwrap();
+                            ftue.clone()
+                        };
 
-                            ui.label(format!("FTUE: {}", ftue.info));
-                            ui.label(format!("Current progress: {}/{}", ftue.current_progress, ftue.total_progress));
-                        });
+                        ui.label(format!("FTUE: {}", ftue.info));
+                        ui.label(format!(
+                            "Current progress: {}/{}",
+                            ftue.current_progress, ftue.total_progress
+                        ));
                     });
+                });
             }
         }
     }

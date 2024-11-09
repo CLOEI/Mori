@@ -8,7 +8,7 @@ pub struct TankPacket {
     pub unk2: u8,
     pub unk3: u8,
     pub net_id: u32,
-    pub unk4: u32,
+    pub sec_id: u32,
     pub flags: u32,
     pub unk6: f32,
     pub value: u32,

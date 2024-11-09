@@ -1,18 +1,17 @@
-use std::{fs, sync::Arc};
-use std::fs::File;
-use std::io::{Cursor, Read, Write};
-use std::time::Instant;
-use flate2::read::{GzDecoder, ZlibDecoder};
-use gtworld_r::TileType;
-use regex::Regex;
+use super::{inventory::InventoryItem, Bot};
 use crate::{
-    core::{self, variant_handler},
+    core::variant_handler,
     types::{
         epacket_type::EPacketType, etank_packet_type::ETankPacketType, tank_packet::TankPacket,
     },
     utils,
 };
-use super::{inventory::InventoryItem, Bot};
+use flate2::read::ZlibDecoder;
+use gtworld_r::TileType;
+use regex::Regex;
+use std::io::{Cursor, Read};
+use std::time::Instant;
+use std::{fs, sync::Arc};
 
 pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
@@ -118,8 +117,7 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             vector_y: 64.0,
                             vector_x2: 1000.0,
                             vector_y2: 250.0,
-                            value: tank_packet.value,
-                            unk4: utils::proton::hash_string(&tank_packet.value.to_string()),
+                            value: tank_packet.value + 5000,
                             ..Default::default()
                         };
 
@@ -151,7 +149,9 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             let mut remove_item = None;
                             {
                                 let mut inventory = bot.inventory.write().unwrap();
-                                if let Some(item) = inventory.items.get_mut(&(tank_packet.value as u16)) {
+                                if let Some(item) =
+                                    inventory.items.get_mut(&(tank_packet.value as u16))
+                                {
                                     item.amount -= 1;
                                     if item.amount == 0 || item.amount > 200 {
                                         remove_item = Some(tank_packet.value as u16);
@@ -166,7 +166,9 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
 
                         {
                             let mut world = bot.world.write().unwrap();
-                            if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+                            if let Some(tile) = world
+                                .get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32)
+                            {
                                 if tank_packet.value == 18 {
                                     if tile.foreground_item_id != 0 {
                                         tile.foreground_item_id = 0;
@@ -174,12 +176,26 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                         tile.background_item_id = 0;
                                     }
                                 } else {
-                                    if let Some(item) = bot.item_database.read().unwrap().items.get(&tank_packet.value) {
-                                        if item.action_type == 22 || item.action_type == 28 || item.action_type == 18 {
+                                    if let Some(item) = bot
+                                        .item_database
+                                        .read()
+                                        .unwrap()
+                                        .items
+                                        .get(&tank_packet.value)
+                                    {
+                                        if item.action_type == 22
+                                            || item.action_type == 28
+                                            || item.action_type == 18
+                                        {
                                             tile.background_item_id = tank_packet.value as u16;
                                         } else {
                                             tile.foreground_item_id = tank_packet.value as u16;
-                                            let item = bot.item_database.read().unwrap().get_item(&tank_packet.value).unwrap();
+                                            let item = bot
+                                                .item_database
+                                                .read()
+                                                .unwrap()
+                                                .get_item(&tank_packet.value)
+                                                .unwrap();
                                             if item.name.contains("Seed") {
                                                 tile.tile_type = TileType::Seed {
                                                     ready_to_harvest: false,
@@ -258,7 +274,9 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     }
                     ETankPacketType::NetGamePacketSendTileTreeState => {
                         let mut world = bot.world.write().unwrap();
-                        let tile = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32).unwrap();
+                        let tile = world
+                            .get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32)
+                            .unwrap();
                         tile.foreground_item_id = 0;
                         tile.tile_type = TileType::Basic;
                     }
@@ -271,11 +289,17 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     ETankPacketType::NetGamePacketSendTileUpdateData => {
                         let tile = {
                             let mut world = bot.world.write().unwrap();
-                            world.get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32).unwrap().clone()
+                            world
+                                .get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32)
+                                .unwrap()
+                                .clone()
                         };
                         let data = &data[56..];
                         let mut cursor = Cursor::new(data);
-                        bot.world.write().unwrap().update_tile(tile, &mut cursor, true);
+                        bot.world
+                            .write()
+                            .unwrap()
+                            .update_tile(tile, &mut cursor, true);
                     }
                     ETankPacketType::NetGamePacketSendItemDatabaseData => {
                         let data = &data[56..];
