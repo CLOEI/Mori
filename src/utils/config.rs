@@ -3,7 +3,7 @@ use std::{
     io::{Read, Write},
 };
 
-use crate::types::config::{BotConfig, Config};
+use crate::types::config::{BotConfig, Config, Theme};
 use crate::utils;
 
 use super::captcha::CaptchaProvider;
@@ -154,17 +154,17 @@ pub fn get_bot_use_proxy(username: String) -> bool {
     false
 }
 
-pub fn set_dark_mode(dark_mode: bool) {
+pub fn set_theme(theme: Theme) {
     let mut config = parse_config().unwrap();
-    config.dark_mode = dark_mode;
+    config.theme = theme;
     let j = serde_json::to_string_pretty(&config).unwrap();
     let mut file = File::create("config.json").unwrap();
     file.write_all(j.as_bytes()).unwrap();
 }
 
-pub fn get_dark_mode() -> bool {
+pub fn get_theme() -> Theme {
     let config = parse_config().unwrap();
-    config.dark_mode
+    config.theme
 }
 
 pub fn set_auto_collect(auto_collect: bool) {

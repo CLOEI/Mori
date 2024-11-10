@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use crate::utils;
 use super::elogin_method::ELoginMethod;
+use crate::utils;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -12,8 +12,24 @@ pub struct Config {
     pub selected_bot: String,
     pub game_version: String,
     pub use_alternate_server: bool,
-    pub dark_mode: bool,
+    pub theme: Theme,
     pub captcha: Captcha,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub enum Theme {
+    Dark,
+    Light,
+    Macchiato,
+    Latte,
+    Frappe,
+    Mocha,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Theme::Dark
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

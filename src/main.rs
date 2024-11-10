@@ -18,7 +18,7 @@ use std::{
     fs::{self, File},
     io::Write,
 };
-use types::config::Config;
+use types::config::{Config, Theme};
 
 mod core;
 mod gui;
@@ -39,7 +39,7 @@ fn init_config() {
             selected_bot: "".to_string(),
             game_version: "4.70".to_string(),
             use_alternate_server: false,
-            dark_mode: true,
+            theme: Theme::Dark,
             captcha: Default::default(),
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
@@ -103,7 +103,7 @@ impl App {
                 timeout_delay: config::get_timeout(),
                 findpath_delay: config::get_findpath_delay(),
                 auto_collect: config::get_auto_collect(),
-                dark_mode: config::get_dark_mode(),
+                theme: config::get_theme(),
                 captcha_provider: config::get_captcha_provider(),
                 captcha_api_key: config::get_captcha_api_key(),
             },
@@ -117,10 +117,26 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint();
 
-        if self.settings.dark_mode {
-            catppuccin_egui::set_theme(ctx, catppuccin_egui::MACCHIATO);
-        } else {
-            catppuccin_egui::set_theme(ctx, catppuccin_egui::LATTE);
+        match self.settings.theme {
+            Theme::Dark => {
+                ctx.set_visuals(egui::Visuals::dark());
+            }
+            Theme::Light => {
+                ctx.set_visuals(egui::Visuals::light());
+            }
+            Theme::Macchiato => {
+                catppuccin_egui::set_theme(ctx, catppuccin_egui::MACCHIATO);
+            }
+            Theme::Latte => {
+                catppuccin_egui::set_theme(ctx, catppuccin_egui::LATTE);
+            }
+            Theme::Frappe => {
+                catppuccin_egui::set_theme(ctx, catppuccin_egui::FRAPPE);
+            }
+            Theme::Mocha => {
+                catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
+            }
+            _ => ctx.set_visuals(egui::Visuals::dark()),
         }
 
         egui_extras::install_image_loaders(ctx);

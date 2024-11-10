@@ -6,10 +6,11 @@ use crate::{
     },
     utils,
 };
-use flate2::read::ZlibDecoder;
+use flate2::read::{GzDecoder, ZlibDecoder};
 use gtworld_r::TileType;
 use regex::Regex;
-use std::io::{Cursor, Read};
+use std::fs::File;
+use std::io::{Cursor, Read, Write};
 use std::time::Instant;
 use std::{fs, sync::Arc};
 

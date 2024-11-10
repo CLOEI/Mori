@@ -1,11 +1,14 @@
-use crate::utils::{captcha::CaptchaProvider, config};
+use crate::{
+    types::config::Theme,
+    utils::{captcha::CaptchaProvider, config},
+};
 use eframe::egui::{self, Ui};
 
 #[derive(Default)]
 pub struct Settings {
     pub use_alternate: bool,
     pub auto_collect: bool,
-    pub dark_mode: bool,
+    pub theme: Theme,
     pub timeout_delay: u32,
     pub findpath_delay: u32,
     pub captcha_provider: CaptchaProvider,
@@ -32,14 +35,47 @@ impl Settings {
                     {
                         config::set_auto_collect(self.auto_collect);
                     }
-                    if ui.checkbox(&mut self.dark_mode, "Use dark mode").changed() {
-                        if self.dark_mode {
-                            ctx.set_visuals(egui::Visuals::dark());
-                        } else {
-                            ctx.set_visuals(egui::Visuals::light());
-                        }
-                        config::set_dark_mode(self.dark_mode);
-                    }
+                    ui.horizontal(|ui| {
+                        ui.label("Theme:");
+                        egui::ComboBox::from_label("")
+                            .selected_text(format!("{:?}", self.theme))
+                            .show_ui(ui, |ui| {
+                                if ui
+                                    .selectable_value(&mut self.theme, Theme::Dark, "Dark")
+                                    .changed()
+                                {
+                                    config::set_theme(self.theme.clone());
+                                };
+                                if ui
+                                    .selectable_value(&mut self.theme, Theme::Light, "Light")
+                                    .changed()
+                                {
+                                    config::set_theme(self.theme.clone());
+                                };
+                                if ui
+                                    .selectable_value(
+                                        &mut self.theme,
+                                        Theme::Macchiato,
+                                        "Maccchiato",
+                                    )
+                                    .changed()
+                                {
+                                    config::set_theme(self.theme.clone());
+                                };
+                                if ui
+                                    .selectable_value(&mut self.theme, Theme::Frappe, "Frappe")
+                                    .changed()
+                                {
+                                    config::set_theme(self.theme.clone());
+                                };
+                                if ui
+                                    .selectable_value(&mut self.theme, Theme::Mocha, "Mocha")
+                                    .changed()
+                                {
+                                    config::set_theme(self.theme.clone());
+                                };
+                            });
+                    });
                     ui.add_space(10.0);
                     if ui
                         .add(
