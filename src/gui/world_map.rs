@@ -218,21 +218,6 @@ impl WorldMap {
                                     bot_clone.walk(1, 0, false);
                                 });
                             }
-                            if ui.button("Dev button").clicked() {
-                                // this button used only for dev purpose, change it to your needs
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || {
-                                    // features::auto_tutorial::lock_the_world(&bot_clone);
-                                });
-                            }
-                            if ui.button("Dev button").clicked() {
-                                // this button used only for dev purpose, change it to your needs
-                                let bot_clone = bot.clone();
-                                thread::spawn(move || loop {
-                                    bot_clone.punch(0, 1);
-                                    thread::sleep(std::time::Duration::from_millis(350));
-                                });
-                            }
                         });
                     });
 

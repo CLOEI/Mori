@@ -13,6 +13,7 @@ use egui::{
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
+use paris::info;
 use std::sync::{Arc, RwLock};
 use std::{
     fs::{self, File},
@@ -24,6 +25,7 @@ mod core;
 mod gui;
 mod lua_register;
 mod manager;
+mod texture_manager;
 mod types;
 mod utils;
 
@@ -83,6 +85,8 @@ impl App {
         let mut fonts = egui::FontDefinitions::default();
         egui_remixicon::add_to_fonts(&mut fonts);
         cc.egui_ctx.set_fonts(fonts);
+        let mut texture_manager = texture_manager::TextureManager::new();
+        texture_manager.load_textures(&cc.egui_ctx);
 
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
         let bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
