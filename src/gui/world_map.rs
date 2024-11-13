@@ -189,64 +189,70 @@ impl WorldMap {
                     }
                 }
 
-                egui::Window::new("Movement").show(ui.ctx(), |ui| {
-                    ui.horizontal(|ui| {
-                        if ui.button("Up").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot_clone.walk(0, -1, false);
-                            });
-                        }
-                        if ui.button("Down").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot_clone.walk(0, 1, false);
-                            });
-                        }
-                        if ui.button("Left").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot_clone.walk(-1, 0, false);
-                            });
-                        }
-                        if ui.button("Right").clicked() {
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                bot_clone.walk(1, 0, false);
-                            });
-                        }
-                        if ui.button("Dev button").clicked() {
-                            // this button used only for dev purpose, change it to your needs
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || {
-                                // features::auto_tutorial::lock_the_world(&bot_clone);
-                            });
-                        }
-                        if ui.button("Dev button").clicked() {
-                            // this button used only for dev purpose, change it to your needs
-                            let bot_clone = bot.clone();
-                            thread::spawn(move || loop {
-                                bot_clone.punch(0, 1);
-                                thread::sleep(std::time::Duration::from_millis(350));
-                            });
-                        }
+                egui::Window::new("Movement")
+                    .anchor(egui::Align2::RIGHT_BOTTOM, [0.0, 0.0])
+                    .default_open(false)
+                    .show(ui.ctx(), |ui| {
+                        ui.horizontal(|ui| {
+                            if ui.button("Up").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot_clone.walk(0, -1, false);
+                                });
+                            }
+                            if ui.button("Down").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot_clone.walk(0, 1, false);
+                                });
+                            }
+                            if ui.button("Left").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot_clone.walk(-1, 0, false);
+                                });
+                            }
+                            if ui.button("Right").clicked() {
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    bot_clone.walk(1, 0, false);
+                                });
+                            }
+                            if ui.button("Dev button").clicked() {
+                                // this button used only for dev purpose, change it to your needs
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || {
+                                    // features::auto_tutorial::lock_the_world(&bot_clone);
+                                });
+                            }
+                            if ui.button("Dev button").clicked() {
+                                // this button used only for dev purpose, change it to your needs
+                                let bot_clone = bot.clone();
+                                thread::spawn(move || loop {
+                                    bot_clone.punch(0, 1);
+                                    thread::sleep(std::time::Duration::from_millis(350));
+                                });
+                            }
+                        });
                     });
-                });
 
-                egui::Window::new("FTUE").show(ui.ctx(), |ui| {
-                    ui.vertical(|ui| {
-                        let ftue = {
-                            let ftue = bot.ftue.lock().unwrap();
-                            ftue.clone()
-                        };
+                egui::Window::new("FTUE")
+                    .anchor(egui::Align2::LEFT_BOTTOM, [0.0, 0.0])
+                    .default_open(false)
+                    .show(ui.ctx(), |ui| {
+                        ui.vertical(|ui| {
+                            let ftue = {
+                                let ftue = bot.ftue.lock().unwrap();
+                                ftue.clone()
+                            };
 
-                        ui.label(format!("FTUE: {}", ftue.info));
-                        ui.label(format!(
-                            "Current progress: {}/{}",
-                            ftue.current_progress, ftue.total_progress
-                        ));
+                            ui.label(format!("FTUE: {}", ftue.info));
+                            ui.label(format!(
+                                "Current progress: {}/{}",
+                                ftue.current_progress, ftue.total_progress
+                            ));
+                        });
                     });
-                });
             }
         }
     }

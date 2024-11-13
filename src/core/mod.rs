@@ -471,10 +471,17 @@ impl Bot {
     pub fn get_oauth_links(&self) -> Result<Vec<String>, ureq::Error> {
         self.log_info("Getting OAuth links");
         self.set_status("Getting OAuth links");
+
+        let login_info = {
+            let info = self.info.lock().unwrap().login_info.to_string();
+            let encoded_info = encode(&info).to_string();
+            encoded_info
+        };
+
         loop {
             let res = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
                 .set("User-Agent", USER_AGENT)
-                .send_string(&encode(&self.info.lock().unwrap().login_info.to_string()));
+                .send_string(&login_info);
 
             match res {
                 Ok(res) => {
