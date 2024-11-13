@@ -1,8 +1,8 @@
+use crate::manager::bot_manager::BotManager;
+use crate::utils;
+use eframe::egui::{self, Ui};
 use std::sync::{Arc, RwLock};
 use std::thread::spawn;
-use crate::manager::bot_manager::BotManager;
-use eframe::egui::{self, Ui};
-use crate::utils;
 
 #[derive(Default)]
 pub struct Inventory {
@@ -23,7 +23,7 @@ impl Inventory {
             };
             if let Some(bot) = bot {
                 let inventory_items = {
-                    let inventory = bot.inventory.read().unwrap();
+                    let inventory = bot.inventory.lock().unwrap();
                     inventory.items.clone()
                 };
 
@@ -36,33 +36,46 @@ impl Inventory {
                         .show(ui, |ui| {
                             for (id, inventory_item) in inventory_items {
                                 let (item, wear_disabled) = {
-                                    let item = manager.read().unwrap().items_database.read().unwrap().get_item(&(id as u32)).unwrap();
+                                    let item = manager
+                                        .read()
+                                        .unwrap()
+                                        .items_database
+                                        .read()
+                                        .unwrap()
+                                        .get_item(&(id as u32))
+                                        .unwrap();
                                     (item.clone(), item.action_type != 20)
                                 };
                                 ui.horizontal(|ui| {
                                     ui.label(item.name.clone());
                                     ui.label(format!("x{}", inventory_item.amount));
                                 });
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    if ui.add_enabled(!wear_disabled, egui::Button::new("Wear")).clicked() {
-                                        let bot_clone = bot.clone();
-                                        spawn(move || {
-                                            bot_clone.wear(id as u32);
-                                        });
-                                    }
-                                    if ui.button("Drop").clicked() {
-                                        let bot_clone = bot.clone();
-                                        spawn(move || {
-                                            bot_clone.drop_item(id as u32, 1);
-                                        });
-                                    }
-                                    if ui.button("Trash").clicked() {
-                                        let bot_clone = bot.clone();
-                                        spawn(move || {
-                                            bot_clone.trash_item(id as u32, 1);
-                                        });
-                                    }
-                                });
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        if ui
+                                            .add_enabled(!wear_disabled, egui::Button::new("Wear"))
+                                            .clicked()
+                                        {
+                                            let bot_clone = bot.clone();
+                                            spawn(move || {
+                                                bot_clone.wear(id as u32);
+                                            });
+                                        }
+                                        if ui.button("Drop").clicked() {
+                                            let bot_clone = bot.clone();
+                                            spawn(move || {
+                                                bot_clone.drop_item(id as u32, 1);
+                                            });
+                                        }
+                                        if ui.button("Trash").clicked() {
+                                            let bot_clone = bot.clone();
+                                            spawn(move || {
+                                                bot_clone.trash_item(id as u32, 1);
+                                            });
+                                        }
+                                    },
+                                );
                                 ui.end_row();
                             }
                         });
@@ -71,4 +84,3 @@ impl Inventory {
         }
     }
 }
-

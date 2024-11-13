@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::thread;
+use super::Bot;
 use crate::core;
 use crate::types::epacket_type::EPacketType;
 use crate::types::player::Player;
@@ -7,7 +6,8 @@ use crate::types::tank_packet::TankPacket;
 use crate::types::vector::Vector2;
 use crate::utils::variant::VariantList;
 use crate::utils::{self, textparse};
-use super::Bot;
+use std::sync::Arc;
+use std::thread;
 
 pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
     let variant = VariantList::deserialize(&data).unwrap();
@@ -22,9 +22,9 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let server_data = variant.get(4).unwrap().as_string();
             let parsed_server_data = textparse::parse_and_store_as_vec(&server_data);
 
-            let mut state = bot.state.write().unwrap();
-            let mut server = bot.server.write().unwrap();
-            let mut info = bot.info.write().unwrap();
+            let mut state = bot.state.lock().unwrap();
+            let mut server = bot.server.lock().unwrap();
+            let mut info = bot.info.lock().unwrap();
 
             state.is_redirecting = true;
             server.ip = parsed_server_data.get(0).unwrap().to_string();
@@ -41,7 +41,10 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 item_database.loaded
             };
             if !item_database_loaded {
-                bot.send_packet(EPacketType::NetMessageGenericText, "action|refresh_item_data\n".to_string());
+                bot.send_packet(
+                    EPacketType::NetMessageGenericText,
+                    "action|refresh_item_data\n".to_string(),
+                );
                 let item_database_clone = bot.item_database.clone();
                 let bot_clone = Arc::clone(&bot);
                 thread::spawn(move || {
@@ -59,7 +62,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                         EPacketType::NetMessageGenericText,
                         "action|enter_game\n".to_string(),
                     );
-                    let mut state = bot_clone.state.write().unwrap();
+                    let mut state = bot_clone.state.lock().unwrap();
                     state.is_redirecting = false;
                 });
             } else {
@@ -67,7 +70,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     EPacketType::NetMessageGenericText,
                     "action|enter_game\n".to_string(),
                 );
-                let mut state = bot.state.write().unwrap();
+                let mut state = bot.state.lock().unwrap();
                 state.is_redirecting = false;
             }
         }
@@ -110,16 +113,21 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnSetBux" => {
             let bux = variant.get(1).unwrap().as_int32();
-            let mut state = bot.state.write().unwrap();
+            let mut state = bot.state.lock().unwrap();
             state.gems = bux;
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
             bot.log_info(format!("Received console message: {}", message).as_str());
-            if message.contains("wants to add you to") && message.contains("Wrench yourself to accept") {
+            if message.contains("wants to add you to")
+                && message.contains("Wrench yourself to accept")
+            {
                 bot.send_packet(
                     EPacketType::NetMessageGenericText,
-                    format!("action|wrench\n|netid|{}\n", bot.state.read().unwrap().net_id),
+                    format!(
+                        "action|wrench\n|netid|{}\n",
+                        bot.state.lock().unwrap().net_id
+                    ),
                 );
             }
         }
@@ -127,13 +135,13 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let pos = variant.get(1).unwrap().as_vec2();
             bot.log_info(format!("Received position: {:?}", pos).as_str());
             let pos_y = core::get_coordinate_to_touch_ground(pos.1);
-            let mut position = bot.position.write().unwrap();
+            let mut position = bot.position.lock().unwrap();
             position.x = pos.0;
             position.y = pos_y;
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();
-            let mut info = bot.info.write().unwrap();
+            let mut info = bot.info.lock().unwrap();
             info.login_info.tank_id_name = growid;
             utils::config::save_token_to_bot(
                 info.payload[0].clone(),
@@ -147,12 +155,15 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let current_progress = variant.get(2).unwrap().as_int32();
             let total_progress = variant.get(3).unwrap().as_int32();
             let info = variant.get(4).unwrap().as_string();
-            bot.log_info(format!(
-                "Received FTUE button data set: {} {} {} {}",
-                unknown_1, current_progress, total_progress, info
-            ).as_str());
+            bot.log_info(
+                format!(
+                    "Received FTUE button data set: {} {} {} {}",
+                    unknown_1, current_progress, total_progress, info
+                )
+                .as_str(),
+            );
 
-            let mut ftue = bot.ftue.write().unwrap();
+            let mut ftue = bot.ftue.lock().unwrap();
             ftue.current_progress = current_progress;
             ftue.total_progress = total_progress;
             ftue.info = info;
@@ -162,7 +173,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let data = textparse::parse_and_store_as_map(&message);
             if data.contains_key("type") {
                 if data.get("type").unwrap() == "local" {
-                    let mut state = bot.state.write().unwrap();
+                    let mut state = bot.state.lock().unwrap();
                     state.is_ingame = true;
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
 
@@ -225,7 +236,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                         }
                     },
                 };
-                let mut players = bot.players.write().unwrap();
+                let mut players = bot.players.lock().unwrap();
                 players.push(player);
             }
         }
@@ -234,7 +245,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let data = textparse::parse_and_store_as_map(&message);
             let net_id: u32 = data.get("netID").unwrap().parse().unwrap();
 
-            let mut players = bot.players.write().unwrap();
+            let mut players = bot.players.lock().unwrap();
             players.retain(|player| player.net_id != net_id);
         }
         "OnTalkBubble" => {
@@ -247,7 +258,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         }
         "OnRequestWorldSelectMenu" => {
             bot.world.write().unwrap().reset();
-            bot.players.write().unwrap().clear();
+            bot.players.lock().unwrap().clear();
         }
         _ => {}
     }

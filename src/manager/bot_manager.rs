@@ -1,12 +1,12 @@
 use crate::core::{self, Bot};
+use crate::manager::proxy_manager::ProxyManager;
 use crate::types::config::BotConfig;
+use crate::utils;
 use gtitem_r::structs::ItemDatabase;
 use paris::{error, info};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::thread::{spawn, JoinHandle};
-use crate::manager::proxy_manager::ProxyManager;
-use crate::utils;
 
 pub struct BotManager {
     pub bots: Vec<(Arc<Bot>, JoinHandle<()>)>,
@@ -46,26 +46,27 @@ impl BotManager {
             let bot_clone = Arc::clone(bot);
             thread::spawn(move || {
                 let is_running = {
-                    let state = bot_clone.state.read().unwrap();
+                    let state = bot_clone.state.lock().unwrap();
                     state.is_running
                 };
 
                 if is_running {
                     {
-                        let mut state = bot_clone.state.write().unwrap();
+                        let mut state = bot_clone.state.lock().unwrap();
                         state.is_running = false;
                     }
                     bot_clone.disconnect();
                 }
             });
-            self.bots.retain(|(b, _)| b.info.read().unwrap().payload[0] != username);
+            self.bots
+                .retain(|(b, _)| b.info.lock().unwrap().payload[0] != username);
             utils::config::remove_bot(username.to_string());
         }
     }
 
     pub fn get_bot(&self, username: &str) -> Option<&Arc<Bot>> {
         for (bot, _) in &self.bots {
-            if bot.info.read().unwrap().payload[0] == username {
+            if bot.info.lock().unwrap().payload[0] == username {
                 return Some(bot);
             }
         }

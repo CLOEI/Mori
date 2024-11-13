@@ -1,16 +1,22 @@
+use crate::core::Bot;
+use mlua::prelude::*;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use mlua::prelude::*;
-use crate::core::Bot;
 
 pub fn register(lua: &Lua, bot: &Arc<Bot>) -> LuaResult<()> {
     let bot_table = lua.create_table()?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "walk", |bot, (x, y, ap): (i32, i32, bool)| {
-        bot.walk(x, y, ap);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "walk",
+        |bot, (x, y, ap): (i32, i32, bool)| {
+            bot.walk(x, y, ap);
+            Ok(())
+        },
+    )?;
 
     register_bot_function(lua, bot.clone(), &bot_table, "leave", |bot, (): ()| {
         bot.leave();
@@ -22,60 +28,117 @@ pub fn register(lua: &Lua, bot: &Arc<Bot>) -> LuaResult<()> {
         Ok(())
     })?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "is_in_world", |bot, (): ()| {
-        let in_world = bot.is_inworld();
-        Ok(in_world)
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "is_in_world",
+        |bot, (): ()| {
+            let in_world = bot.is_inworld();
+            Ok(in_world)
+        },
+    )?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "place", |bot, (offset_x, offset_y, item_id): (i32, i32, u32)| {
-        bot.place(offset_x, offset_y, item_id);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "place",
+        |bot, (offset_x, offset_y, item_id): (i32, i32, u32)| {
+            bot.place(offset_x, offset_y, item_id);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "punch", |bot, (offset_x, offset_y): (i32, i32)| {
-        bot.punch(offset_x, offset_y);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "punch",
+        |bot, (offset_x, offset_y): (i32, i32)| {
+            bot.punch(offset_x, offset_y);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "wrench", |bot, (offset_x, offset_y): (i32, i32)| {
-        bot.wrench(offset_x, offset_y);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "wrench",
+        |bot, (offset_x, offset_y): (i32, i32)| {
+            bot.wrench(offset_x, offset_y);
+            Ok(())
+        },
+    )?;
 
     register_bot_function(lua, bot.clone(), &bot_table, "wear", |bot, item_id: u32| {
         bot.wear(item_id);
         Ok(())
     })?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "warp", |bot, world_name: String| {
-        bot.warp(world_name);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "warp",
+        |bot, world_name: String| {
+            bot.warp(world_name);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "talk", |bot, message: String| {
-        bot.talk(message);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "talk",
+        |bot, message: String| {
+            bot.talk(message);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "find_path", |bot, (x, y): (u32, u32)| {
-        bot.find_path(x, y);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "find_path",
+        |bot, (x, y): (u32, u32)| {
+            bot.find_path(x, y);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "drop", |bot, (item_id, amount): (u32, u32)| {
-        bot.drop_item(item_id, amount);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "drop",
+        |bot, (item_id, amount): (u32, u32)| {
+            bot.drop_item(item_id, amount);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, bot.clone(), &bot_table, "trash", |bot, (item_id, amount): (u32, u32)| {
-        bot.trash_item(item_id, amount);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        bot.clone(),
+        &bot_table,
+        "trash",
+        |bot, (item_id, amount): (u32, u32)| {
+            bot.trash_item(item_id, amount);
+            Ok(())
+        },
+    )?;
 
-    bot_table.set("sleep", lua.create_function(|_, ms: u64| {
-        thread::sleep(Duration::from_millis(ms));
-        Ok(())
-    })?)?;
+    bot_table.set(
+        "sleep",
+        lua.create_function(|_, ms: u64| {
+            thread::sleep(Duration::from_millis(ms));
+            Ok(())
+        })?,
+    )?;
 
     register_world_api(lua, bot.clone(), &bot_table)?;
     register_local_api(lua, bot.clone(), &bot_table)?;
@@ -177,8 +240,8 @@ fn register_local_api<'lua>(
     let bot_clone = bot.clone();
     let get_local = lua.create_function(move |lua, ()| -> LuaResult<LuaValue> {
         let local_data = lua.create_table()?;
-        let position = bot_clone.position.read().unwrap();
-        let state = bot_clone.state.read().unwrap();
+        let position = bot_clone.position.lock().unwrap();
+        let state = bot_clone.state.lock().unwrap();
 
         local_data.set("x", position.x)?;
         local_data.set("y", position.y)?;
@@ -200,7 +263,7 @@ fn register_inventory_api<'lua>(
     let bot_clone = bot.clone();
     let get_inventory = lua.create_function(move |lua, ()| -> LuaResult<LuaValue> {
         let inventory_data = lua.create_table()?;
-        let inventory = bot_clone.inventory.read().unwrap();
+        let inventory = bot_clone.inventory.lock().unwrap();
 
         inventory_data.set("size", inventory.size)?;
         inventory_data.set("item_count", inventory.item_count)?;
@@ -231,7 +294,12 @@ fn register_tile_api<'lua>(
         let world = bot_clone.world.read().unwrap();
         let tile = match world.get_tile(x, y) {
             Some(t) => t.clone(),
-            None => return Err(LuaError::RuntimeError(format!("Tile at ({}, {}) not found", x, y))),
+            None => {
+                return Err(LuaError::RuntimeError(format!(
+                    "Tile at ({}, {}) not found",
+                    x, y
+                )))
+            }
         };
         let tile_clone = tile.clone();
         let bot_clone_inner = bot_clone.clone();

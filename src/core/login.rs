@@ -118,8 +118,8 @@ pub fn get_ubisoft_session(
             Ok(res) => Ok(res),
             Err(err) => {
                 {
-                    let mut state = bot.state.write().unwrap();
-                    let mut info = bot.info.write().unwrap();
+                    let mut state = bot.state.lock().expect("Failed to lock state");
+                    let mut info = bot.info.lock().expect("Failed to lock info");
                     state.is_running = false;
                     info.status = "2FA Failed".to_string();
                 }
@@ -172,7 +172,7 @@ pub fn get_ubisoft_token(
     steampassword: &str,
 ) -> Result<String, error::CustomError> {
     let info = {
-        let data = bot.info.read().unwrap().login_info.to_string();
+        let data = bot.info.lock().unwrap().login_info.to_string();
         data.clone()
     };
     let agent = ureq::AgentBuilder::new().redirects(5).build();
@@ -181,8 +181,8 @@ pub fn get_ubisoft_token(
             Ok(res) => res,
             Err(err) => {
                 if err.to_string().contains("code 401") {
-                    bot.state.write().unwrap().is_running = false;
-                    bot.info.write().unwrap().status = "Unauthorized".to_string();
+                    bot.state.lock().unwrap().is_running = false;
+                    bot.info.lock().unwrap().status = "Unauthorized".to_string();
                 }
                 return Err(error::CustomError::Other(format!(
                     "Failed to get ubisoft session: {}",

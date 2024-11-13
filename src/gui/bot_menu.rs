@@ -115,14 +115,15 @@ impl BotMenu {
                                             .max_col_width(120.0)
                                             .show(ui, |ui| {
                                                 let (username, status, ping, world_name, timeout) = {
-                                                    let info = bot.info.read().unwrap();
+                                                    let info = bot.info.lock().unwrap();
+                                                    let temp: std::sync::RwLockReadGuard<'_, crate::types::bot_info::TemporaryData> = bot.temporary_data.read().unwrap();
                                                     let world = bot.world.read().unwrap();
                                                     (
                                                         info.login_info.tank_id_name.clone(),
                                                         info.status.clone(),
-                                                        info.ping.clone().to_string(),
+                                                        temp.ping.clone().to_string(),
                                                         world.name.clone(),
-                                                        info.timeout.clone(),
+                                                        temp.timeout.clone(),
                                                     )
                                                 };
                                                 ui.label("GrowID");
@@ -189,7 +190,7 @@ impl BotMenu {
                                             .max_col_width(120.0)
                                             .show(ui, |ui| {
                                                 let (ip, port) = {
-                                                    let server = bot.server.read().unwrap();
+                                                    let server = bot.server.lock().unwrap();
                                                     (server.ip.clone(), server.port.clone().to_string())
                                                 };
                                                 ui.label("IP");
@@ -214,7 +215,7 @@ impl BotMenu {
                                         .max_col_width(120.0)
                                         .show(ui, |ui| {
                                             let (payload, code, method) = {
-                                                let info = bot.info.read().unwrap();
+                                                let info = bot.info.lock().unwrap();
                                                 (
                                                     info.payload.clone(),
                                                     info.recovery_code.clone(),
@@ -245,10 +246,10 @@ impl BotMenu {
                                         .min_col_width(120.0)
                                         .max_col_width(120.0)
                                         .show(ui, |ui| {
-                                            let net_id = bot.state.read().unwrap().net_id.clone();
-                                            let token = bot.info.read().unwrap().token.clone();
-                                            let is_banned = bot.state.read().unwrap().is_banned.clone();
-                                            let position = bot.position.read().unwrap().clone();
+                                            let net_id = bot.state.lock().unwrap().net_id.clone();
+                                            let token = bot.info.lock().unwrap().token.clone();
+                                            let is_banned = bot.state.lock().unwrap().is_banned.clone();
+                                            let position = bot.position.lock().unwrap().clone();
                                             ui.label("NetID");
                                             ui.label(net_id.to_string());
                                             ui.end_row();
@@ -259,10 +260,10 @@ impl BotMenu {
                                             ui.label(is_banned.to_string());
                                             ui.end_row();
                                             ui.label("Level");
-                                            ui.label(bot.state.read().unwrap().level.to_string());
+                                            ui.label(bot.state.lock().unwrap().level.to_string());
                                             ui.end_row();
                                             ui.label("Gems");
-                                            ui.label(bot.state.read().unwrap().gems.to_string());
+                                            ui.label(bot.state.lock().unwrap().gems.to_string());
                                             ui.end_row();
                                             ui.label("Position");
                                             ui.horizontal(|ui| {

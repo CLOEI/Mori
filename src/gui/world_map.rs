@@ -117,7 +117,7 @@ impl WorldMap {
                             }
                         }
 
-                        for player in bot.players.read().unwrap().clone() {
+                        for player in bot.players.lock().unwrap().clone() {
                             if (player.position.x / 32.0).floor() == (x as f32)
                                 && (player.position.y / 32.0).floor() == (y as f32)
                             {
@@ -129,7 +129,7 @@ impl WorldMap {
                             }
                         }
 
-                        let bot_position = bot.position.read().unwrap();
+                        let bot_position = bot.position.lock().unwrap();
                         if (bot_position.x / 32.0).floor() == (x as f32)
                             && (bot_position.y / 32.0).floor() == (y as f32)
                         {
@@ -236,7 +236,7 @@ impl WorldMap {
                 egui::Window::new("FTUE").show(ui.ctx(), |ui| {
                     ui.vertical(|ui| {
                         let ftue = {
-                            let ftue = bot.ftue.read().unwrap();
+                            let ftue = bot.ftue.lock().unwrap();
                             ftue.clone()
                         };
 

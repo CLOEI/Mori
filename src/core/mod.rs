@@ -3,34 +3,32 @@ pub mod features;
 mod inventory;
 mod login;
 mod packet_handler;
-mod variant_handler;
 mod proxy;
+mod variant_handler;
 
 use astar::AStar;
 use byteorder::{ByteOrder, LittleEndian};
-use rusty_enet as enet;
 use gtitem_r::structs::ItemDatabase;
 use inventory::Inventory;
+use mlua::prelude::*;
+use rusty_enet as enet;
+use socks::Socks5Datagram;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::mem::size_of;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::{self, FromStr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 use std::{thread, time::Duration, vec};
-use mlua::prelude::*;
 use urlencoding::encode;
-use socks::Socks5Datagram;
 
-use crate::types::bot_info::{FTUE, TemporaryData};
-use crate::types::{
-    etank_packet_type::ETankPacketType,
-    player::Player,
-    tank_packet::TankPacket,
-};
+use crate::core::proxy::{SocketType, Socks5UdpSocket};
+use crate::manager::proxy_manager::ProxyManager;
+use crate::types::bot_info::{TemporaryData, FTUE};
+use crate::types::{etank_packet_type::ETankPacketType, player::Player, tank_packet::TankPacket};
+use crate::utils::safe_check;
 use crate::{
-    lua_register, types, utils,
+    lua_register, types,
     types::{
         bot_info::{Info, Server, State},
         elogin_method::ELoginMethod,
@@ -38,32 +36,30 @@ use crate::{
         login_info::LoginInfo,
         vector::Vector2,
     },
+    utils,
     utils::{
-        config,
-        logging,
+        config, logging,
         proton::{self},
         random::{self},
     },
 };
-use crate::core::proxy::{SocketType, Socks5UdpSocket};
-use crate::manager::proxy_manager::ProxyManager;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
 
 pub struct Bot {
-    pub info: RwLock<Info>,
-    pub state: RwLock<State>,
-    pub server: RwLock<Server>,
-    pub position: RwLock<Vector2>,
+    pub info: Mutex<Info>,
+    pub state: Mutex<State>,
+    pub server: Mutex<Server>,
+    pub position: Mutex<Vector2>,
     pub temporary_data: RwLock<TemporaryData>,
     pub host: Mutex<enet::Host<SocketType>>,
-    pub peer_id: RwLock<Option<enet::PeerID>>,
+    pub peer_id: Mutex<Option<enet::PeerID>>,
     pub world: RwLock<gtworld_r::World>,
-    pub inventory: RwLock<Inventory>,
-    pub players: RwLock<Vec<Player>>,
-    pub astar: RwLock<AStar>,
-    pub ftue: RwLock<FTUE>,
+    pub inventory: Mutex<Inventory>,
+    pub players: Mutex<Vec<Player>>,
+    pub astar: Mutex<AStar>,
+    pub ftue: Mutex<FTUE>,
     pub item_database: Arc<RwLock<ItemDatabase>>,
     pub proxy_manager: Arc<RwLock<ProxyManager>>,
     pub logs: Arc<Mutex<Vec<String>>>,
@@ -81,16 +77,14 @@ impl Bot {
         let logs = Arc::new(Mutex::new(Vec::new()));
         let (sender, receiver) = std::sync::mpsc::channel();
         let logs_clone = Arc::clone(&logs);
-        thread::spawn(move || {
-            loop {
-                match receiver.recv() {
-                    Ok(message) => {
-                        let mut logs = logs_clone.lock().unwrap();
-                        logs.push(message);
-                    }
-                    Err(_) => {
-                        break;
-                    }
+        thread::spawn(move || loop {
+            match receiver.recv() {
+                Ok(message) => {
+                    let mut logs = logs_clone.lock().unwrap();
+                    logs.push(message);
+                }
+                Err(_) => {
+                    break;
                 }
             }
         });
@@ -102,10 +96,20 @@ impl Bot {
 
         if config::get_bot_use_proxy(payload[0].clone()) {
             let mut proxy_manager = proxy_manager.write().unwrap();
-            if let Some(proxy_index) = proxy_manager.proxies.iter().position(|proxy| proxy.whos_using.len() < 3) {
+            if let Some(proxy_index) = proxy_manager
+                .proxies
+                .iter()
+                .position(|proxy| proxy.whos_using.len() < 3)
+            {
                 if let Some(proxy_data) = proxy_manager.get_mut(proxy_index) {
                     proxy_data.whos_using.push(payload[0].clone());
-                    proxy_address = Some(SocketAddr::from_str(&format!("{}:{}", proxy_data.proxy.ip, proxy_data.proxy.port)).unwrap());
+                    proxy_address = Some(
+                        SocketAddr::from_str(&format!(
+                            "{}:{}",
+                            proxy_data.proxy.ip, proxy_data.proxy.port
+                        ))
+                        .unwrap(),
+                    );
                     proxy_username = proxy_data.proxy.username.clone();
                     proxy_password = proxy_data.proxy.password.clone();
                 }
@@ -122,7 +126,7 @@ impl Bot {
                 &proxy_username,
                 &proxy_password,
             )
-                .expect("Failed to bind SOCKS5 datagram");
+            .expect("Failed to bind SOCKS5 datagram");
             logging::info("Bound to proxy", &sender);
             SocketType::Socks5(Socks5UdpSocket::new(udp_datagram))
         } else {
@@ -142,29 +146,28 @@ impl Bot {
                 ..Default::default()
             },
         )
-            .expect("Failed to create host");
+        .expect("Failed to create host");
 
         Arc::new(Self {
-            info: RwLock::new(Info {
+            info: Mutex::new(Info {
                 payload,
                 recovery_code: bot_config.recovery_code,
                 login_method: bot_config.login_method,
                 token: bot_config.token,
                 login_info: LoginInfo::new(),
-                timeout: 0,
                 ..Default::default()
             }),
-            state: RwLock::new(State::default()),
-            server: RwLock::new(Server::default()),
-            position: RwLock::new(Vector2::default()),
+            state: Mutex::new(State::default()),
+            server: Mutex::new(Server::default()),
+            position: Mutex::new(Vector2::default()),
             temporary_data: RwLock::new(TemporaryData::default()),
             host: Mutex::new(host),
-            peer_id: RwLock::new(None),
+            peer_id: Mutex::new(None),
             world: RwLock::new(gtworld_r::World::new(item_database.clone())),
-            inventory: RwLock::new(Inventory::new()),
-            players: RwLock::new(Vec::new()),
-            astar: RwLock::new(AStar::new(item_database.clone())),
-            ftue: RwLock::new(FTUE::default()),
+            inventory: Mutex::new(Inventory::new()),
+            players: Mutex::new(Vec::new()),
+            astar: Mutex::new(AStar::new(item_database.clone())),
+            ftue: Mutex::new(FTUE::default()),
             item_database,
             proxy_manager,
             logs,
@@ -187,7 +190,7 @@ impl Bot {
 
     pub fn logon(self: Arc<Self>, data: String) {
         {
-            let lua = self.lua.lock().unwrap();
+            let lua = self.lua.lock().expect("Failed to lock Lua");
             let _ = lua_register::register(&lua, &self);
         }
         self.set_status("Logging in...");
@@ -197,7 +200,7 @@ impl Bot {
             self.update_login_info(data);
         }
         {
-            let mut state = self.state.write().unwrap();
+            let mut state = self.state.lock().expect("Failed to lock state");
             state.is_running = true;
         }
         poll(Arc::clone(&self));
@@ -205,7 +208,7 @@ impl Bot {
     }
 
     pub fn set_status(&self, message: &str) {
-        let mut info = self.info.write().unwrap();
+        let mut info = self.info.lock().expect("Failed to lock info");
         info.status = message.to_string();
     }
 
@@ -214,7 +217,7 @@ impl Bot {
         self.to_http();
 
         let (meta, login_method, oauth_links_empty) = {
-            let info = self.info.read().unwrap();
+            let info = self.info.lock().unwrap();
             (
                 info.server_data.get("meta").cloned(),
                 info.login_method.clone(),
@@ -223,14 +226,14 @@ impl Bot {
         };
 
         if let Some(meta) = meta {
-            let mut info = self.info.write().unwrap();
+            let mut info = self.info.lock().unwrap();
             info.login_info.meta = meta;
         }
 
         if login_method != ELoginMethod::STEAM && oauth_links_empty {
             match self.get_oauth_links() {
                 Ok(links) => {
-                    let mut info = self.info.write().unwrap();
+                    let mut info = self.info.lock().unwrap();
                     info.oauth_links = links;
                     self.log_info("Successfully got OAuth links for: apple, google and legacy");
                 }
@@ -244,17 +247,23 @@ impl Bot {
         self.get_token();
 
         {
-            let state = self.state.read().unwrap();
+            let state = self.state.lock().unwrap();
             if !state.is_running {
                 return false;
             }
         }
 
         let (server, port) = {
-            let info = self.info.read().unwrap();
+            let info = self.info.lock().unwrap();
             (
-                info.server_data.get("server").cloned().unwrap_or_default(),
-                info.server_data.get("port").cloned().unwrap_or_default(),
+                info.server_data
+                    .get("server")
+                    .cloned()
+                    .expect("Failed to get server"),
+                info.server_data
+                    .get("port")
+                    .cloned()
+                    .expect("Failed to get port"),
             )
         };
 
@@ -265,7 +274,7 @@ impl Bot {
     pub fn relog(&self) {
         self.log_info("Relogging core");
         {
-            let mut state = self.state.write().unwrap();
+            let mut state = self.state.lock().expect("Failed to lock state");
             state.is_running = false;
             state.is_redirecting = false;
         }
@@ -276,7 +285,7 @@ impl Bot {
 
     fn update_login_info(&self, data: String) {
         self.set_status("Updating login info");
-        let mut info = self.info.write().unwrap();
+        let mut info = self.info.lock().expect("Failed to lock info");
         let parsed_data = utils::textparse::parse_and_store_as_map(&data);
         for (key, value) in parsed_data {
             match key.as_str() {
@@ -319,7 +328,7 @@ impl Bot {
         self.set_status("Checking refresh token");
 
         let (token, login_info) = {
-            let info = self.info.read().unwrap();
+            let info = self.info.lock().unwrap();
             if info.token.is_empty() {
                 return false;
             }
@@ -351,12 +360,9 @@ impl Bot {
                             .as_str()
                             .unwrap_or_default()
                             .to_string();
-                        self.log_info(&format!(
-                            "Token is still valid | new token: {}",
-                            new_token
-                        ));
+                        self.log_info(&format!("Token is still valid | new token: {}", new_token));
 
-                        let mut info = self.info.write().unwrap();
+                        let mut info = self.info.lock().unwrap();
                         info.token = new_token;
 
                         return true;
@@ -375,13 +381,13 @@ impl Bot {
     }
 
     pub fn sleep(&self) {
-        let mut info = self.info.write().unwrap();
-        info.timeout += config::get_timeout();
-        while info.timeout > 0 {
-            info.timeout -= 1;
-            drop(info);
+        let mut temp = self.temporary_data.write().unwrap();
+        temp.timeout += config::get_timeout();
+        while temp.timeout > 0 {
+            temp.timeout -= 1;
+            drop(temp);
             thread::sleep(Duration::from_secs(1));
-            info = self.info.write().unwrap();
+            temp = self.temporary_data.write().unwrap();
         }
     }
 
@@ -393,7 +399,7 @@ impl Bot {
         self.log_info("Getting token for bot");
         self.set_status("Getting token");
         let (payload, recovery_code, method, oauth_links) = {
-            let info = self.info.read().unwrap();
+            let info = self.info.lock().unwrap();
             (
                 info.payload.clone(),
                 info.recovery_code.clone(),
@@ -431,7 +437,7 @@ impl Bot {
             },
             ELoginMethod::STEAM => {
                 {
-                    let mut info = self.info.write().unwrap();
+                    let mut info = self.info.lock().unwrap();
                     info.login_info.platform_id = "15,1,0".to_string();
                 }
                 match login::get_ubisoft_token(
@@ -456,7 +462,7 @@ impl Bot {
         };
 
         if !token_result.is_empty() {
-            let mut info = self.info.write().unwrap();
+            let mut info = self.info.lock().expect("Failed to lock info");
             info.token = token_result;
             self.log_info(&format!("Received the token: {}", info.token));
         }
@@ -468,7 +474,7 @@ impl Bot {
         loop {
             let res = ureq::post("https://login.growtopiagame.com/player/login/dashboard")
                 .set("User-Agent", USER_AGENT)
-                .send_string(&encode(&self.info.read().unwrap().login_info.to_string()));
+                .send_string(&encode(&self.info.lock().unwrap().login_info.to_string()));
 
             match res {
                 Ok(res) => {
@@ -500,7 +506,7 @@ impl Bot {
     pub fn spoof(&self) {
         self.log_info("Spoofing core data");
         self.set_status("Spoofing core data");
-        let mut info = self.info.write().unwrap();
+        let mut info = self.info.lock().unwrap();
         info.login_info.klv = proton::generate_klv(
             &info.login_info.protocol,
             &info.login_info.game_version,
@@ -522,7 +528,10 @@ impl Bot {
         self.set_status("Fetching server data");
         loop {
             let req = ureq::post(server)
-                .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
+                .set(
+                    "User-Agent",
+                    "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
+                )
                 .send_string("");
 
             let res = match req {
@@ -548,7 +557,7 @@ impl Bot {
     pub fn parse_server_data(&self, data: String) {
         self.log_info("Parsing server data");
         self.set_status("Parsing server data");
-        let mut info = self.info.write().unwrap();
+        let mut info = self.info.lock().unwrap();
         info.server_data = data
             .lines()
             .filter_map(|line| {
@@ -568,18 +577,23 @@ impl Bot {
         let socket_address = SocketAddr::from_str(&format!("{}:{}", ip, port)).unwrap();
 
         let mut host = self.host.lock().unwrap();
-        if let Err(err) = host.connect(socket_address, 2, 0) {
-            self.log_error(&format!("Failed to connect to the server: {}", err));
+        match host.connect(socket_address, 2, 0) {
+            Ok(peer) => {
+                peer.set_ping_interval(100);
+            }
+            Err(err) => {
+                self.log_error(&format!("Failed to connect to the server: {}", err));
+            }
         }
     }
 
     pub fn set_ping(&self) {
         if let Ok(mut host) = self.host.try_lock() {
-            if let Ok(peer_id) = self.peer_id.try_read() {
+            if let Ok(peer_id) = self.peer_id.try_lock() {
                 if let Some(peer_id) = *peer_id {
                     let peer = host.peer_mut(peer_id);
-                    if let Ok(mut info) = self.info.try_write() {
-                        info.ping = peer.round_trip_time().as_millis() as u32;
+                    if let Ok(mut temp) = self.temporary_data.try_write() {
+                        temp.ping = peer.round_trip_time().as_millis() as u32;
                     }
                 }
             }
@@ -589,8 +603,8 @@ impl Bot {
     fn process_events(self: Arc<Self>) {
         loop {
             let (is_running, is_redirecting, ip, port) = {
-                let state = self.state.read().unwrap();
-                let server = self.server.read().unwrap();
+                let state = self.state.lock().unwrap();
+                let server = self.server.lock().unwrap();
 
                 (
                     state.is_running,
@@ -624,12 +638,14 @@ impl Bot {
                         enet::EventNoRef::Connect { peer, .. } => {
                             self.log_info("Connected to the server");
                             self.set_status("Connected");
-                            let mut peer_id = self.peer_id.write().unwrap();
+                            let mut peer_id = self.peer_id.lock().unwrap();
                             *peer_id = Some(peer);
                         }
                         enet::EventNoRef::Disconnect { .. } => {
                             self.log_warn("Disconnected from the server");
                             self.set_status("Disconnected");
+                            let mut world = self.world.write().unwrap();
+                            world.reset();
                             break;
                         }
                         enet::EventNoRef::Receive { packet, .. } => {
@@ -650,7 +666,7 @@ impl Bot {
     }
 
     pub fn disconnect(&self) {
-        let peer_id = self.peer_id.read().unwrap().clone();
+        let peer_id = self.peer_id.lock().unwrap().clone();
         if let Some(peer_id) = peer_id {
             if let Ok(mut host) = self.host.try_lock() {
                 let peer = host.peer_mut(peer_id);
@@ -665,7 +681,7 @@ impl Bot {
         packet_data.extend_from_slice(message.as_bytes());
         let pkt = enet::Packet::reliable(packet_data.as_slice());
 
-        if let Ok(peer_id) = self.peer_id.read() {
+        if let Ok(peer_id) = self.peer_id.lock() {
             if let Some(peer_id) = *peer_id {
                 if let Ok(mut host) = self.host.try_lock() {
                     let peer = host.peer_mut(peer_id);
@@ -686,14 +702,13 @@ impl Bot {
         let packet_type = EPacketType::NetMessageGamePacket as u32;
         enet_packet_data[..size_of::<u32>()].copy_from_slice(&packet_type.to_le_bytes());
 
-        let tank_packet_bytes =
-            bincode::serialize(packet).expect("Failed to serialize TankPacket");
+        let tank_packet_bytes = bincode::serialize(packet).expect("Failed to serialize TankPacket");
         enet_packet_data[size_of::<u32>()..size_of::<u32>() + tank_packet_bytes.len()]
             .copy_from_slice(&tank_packet_bytes);
 
         let enet_packet = enet::Packet::reliable(enet_packet_data.as_slice());
 
-        if let Ok(peer_id) = self.peer_id.read() {
+        if let Ok(peer_id) = self.peer_id.lock() {
             if let Some(peer_id) = *peer_id {
                 if let Ok(mut host) = self.host.try_lock() {
                     let peer = host.peer_mut(peer_id);
@@ -715,12 +730,12 @@ impl Bot {
         }
 
         let (bot_x, bot_y) = {
-            let position = self.position.read().unwrap();
+            let position = self.position.lock().expect("Failed to lock position");
             (position.x, position.y)
         };
 
         let items = {
-            let world = self.world.read().unwrap();
+            let world = self.world.read().expect("Failed to lock world");
             world.dropped.items.clone()
         };
 
@@ -730,10 +745,12 @@ impl Bot {
             let distance = (dx.powi(2) + dy.powi(2)).sqrt();
             if distance <= 5.0 {
                 let can_collect = {
-                    let inventory = self.inventory.read().unwrap();
+                    let inventory = self.inventory.lock().expect("Failed to lock inventory");
                     let inventory_size = inventory.size;
 
-                    if inventory.items.get(&obj.id).is_none() && inventory_size > inventory.item_count as u32 {
+                    if inventory.items.get(&obj.id).is_none()
+                        && inventory_size > inventory.item_count as u32
+                    {
                         true
                     } else {
                         if let Some(item) = inventory.items.get(&obj.id) {
@@ -761,14 +778,17 @@ impl Bot {
         let mut pkt = TankPacket::default();
         pkt._type = ETankPacketType::NetGamePacketTileChangeRequest;
         let (base_x, base_y) = {
-            let position = self.position.read().unwrap();
+            let position = self.position.lock().expect("Failed to lock position");
             pkt.vector_x = position.x;
             pkt.vector_y = position.y;
             pkt.int_x = (position.x / 32.0).floor() as i32 + offset_x;
             pkt.int_y = (position.y / 32.0).floor() as i32 + offset_y;
             pkt.value = item_id;
 
-            ((position.x / 32.0).floor() as i32, (position.y / 32.0).floor() as i32)
+            (
+                (position.x / 32.0).floor() as i32,
+                (position.y / 32.0).floor() as i32,
+            )
         };
 
         if pkt.int_x <= base_x + 4
@@ -806,16 +826,18 @@ impl Bot {
     }
 
     pub fn warp(&self, world_name: String) {
-        if self.state.read().unwrap().is_not_allowed_to_warp {
+        if self
+            .state
+            .lock()
+            .expect("Failed to lock state")
+            .is_not_allowed_to_warp
+        {
             return;
         }
         self.log_info(&format!("Warping to world: {}", world_name));
         self.send_packet(
             EPacketType::NetMessageGameMessage,
-            format!(
-                "action|join_request\nname|{}\ninvitedWorld|0\n",
-                world_name
-            ),
+            format!("action|join_request\nname|{}\ninvitedWorld|0\n", world_name),
         );
     }
 
@@ -837,14 +859,14 @@ impl Bot {
 
     pub fn walk(&self, x: i32, y: i32, ap: bool) {
         if !ap {
-            let mut position = self.position.write().unwrap();
+            let mut position = self.position.lock().expect("Failed to lock position");
             position.x += (x * 32) as f32;
             position.y += (y * 32) as f32;
         }
 
         let mut pkt = TankPacket::default();
         {
-            let position = self.position.read().unwrap();
+            let position = self.position.lock().expect("Failed to lock position");
             pkt._type = ETankPacketType::NetGamePacketState;
             pkt.vector_x = position.x;
             pkt.vector_y = position.y;
@@ -853,19 +875,19 @@ impl Bot {
             pkt.flags |= (1 << 1) | (1 << 5);
         }
 
-        if self.state.read().unwrap().is_running && self.is_inworld() {
+        if safe_check::is_connected(self) && self.is_inworld() {
             self.send_packet_raw(&pkt);
         }
     }
 
     pub fn find_path(&self, x: u32, y: u32) {
         let position = {
-            let position = self.position.read().unwrap();
+            let position = self.position.lock().expect("Failed to lock position");
             position.clone()
         };
 
         let paths = {
-            let astar = self.astar.read().unwrap();
+            let astar = self.astar.lock().expect("Failed to lock astar");
             astar.find_path((position.x as u32) / 32, (position.y as u32) / 32, x, y)
         };
 
@@ -874,7 +896,7 @@ impl Bot {
             for node in paths {
                 let pos_y = get_coordinate_to_touch_ground(node.y as f32 * 32.0);
                 {
-                    let mut position = self.position.write().unwrap();
+                    let mut position = self.position.lock().expect("Failed to lock position");
                     position.x = node.x as f32 * 32.0;
                     position.y = pos_y;
                 }
@@ -907,20 +929,15 @@ impl Bot {
 
 fn poll(bot: Arc<Bot>) {
     let bot_clone = Arc::clone(&bot);
-    thread::spawn(move || {
-        loop {
-            {
-                let state = bot_clone.state.read().unwrap();
-                if !state.is_running {
-                    break;
-                }
-            }
-            if config::get_auto_collect() {
-                bot_clone.collect();
-            }
-            bot_clone.set_ping();
-            thread::sleep(Duration::from_millis(100));
+    thread::spawn(move || loop {
+        if !safe_check::is_connected(&bot_clone) {
+            break;
         }
+        if config::get_auto_collect() {
+            bot_clone.collect();
+        }
+        bot_clone.set_ping();
+        thread::sleep(Duration::from_millis(100));
     });
 }
 

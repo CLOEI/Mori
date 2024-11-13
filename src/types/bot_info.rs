@@ -11,10 +11,8 @@ pub struct Info {
     pub server_data: HashMap<String, String>,
     pub token: String,
     pub login_info: LoginInfo,
-    pub ping: u32,
     pub status: String,
-    pub timeout: u32,
-    pub proxy: Option<ProxyInfo>
+    pub proxy: Option<ProxyInfo>,
 }
 
 #[derive(Debug)]
@@ -45,7 +43,8 @@ pub struct Server {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct FTUE { // First Time User Experience
+pub struct FTUE {
+    // First Time User Experience
     pub current_progress: i32,
     pub total_progress: i32,
     pub info: String,
@@ -55,4 +54,6 @@ pub struct FTUE { // First Time User Experience
 pub struct TemporaryData {
     pub drop: (u32, u32),
     pub trash: (u32, u32),
+    pub timeout: u32,
+    pub ping: u32,
 }
