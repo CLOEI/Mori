@@ -1,10 +1,9 @@
-use crate::core::{self, Bot};
+use crate::core::Bot;
 use crate::manager::proxy_manager::ProxyManager;
 use crate::types::config::BotConfig;
 use crate::utils;
 use gtitem_r::structs::ItemDatabase;
-use paris::{error, info};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::{spawn, JoinHandle};
 

@@ -1,4 +1,4 @@
-use egui::{ColorImage, Context, TextureHandle, TextureId};
+use egui::{ColorImage, Context, TextureHandle};
 use paris::info;
 use std::collections::HashMap;
 use std::fs;
@@ -32,20 +32,16 @@ impl TextureManager {
                 .collect();
             let image = ColorImage { size, pixels };
 
-            let handler = ctx.load_texture(
-                format!("game/{}", filename),
-                image,
-                egui::TextureOptions::default(),
-            );
+            let handler = ctx.load_texture(&filename, image, egui::TextureOptions::default());
             self.textures.insert(filename.clone(), handler);
 
             info!("Loaded texture: {}", filename);
         }
     }
 
-    pub fn get_texture(&self, filename: &str) -> Option<TextureId> {
+    pub fn get_texture(&self, filename: &str) -> Option<&TextureHandle> {
         match self.textures.get(filename) {
-            Some(texture) => Some(texture.id()),
+            Some(texture) => Some(texture),
             None => None,
         }
     }

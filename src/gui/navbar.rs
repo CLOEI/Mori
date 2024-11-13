@@ -1,6 +1,6 @@
 use super::add_bot_dialog::AddBotDialog;
-use crate::manager::bot_manager::BotManager;
 use crate::utils;
+use crate::{manager::bot_manager::BotManager, texture_manager::TextureManager};
 use eframe::egui::{self, include_image, Ui};
 use std::sync::{Arc, RwLock};
 

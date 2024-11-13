@@ -1,4 +1,4 @@
-use crate::manager::bot_manager::BotManager;
+use crate::{manager::bot_manager::BotManager, texture_manager::TextureManager};
 use eframe::egui::{self, Ui};
 use std::sync::{Arc, RwLock};
 
@@ -9,7 +9,13 @@ pub struct ItemDatabase {
 }
 
 impl ItemDatabase {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>, _ctx: &egui::Context) {
+    pub fn render(
+        &mut self,
+        ui: &mut Ui,
+        manager: &Arc<RwLock<BotManager>>,
+        texture_manager: &TextureManager,
+        _ctx: &egui::Context,
+    ) {
         let manager = manager.read().unwrap();
         let items_database = manager.items_database.read().unwrap();
 
@@ -91,7 +97,38 @@ impl ItemDatabase {
                             if let Some(selected_index) = self.selected_item_index {
                                 let selected_item =
                                     { items_database.get_item(&selected_index).unwrap().clone() };
+                                match texture_manager.get_texture(&selected_item.texture_file_name)
+                                {
+                                    Some(texture) => {
+                                        let [width, height] = texture.size();
+                                        let uv_x_start =
+                                            (selected_item.texture_x as f32 * 32.0) / width as f32;
+                                        let uv_y_start =
+                                            (selected_item.texture_y as f32 * 32.0) / height as f32;
+                                        let uv_x_end = ((selected_item.texture_x as f32 * 32.0)
+                                            + 32.0)
+                                            / width as f32;
+                                        let uv_y_end = ((selected_item.texture_y as f32 * 32.0)
+                                            + 32.0)
+                                            / height as f32;
+
+                                        let uv_start = egui::Pos2::new(uv_x_start, uv_y_start);
+                                        let uv_end = egui::Pos2::new(uv_x_end, uv_y_end);
+
+                                        ui.add(
+                                            egui::Image::new(texture)
+                                                .uv(egui::Rect::from_min_max(uv_start, uv_end))
+                                                .fit_to_exact_size(egui::Vec2::new(32.0, 32.0)),
+                                        );
+                                    }
+                                    None => (),
+                                }
+
                                 ui.label(format!("Name: {}", selected_item.name));
+                                ui.label(format!(
+                                    "Texture file name: {}",
+                                    selected_item.texture_file_name
+                                ));
 
                                 if selected_item.id != 0 {
                                     ui.label(format!("ID: {}", selected_item.id));

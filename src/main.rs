@@ -13,7 +13,6 @@ use egui::{
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
-use paris::info;
 use std::sync::{Arc, RwLock};
 use std::{
     fs::{self, File},
@@ -75,6 +74,7 @@ struct App {
     add_proxy_dialog: AddProxyDialog,
     bot_manager: Arc<RwLock<BotManager>>,
     proxy_manager: Arc<RwLock<ProxyManager>>,
+    texture_manager: texture_manager::TextureManager,
     proxy_list: ProxyList,
     settings: Settings,
     bot_menu: BotMenu,
@@ -113,6 +113,7 @@ impl App {
             },
             proxy_manager,
             bot_manager,
+            texture_manager,
         }
     }
 }
@@ -238,10 +239,12 @@ impl eframe::App for App {
             let mut content_ui = ui.new_child(UiBuilder::new().max_rect(content_rect));
             match self.navbar.current_menu.as_str() {
                 "bots" => self.bot_menu.render(&mut content_ui, &self.bot_manager),
-                "item_database" => {
-                    self.item_database
-                        .render(&mut content_ui, &self.bot_manager, ctx)
-                }
+                "item_database" => self.item_database.render(
+                    &mut content_ui,
+                    &self.bot_manager,
+                    &self.texture_manager,
+                    ctx,
+                ),
                 "proxy_list" => self.proxy_list.render(
                     &mut content_ui,
                     &self.proxy_manager,
