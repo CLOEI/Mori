@@ -238,7 +238,10 @@ impl eframe::App for App {
 
             let mut content_ui = ui.new_child(UiBuilder::new().max_rect(content_rect));
             match self.navbar.current_menu.as_str() {
-                "bots" => self.bot_menu.render(&mut content_ui, &self.bot_manager),
+                "bots" => {
+                    self.bot_menu
+                        .render(&mut content_ui, &self.bot_manager, &self.texture_manager)
+                }
                 "item_database" => self.item_database.render(
                     &mut content_ui,
                     &self.bot_manager,

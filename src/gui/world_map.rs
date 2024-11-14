@@ -1,4 +1,5 @@
 use crate::core::features;
+use crate::texture_manager::TextureManager;
 use crate::{
     core::{self},
     manager::bot_manager::BotManager,
@@ -6,6 +7,8 @@ use crate::{
     utils,
 };
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
+use egui::Painter;
+use gtitem_r::structs::Item;
 use gtworld_r::TileType;
 use paris::info;
 use std::sync::{Arc, RwLock};
@@ -21,7 +24,12 @@ pub struct WorldMap {
 }
 
 impl WorldMap {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>) {
+    pub fn render(
+        &mut self,
+        ui: &mut Ui,
+        manager: &Arc<RwLock<BotManager>>,
+        texture_manager: &TextureManager,
+    ) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
 
@@ -38,6 +46,8 @@ impl WorldMap {
                 let size = ui.available_size();
                 let (rect, response) = ui.allocate_exact_size(size, egui::Sense::hover());
                 let draw_list = ui.painter_at(rect);
+
+                draw_list.rect_filled(rect, 0.0, Color32::from_rgb(96, 215, 255));
 
                 if self.camera_pos == Pos2::default() {
                     let bot_position = bot.position.lock().unwrap();
@@ -98,61 +108,29 @@ impl WorldMap {
                                 .unwrap()
                         };
 
-                        if item.id == 0 {
-                            draw_list.rect_filled(
-                                Rect::from_min_max(
-                                    Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
-                                    Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
-                                ),
-                                0.0,
-                                Color32::from_rgb(96, 215, 255),
+                        if tile.background_item_id != 0 {
+                            let item_database = bot.item_database.read().unwrap();
+                            let background_item = item_database
+                                .get_item(&((tile.background_item_id + 1) as u32))
+                                .unwrap();
+
+                            self.draw_texture(
+                                &draw_list,
+                                &background_item,
+                                texture_manager,
+                                cell_min,
+                                cell_max,
                             );
-                            if tile.background_item_id != 0 {
-                                let item_database = bot.item_database.read().unwrap();
-                                let item = item_database
-                                    .get_item(&((tile.background_item_id + 1) as u32))
-                                    .unwrap();
-                                let color = item.base_color;
-                                let r = ((color >> 24) & 0xFF) as u8;
-                                let g = ((color >> 16) & 0xFF) as u8;
-                                let b = ((color >> 8) & 0xFF) as u8;
-                                draw_list.rect_filled(
-                                    Rect::from_min_max(
-                                        Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
-                                        Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
-                                    ),
-                                    0.0,
-                                    Color32::from_rgb(b, g, r),
-                                );
-                            }
-                        } else {
-                            let items_database = bot.item_database.read().unwrap();
-                            let color = items_database
-                                .get_item(&((tile.foreground_item_id + 1) as u32))
-                                .unwrap()
-                                .base_color;
-                            let r = ((color >> 24) & 0xFF) as u8;
-                            let g = ((color >> 16) & 0xFF) as u8;
-                            let b = ((color >> 8) & 0xFF) as u8;
-                            if item.name == "Bedrock" {
-                                draw_list.rect_filled(
-                                    Rect::from_min_max(
-                                        Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
-                                        Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
-                                    ),
-                                    0.0,
-                                    Color32::from_rgb(105, 105, 105),
-                                );
-                            } else {
-                                draw_list.rect_filled(
-                                    Rect::from_min_max(
-                                        Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
-                                        Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
-                                    ),
-                                    0.0,
-                                    Color32::from_rgb(b, g, r),
-                                );
-                            }
+                        }
+
+                        if item.id != 0 {
+                            self.draw_texture(
+                                &draw_list,
+                                &item,
+                                texture_manager,
+                                cell_min,
+                                cell_max,
+                            );
                         }
 
                         for player in bot.players.lock().unwrap().clone() {
@@ -280,6 +258,42 @@ impl WorldMap {
                         });
                     });
             }
+        }
+    }
+
+    fn draw_texture(
+        &self,
+        draw_list: &Painter,
+        item: &Item,
+        texture_manager: &TextureManager,
+        cell_min: Pos2,
+        cell_max: Pos2,
+    ) {
+        match texture_manager.get_texture(&item.texture_file_name) {
+            Some(texture) => {
+                let [width, height] = texture.size();
+                let uv_x_start = (item.texture_x as f32 * 32.0) / width as f32;
+                let uv_y_start = (item.texture_y as f32 * 32.0) / height as f32;
+                let uv_x_end = ((item.texture_x as f32 * 32.0) + 32.0) / width as f32;
+                let uv_y_end = ((item.texture_y as f32 * 32.0) + 32.0) / height as f32;
+
+                let uv_start = egui::Pos2::new(uv_x_start, uv_y_start);
+                let uv_end = egui::Pos2::new(uv_x_end, uv_y_end);
+
+                let cell_min = Pos2::new(cell_min.x.round(), cell_min.y.round());
+                let cell_max = Pos2::new(cell_max.x.round(), cell_max.y.round());
+
+                draw_list.image(
+                    texture.id(),
+                    Rect::from_min_max(
+                        Pos2::new(cell_min.x, cell_min.y),
+                        Pos2::new(cell_max.x, cell_max.y),
+                    ),
+                    egui::Rect::from_min_max(uv_start, uv_end),
+                    Color32::WHITE,
+                );
+            }
+            None => (),
         }
     }
 }

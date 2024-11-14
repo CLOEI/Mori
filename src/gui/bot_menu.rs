@@ -5,6 +5,7 @@ use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
 use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
+use crate::texture_manager::TextureManager;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Ui};
 use egui::scroll_area::ScrollBarVisibility;
@@ -23,7 +24,7 @@ pub struct BotMenu {
 }
 
 impl BotMenu {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>, texture_manager: &TextureManager) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
         ui.add_space(4.0);
@@ -289,7 +290,7 @@ impl BotMenu {
                     }
                 } else if self.current_menu == "world_map" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
-                        self.world_map.render(ui, &manager);
+                        self.world_map.render(ui, &manager, &texture_manager);
                     });
                 } else if self.current_menu == "inventory" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
