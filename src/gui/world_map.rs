@@ -16,6 +16,8 @@ pub struct WorldMap {
     pub selected_bot: String,
     pub warp_name: String,
     pub bots: Vec<BotConfig>,
+    camera_pos: Pos2,
+    zoom: f32,
 }
 
 impl WorldMap {
@@ -33,26 +35,54 @@ impl WorldMap {
                 }
             };
             if let Some(bot) = bot {
-                let draw_list = ui.painter();
-                let p = ui.min_rect().min;
                 let size = ui.available_size();
-                let min = Pos2::new(p.x, p.y);
-                let max = Pos2::new(p.x + size.x, p.y + size.y);
-                let rect = Rect::from_min_max(min, max);
-                draw_list.rect_filled(rect, 0.0, Color32::from_rgb(96, 215, 242));
+                let (rect, response) = ui.allocate_exact_size(size, egui::Sense::hover());
+                let draw_list = ui.painter_at(rect);
+
+                if self.camera_pos == Pos2::default() {
+                    let bot_position = bot.position.lock().unwrap();
+                    self.camera_pos = Pos2::new(bot_position.x, bot_position.y);
+                    self.zoom = 0.5;
+                }
+
+                {
+                    let bot_position = bot.position.lock().unwrap();
+                    let target_pos = Pos2::new(bot_position.x, bot_position.y);
+                    let smoothing_factor = 0.1;
+                    self.camera_pos.x += (target_pos.x - self.camera_pos.x) * smoothing_factor;
+                    self.camera_pos.y += (target_pos.y - self.camera_pos.y) * smoothing_factor;
+                }
+
+                let cell_size = 32.0 * self.zoom;
+                let camera_tile_x = (self.camera_pos.x / 32.0).floor() as i32;
+                let camera_tile_y = (self.camera_pos.y / 32.0).floor() as i32;
+                let offset_x = (self.camera_pos.x % 32.0) * self.zoom;
+                let offset_y = (self.camera_pos.y % 32.0) * self.zoom;
+
+                let tiles_in_view_x = (size.x / cell_size).ceil() as i32 + 1;
+                let tiles_in_view_y = (size.y / cell_size).ceil() as i32 + 1;
 
                 let world = bot.world.read().unwrap();
-                let cell_width = size.x / world.width as f32;
-                let cell_height = size.y / world.height as f32;
+                for y in 0..tiles_in_view_y {
+                    for x in 0..tiles_in_view_x {
+                        let world_x = camera_tile_x + x - tiles_in_view_x / 2;
+                        let world_y = camera_tile_y + y - tiles_in_view_y / 2;
 
-                for y in 0..world.height {
-                    for x in 0..world.width {
                         let cell_min = Pos2::new(
-                            min.x + x as f32 * cell_width,
-                            min.y + y as f32 * cell_height,
+                            rect.min.x + x as f32 * cell_size - offset_x,
+                            rect.min.y + y as f32 * cell_size - offset_y,
                         );
-                        let cell_max = Pos2::new(cell_min.x + cell_width, cell_min.y + cell_height);
-                        if (y * world.width + x) >= world.tile_count {
+                        let cell_max = Pos2::new(cell_min.x + cell_size, cell_min.y + cell_size);
+
+                        if world_x < 0
+                            || world_y < 0
+                            || world_x >= world.width as i32
+                            || world_y >= world.height as i32
+                        {
+                            continue;
+                        }
+
+                        if (world_y * world.width as i32 + world_x) >= world.tile_count as i32 {
                             draw_list.rect_filled(
                                 Rect::from_min_max(cell_min, cell_max),
                                 0.0,
@@ -60,7 +90,7 @@ impl WorldMap {
                             );
                             continue;
                         }
-                        let tile = world.get_tile(x, y).unwrap();
+                        let tile = world.get_tile(world_x as u32, world_y as u32).unwrap();
                         let item = {
                             let item_database = bot.item_database.read().unwrap();
                             item_database
@@ -69,6 +99,14 @@ impl WorldMap {
                         };
 
                         if item.id == 0 {
+                            draw_list.rect_filled(
+                                Rect::from_min_max(
+                                    Pos2::new(cell_min.x - 1.0, cell_min.y - 1.0),
+                                    Pos2::new(cell_max.x + 1.0, cell_max.y + 1.0),
+                                ),
+                                0.0,
+                                Color32::from_rgb(96, 215, 255),
+                            );
                             if tile.background_item_id != 0 {
                                 let item_database = bot.item_database.read().unwrap();
                                 let item = item_database
@@ -118,8 +156,8 @@ impl WorldMap {
                         }
 
                         for player in bot.players.lock().unwrap().clone() {
-                            if (player.position.x / 32.0).floor() == (x as f32)
-                                && (player.position.y / 32.0).floor() == (y as f32)
+                            if (player.position.x / 32.0).floor() == (world_x as f32)
+                                && (player.position.y / 32.0).floor() == (world_y as f32)
                             {
                                 draw_list.rect_filled(
                                     Rect::from_min_max(cell_min, cell_max),
@@ -130,8 +168,8 @@ impl WorldMap {
                         }
 
                         let bot_position = bot.position.lock().unwrap();
-                        if (bot_position.x / 32.0).floor() == (x as f32)
-                            && (bot_position.y / 32.0).floor() == (y as f32)
+                        if (bot_position.x / 32.0).floor() == (world_x as f32)
+                            && (bot_position.y / 32.0).floor() == (world_y as f32)
                         {
                             draw_list.rect_filled(
                                 Rect::from_min_max(cell_min, cell_max),
@@ -140,8 +178,10 @@ impl WorldMap {
                             );
                         }
 
-                        if ui.rect_contains_pointer(Rect::from_min_max(cell_min, cell_max)) {
-                            let mut data;
+                        if response.hover_pos().map_or(false, |pos| {
+                            Rect::from_min_max(cell_min, cell_max).contains(pos)
+                        }) {
+                            let data;
                             if let TileType::Seed {
                                 ready_to_harvest,
                                 timer,
@@ -160,12 +200,12 @@ impl WorldMap {
                                 };
                                 data = format!(
                                     "Position: {}|{}\nItem name: {}\nCollision type: {}\nReady to harvest: {}\nTime passed: {}",
-                                    x, y, item.name, item.collision_type, ready_to_harvest, elapsed
+                                    world_x, world_y, item.name, item.collision_type, ready_to_harvest, elapsed
                                 )
                             } else {
                                 data = format!(
                                     "Position: {}|{}\nItem name: {}\nCollision type: {}",
-                                    x, y, item.name, item.collision_type
+                                    world_x, world_y, item.name, item.collision_type
                                 )
                             }
 
@@ -179,10 +219,10 @@ impl WorldMap {
                             );
 
                             if ui.input(|i| i.pointer.any_click()) {
-                                info!("Clicked on tile: {}|{}", x, y);
+                                info!("Clicked on tile: {}|{}", world_x, world_y);
                                 let bot_clone = bot.clone();
                                 thread::spawn(move || {
-                                    bot_clone.find_path(x, y);
+                                    bot_clone.find_path(world_x as u32, world_y as u32);
                                 });
                             }
                         }
@@ -218,6 +258,7 @@ impl WorldMap {
                                     bot_clone.walk(1, 0, false);
                                 });
                             }
+                            ui.add(egui::Slider::new(&mut self.zoom, 0.1..=2.0).text("Zoom"));
                         });
                     });
 
