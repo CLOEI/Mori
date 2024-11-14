@@ -652,6 +652,7 @@ impl Bot {
                             self.log_warn("Disconnected from the server");
                             self.set_status("Disconnected");
                             let mut world = self.world.write().unwrap();
+                            self.players.lock().unwrap().clear();
                             world.reset();
                             break;
                         }

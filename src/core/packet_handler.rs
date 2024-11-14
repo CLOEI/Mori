@@ -133,6 +133,7 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                             let mut world = bot.world.write().unwrap();
                             world.parse(&data[56..]);
                         }
+                        bot.players.lock().unwrap().clear();
                         bot.astar.lock().unwrap().update(&bot);
                         bot.send_packet(
                             EPacketType::NetMessageGenericText,
