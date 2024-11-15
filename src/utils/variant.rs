@@ -65,6 +65,13 @@ impl Variant {
             _ => (0.0, 0.0),
         }
     }
+
+    pub fn as_uint32(&self) -> u32 {
+        match self {
+            Variant::Unsigned(value) => *value,
+            _ => 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

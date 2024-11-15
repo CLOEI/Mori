@@ -289,7 +289,7 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     }
                     ETankPacketType::NetGamePacketSendTileUpdateData => {
                         let tile = {
-                            let mut world = bot.world.write().unwrap();
+                            let world = bot.world.write().unwrap();
                             world
                                 .get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32)
                                 .unwrap()
@@ -307,6 +307,7 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                         let mut decoder = ZlibDecoder::new(data);
                         let mut data = Vec::new();
                         decoder.read_to_end(&mut data).unwrap();
+                        fs::write("items.dat", &data).unwrap();
                         let mut item_database = bot.item_database.write().unwrap();
                         *item_database = gtitem_r::load_from_memory(&data).unwrap();
                     }

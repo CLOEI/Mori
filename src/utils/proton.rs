@@ -1,3 +1,8 @@
+use std::{
+    fs::File,
+    io::{self, Read},
+};
+
 use md5;
 use sha2::{Digest, Sha256};
 
@@ -51,4 +56,17 @@ pub fn hash_string(input: &str) -> u32 {
         acc = (acc >> 27) + (acc << 5) + (*byte as u32);
     }
     acc
+}
+
+pub fn hash_file(file_name: &str) -> io::Result<u32> {
+    let mut file = File::open(file_name)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+
+    let mut hash: u32 = 0x55555555;
+    for byte in buffer {
+        hash = (hash >> 27) + (hash << 5) + (byte as u32);
+    }
+
+    Ok(hash)
 }

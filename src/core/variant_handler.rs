@@ -36,11 +36,28 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             bot.disconnect();
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
+            let server_hash = variant.get(1).unwrap().as_uint32();
             let item_database_loaded = {
                 let item_database = bot.item_database.read().unwrap();
                 item_database.loaded
             };
+
             if !item_database_loaded {
+                match utils::proton::hash_file("items.dat") {
+                    Ok(hash) => {
+                        if hash == server_hash {
+                            let mut item_database = bot.item_database.write().unwrap();
+                            *item_database = gtitem_r::load_from_file("items.dat").unwrap();
+                            bot.send_packet(
+                                EPacketType::NetMessageGenericText,
+                                "action|enter_game\n".to_string(),
+                            );
+                            return;
+                        }
+                    }
+                    Err(_) => {}
+                }
+
                 bot.send_packet(
                     EPacketType::NetMessageGenericText,
                     "action|refresh_item_data\n".to_string(),
