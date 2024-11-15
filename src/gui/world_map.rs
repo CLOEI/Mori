@@ -236,6 +236,39 @@ impl WorldMap {
                                 }
                             }
 
+                            if item.render_type == 3 {
+                                if let (Some(left_tile), Some(right_tile), Some(top_tile)) =
+                                    (left_tile, right_tile, top_tile)
+                                {
+                                    if left_tile.foreground_item_id == item.id as u16
+                                        && right_tile.foreground_item_id == item.id as u16
+                                    {
+                                        texture_x += 1;
+                                    }
+                                    if left_tile.foreground_item_id == item.id as u16
+                                        && right_tile.foreground_item_id != item.id as u16
+                                    {
+                                        if top_tile.foreground_item_id == 8986 {
+                                            texture_x += 5;
+                                        } else {
+                                            texture_x += 2;
+                                        }
+                                    }
+                                    if left_tile.foreground_item_id != item.id as u16
+                                        && right_tile.foreground_item_id != item.id as u16
+                                    {
+                                        texture_x += 3;
+                                    }
+                                    if left_tile.foreground_item_id != item.id as u16
+                                        && right_tile.foreground_item_id == item.id as u16
+                                    {
+                                        if top_tile.foreground_item_id == 8986 {
+                                            texture_x += 4;
+                                        }
+                                    }
+                                }
+                            }
+
                             self.draw_texture(
                                 &draw_list,
                                 texture_manager,
