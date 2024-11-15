@@ -215,6 +215,27 @@ impl WorldMap {
                                 }
                             }
 
+                            if item.render_type == 7 {
+                                if let (Some(top_tile), Some(bottom_tile)) = (top_tile, bottom_tile)
+                                {
+                                    if top_tile.foreground_item_id != item.id as u16
+                                        && bottom_tile.foreground_item_id == item.id as u16
+                                    {
+                                        texture_x += 2;
+                                    }
+                                    if top_tile.foreground_item_id == item.id as u16
+                                        && bottom_tile.foreground_item_id == item.id as u16
+                                    {
+                                        texture_x += 1;
+                                    }
+                                    if top_tile.foreground_item_id != item.id as u16
+                                        && bottom_tile.foreground_item_id != item.id as u16
+                                    {
+                                        texture_x += 3;
+                                    }
+                                }
+                            }
+
                             self.draw_texture(
                                 &draw_list,
                                 texture_manager,
