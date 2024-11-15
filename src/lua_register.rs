@@ -197,7 +197,7 @@ fn register_world_api<'lua>(
             tile_table.set("fg", tile.foreground_item_id)?;
             tile_table.set("bg", tile.background_item_id)?;
             tile_table.set("pbi", tile.parent_block_index)?;
-            tile_table.set("flags", tile.flags)?;
+            // tile_table.set("flags", tile.flags)?;
             tile_table.set("x", tile.x)?;
             tile_table.set("y", tile.y)?;
             tile_table.set("harvestable", tile_harvestable_func)?;
@@ -307,7 +307,7 @@ fn register_tile_api<'lua>(
         tile_data.set("fg", tile.foreground_item_id)?;
         tile_data.set("bg", tile.background_item_id)?;
         tile_data.set("pbi", tile.parent_block_index)?;
-        tile_data.set("flags", tile.flags)?;
+        // tile_data.set("flags", tile.flags)?;
         tile_data.set("x", tile.x)?;
         tile_data.set("y", tile.y)?;
 

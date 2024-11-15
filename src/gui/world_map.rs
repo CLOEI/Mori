@@ -1,18 +1,10 @@
-use crate::core::features;
 use crate::texture_manager::TextureManager;
-use crate::{
-    core::{self},
-    manager::bot_manager::BotManager,
-    types::config::BotConfig,
-    utils,
-};
+use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use egui::Painter;
-use gtitem_r::structs::Item;
-use gtworld_r::{TileType, World};
-use image::codecs::farbfeld;
+use gtworld_r::TileType;
 use paris::info;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::{Arc, RwLock};
 use std::thread;
 
 #[derive(Default)]
@@ -123,6 +115,7 @@ impl WorldMap {
                                 background_item.texture_file_name.clone(),
                                 cell_min,
                                 cell_max,
+                                tile.flags.flipped_x,
                             );
                         }
 
@@ -269,6 +262,32 @@ impl WorldMap {
                                 }
                             }
 
+                            if item.render_type == 5 {
+                                if let (
+                                    Some(left_tile),
+                                    Some(right_tile),
+                                    Some(top_tile),
+                                    Some(bottom_tile),
+                                ) = (left_tile, right_tile, top_tile, bottom_tile)
+                                {
+                                    let left_match = left_tile.foreground_item_id == item.id as u16;
+                                    let right_match =
+                                        right_tile.foreground_item_id == item.id as u16;
+                                    let top_match = top_tile.foreground_item_id == item.id as u16;
+                                    let bottom_match =
+                                        bottom_tile.foreground_item_id == item.id as u16;
+
+                                    if (left_match && !right_match && !top_match && !bottom_match)
+                                        || (!left_match
+                                            && right_match
+                                            && !top_match
+                                            && !bottom_match)
+                                    {
+                                        texture_x += 7;
+                                    }
+                                }
+                            }
+
                             self.draw_texture(
                                 &draw_list,
                                 texture_manager,
@@ -277,6 +296,7 @@ impl WorldMap {
                                 texture_name,
                                 cell_min,
                                 cell_max,
+                                tile.flags.flipped_x,
                             );
                         }
 
@@ -417,6 +437,7 @@ impl WorldMap {
         texture_name: String,
         cell_min: Pos2,
         cell_max: Pos2,
+        flipped: bool,
     ) {
         match texture_manager.get_texture(&texture_name) {
             Some(texture) => {
@@ -432,15 +453,27 @@ impl WorldMap {
                 let cell_min = Pos2::new(cell_min.x.round(), cell_min.y.round());
                 let cell_max = Pos2::new(cell_max.x.round(), cell_max.y.round());
 
-                draw_list.image(
-                    texture.id(),
-                    Rect::from_min_max(
-                        Pos2::new(cell_min.x, cell_min.y),
-                        Pos2::new(cell_max.x, cell_max.y),
-                    ),
-                    egui::Rect::from_min_max(uv_start, uv_end),
-                    Color32::WHITE,
-                );
+                if flipped {
+                    draw_list.image(
+                        texture.id(),
+                        Rect::from_min_max(
+                            Pos2::new(cell_max.x, cell_min.y),
+                            Pos2::new(cell_min.x, cell_max.y),
+                        ),
+                        egui::Rect::from_min_max(uv_end, uv_start),
+                        Color32::WHITE,
+                    );
+                } else {
+                    draw_list.image(
+                        texture.id(),
+                        Rect::from_min_max(
+                            Pos2::new(cell_min.x, cell_min.y),
+                            Pos2::new(cell_max.x, cell_max.y),
+                        ),
+                        egui::Rect::from_min_max(uv_start, uv_end),
+                        Color32::WHITE,
+                    );
+                }
             }
             None => (),
         }
