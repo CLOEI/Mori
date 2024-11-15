@@ -100,17 +100,28 @@ impl ItemDatabase {
                                 match texture_manager.get_texture(&selected_item.texture_file_name)
                                 {
                                     Some(texture) => {
+                                        let (spread_x, spread_y) = match selected_item.render_type {
+                                            2 | 5 => (4.0, 1.0),
+                                            4 => (4.0, 0.0),
+                                            3 | 7 | 8 | 9 | 10 => (3.0, 0.0),
+                                            _ => (0.0, 0.0),
+                                        };
+
                                         let [width, height] = texture.size();
                                         let uv_x_start =
-                                            (selected_item.texture_x as f32 * 32.0) / width as f32;
+                                            ((selected_item.texture_x as f32 + spread_x) * 32.0)
+                                                / width as f32;
                                         let uv_y_start =
-                                            (selected_item.texture_y as f32 * 32.0) / height as f32;
-                                        let uv_x_end = ((selected_item.texture_x as f32 * 32.0)
-                                            + 32.0)
-                                            / width as f32;
-                                        let uv_y_end = ((selected_item.texture_y as f32 * 32.0)
-                                            + 32.0)
-                                            / height as f32;
+                                            ((selected_item.texture_y as f32 + spread_y) * 32.0)
+                                                / height as f32;
+                                        let uv_x_end =
+                                            (((selected_item.texture_x as f32 + spread_x) * 32.0)
+                                                + 32.0)
+                                                / width as f32;
+                                        let uv_y_end =
+                                            (((selected_item.texture_y as f32 + spread_y) * 32.0)
+                                                + 32.0)
+                                                / height as f32;
 
                                         let uv_start = egui::Pos2::new(uv_x_start, uv_y_start);
                                         let uv_end = egui::Pos2::new(uv_x_end, uv_y_end);
@@ -125,10 +136,6 @@ impl ItemDatabase {
                                 }
 
                                 ui.label(format!("Name: {}", selected_item.name));
-                                ui.label(format!(
-                                    "Texture file name: {}",
-                                    selected_item.texture_file_name
-                                ));
 
                                 if selected_item.id != 0 {
                                     ui.label(format!("ID: {}", selected_item.id));
