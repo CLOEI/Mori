@@ -9,9 +9,10 @@ use crate::{
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
 use egui::Painter;
 use gtitem_r::structs::Item;
-use gtworld_r::TileType;
+use gtworld_r::{TileType, World};
+use image::codecs::farbfeld;
 use paris::info;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::thread;
 
 #[derive(Default)]
@@ -116,18 +117,110 @@ impl WorldMap {
 
                             self.draw_texture(
                                 &draw_list,
-                                &background_item,
                                 texture_manager,
+                                background_item.texture_x,
+                                background_item.texture_y,
+                                background_item.texture_file_name.clone(),
                                 cell_min,
                                 cell_max,
                             );
                         }
 
                         if item.id != 0 {
+                            let mut texture_x = item.texture_x;
+                            let mut texture_y = item.texture_y;
+                            let texture_name = item.texture_file_name.clone();
+
+                            let left_tile = if world_x > 0 {
+                                world.get_tile(world_x as u32 - 1, world_y as u32)
+                            } else {
+                                None
+                            };
+                            let right_tile = if world_x < world.width as i32 - 1 {
+                                world.get_tile(world_x as u32 + 1, world_y as u32)
+                            } else {
+                                None
+                            };
+                            let top_tile = if world_y > 0 {
+                                world.get_tile(world_x as u32, world_y as u32 - 1)
+                            } else {
+                                None
+                            };
+                            let bottom_tile = if world_y < world.height as i32 - 1 {
+                                world.get_tile(world_x as u32, world_y as u32 + 1)
+                            } else {
+                                None
+                            };
+
+                            if item.render_type == 2 {
+                                if let (
+                                    Some(left_tile),
+                                    Some(right_tile),
+                                    Some(top_tile),
+                                    Some(bottom_tile),
+                                ) = (left_tile, right_tile, top_tile, bottom_tile)
+                                {
+                                    let left_match = left_tile.foreground_item_id == item.id as u16;
+                                    let right_match =
+                                        right_tile.foreground_item_id == item.id as u16;
+                                    let top_match = top_tile.foreground_item_id == item.id as u16;
+                                    let bottom_match =
+                                        bottom_tile.foreground_item_id == item.id as u16;
+
+                                    match (left_match, right_match, top_match, bottom_match) {
+                                        (true, true, true, true) => (),
+                                        (true, true, true, false) => texture_x += 2,
+                                        (true, true, false, true) => texture_x += 1,
+                                        (true, false, true, true) => texture_x += 4,
+                                        (false, true, true, true) => texture_x += 3,
+                                        (true, true, false, false) => texture_x += 1,
+                                        (true, false, false, true) => texture_x += 6,
+                                        (false, true, true, false) => texture_x += 7,
+                                        (false, true, false, true) => texture_x += 5,
+                                        (true, false, false, false) => texture_x += 6,
+                                        (false, false, false, true) => {
+                                            texture_x += 2;
+                                            texture_y += 1;
+                                        }
+                                        (false, true, false, false) => texture_x += 5,
+                                        _ => (),
+                                    }
+                                }
+
+                                if let (None, Some(right_tile), Some(top_tile), Some(bottom_tile)) =
+                                    (left_tile, right_tile, top_tile, bottom_tile)
+                                {
+                                    let right_match =
+                                        right_tile.foreground_item_id == item.id as u16;
+                                    let bottom_match =
+                                        bottom_tile.foreground_item_id == item.id as u16;
+                                    let top_match = top_tile.foreground_item_id != item.id as u16;
+
+                                    if right_match && bottom_match && top_match {
+                                        texture_x += 1;
+                                    }
+                                }
+
+                                if let (Some(left_tile), None, Some(top_tile), Some(bottom_tile)) =
+                                    (left_tile, right_tile, top_tile, bottom_tile)
+                                {
+                                    let left_match = left_tile.foreground_item_id == item.id as u16;
+                                    let bottom_match =
+                                        bottom_tile.foreground_item_id == item.id as u16;
+                                    let top_match = top_tile.foreground_item_id != item.id as u16;
+
+                                    if left_match && bottom_match && top_match {
+                                        texture_x += 1;
+                                    }
+                                }
+                            }
+
                             self.draw_texture(
                                 &draw_list,
-                                &item,
                                 texture_manager,
+                                texture_x,
+                                texture_y,
+                                texture_name,
                                 cell_min,
                                 cell_max,
                             );
@@ -177,13 +270,13 @@ impl WorldMap {
                                     }
                                 };
                                 data = format!(
-                                    "Position: {}|{}\nItem name: {}\nCollision type: {}\nReady to harvest: {}\nTime passed: {}",
-                                    world_x, world_y, item.name, item.collision_type, ready_to_harvest, elapsed
+                                    "Position: {}|{}\nItem name: {}\nCollision type: {}\nReady to harvest: {}\nTime passed: {}\nRender type: {}",
+                                    world_x, world_y, item.name, item.collision_type, ready_to_harvest, elapsed, item.render_type
                                 )
                             } else {
                                 data = format!(
-                                    "Position: {}|{}\nItem name: {}\nCollision type: {}",
-                                    world_x, world_y, item.name, item.collision_type
+                                    "Position: {}|{}\nItem name: {}\nCollision type: {}\nRender type: {}",
+                                    world_x, world_y, item.name, item.collision_type, item.render_type
                                 )
                             }
 
@@ -264,18 +357,20 @@ impl WorldMap {
     fn draw_texture(
         &self,
         draw_list: &Painter,
-        item: &Item,
         texture_manager: &TextureManager,
+        texture_x: u8,
+        texture_y: u8,
+        texture_name: String,
         cell_min: Pos2,
         cell_max: Pos2,
     ) {
-        match texture_manager.get_texture(&item.texture_file_name) {
+        match texture_manager.get_texture(&texture_name) {
             Some(texture) => {
                 let [width, height] = texture.size();
-                let uv_x_start = (item.texture_x as f32 * 32.0) / width as f32;
-                let uv_y_start = (item.texture_y as f32 * 32.0) / height as f32;
-                let uv_x_end = ((item.texture_x as f32 * 32.0) + 32.0) / width as f32;
-                let uv_y_end = ((item.texture_y as f32 * 32.0) + 32.0) / height as f32;
+                let uv_x_start = (texture_x as f32 * 32.0) / width as f32;
+                let uv_y_start = (texture_y as f32 * 32.0) / height as f32;
+                let uv_x_end = ((texture_x as f32 * 32.0) + 32.0) / width as f32;
+                let uv_y_end = ((texture_y as f32 * 32.0) + 32.0) / height as f32;
 
                 let uv_start = egui::Pos2::new(uv_x_start, uv_y_start);
                 let uv_end = egui::Pos2::new(uv_x_end, uv_y_end);
