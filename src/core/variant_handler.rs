@@ -151,10 +151,34 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
             bot.log_info(format!("Received position: {:?}", pos).as_str());
-            let pos_y = core::get_coordinate_to_touch_ground(pos.1);
             let mut position = bot.position.lock().unwrap();
+            let mut temp = bot.temporary_data.write().unwrap();
+            let (world_name, main_door_x, main_door_y) = {
+                let world = bot.world.read().unwrap();
+                let mut data = (0.0, 0.0);
+                if let Some(item) = world.tiles.iter().find(|item| item.foreground_item_id == 6) {
+                    data = (item.x as f32 * 32.0, item.y as f32 * 32.0);
+                } else {
+                    data = (0.0, 0.0);
+                }
+                (world.name.clone(), data.0, data.1)
+            };
+
+            let is_warp_to_id = world_name.contains("|");
+
+            if !temp.entered_world
+                && (pos.0 != main_door_x || pos.1 != main_door_y)
+                && !is_warp_to_id
+            {
+                position.x = main_door_x;
+                position.y = core::get_coordinate_to_touch_ground(main_door_y);
+                temp.entered_world = true;
+                return;
+            }
+
             position.x = pos.0;
-            position.y = pos_y;
+            position.y = core::get_coordinate_to_touch_ground(pos.1);
+            temp.entered_world = true;
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();

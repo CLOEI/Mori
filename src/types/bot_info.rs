@@ -56,4 +56,5 @@ pub struct TemporaryData {
     pub trash: (u32, u32),
     pub timeout: u32,
     pub ping: u32,
+    pub entered_world: bool,
 }

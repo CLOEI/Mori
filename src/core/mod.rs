@@ -652,8 +652,12 @@ impl Bot {
                             self.log_warn("Disconnected from the server");
                             self.set_status("Disconnected");
                             let mut world = self.world.write().unwrap();
+                            let mut position = self.position.lock().unwrap();
+                            let mut temp = self.temporary_data.write().unwrap();
                             self.players.lock().unwrap().clear();
                             world.reset();
+                            position.reset();
+                            temp.entered_world = false;
                             break;
                         }
                         enet::EventNoRef::Receive { packet, .. } => {
