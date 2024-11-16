@@ -1,7 +1,7 @@
 use crate::texture_manager::TextureManager;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
-use egui::Painter;
+use egui::{Painter, TextBuffer};
 use gtworld_r::TileType;
 use paris::info;
 use std::sync::{Arc, RwLock};
@@ -238,22 +238,8 @@ impl WorldMap {
                                     {
                                         texture_x += 1;
                                     }
-                                    if left_tile.foreground_item_id == item.id as u16
-                                        && right_tile.foreground_item_id != item.id as u16
-                                    {
-                                        if top_tile.foreground_item_id == 8986 {
-                                            texture_x += 5;
-                                        } else {
-                                            texture_x += 2;
-                                        }
-                                    }
                                     if left_tile.foreground_item_id != item.id as u16
-                                        && right_tile.foreground_item_id != item.id as u16
-                                    {
-                                        texture_x += 3;
-                                    }
-                                    if left_tile.foreground_item_id != item.id as u16
-                                        && right_tile.foreground_item_id == item.id as u16
+                                        || right_tile.foreground_item_id != item.id as u16
                                     {
                                         if top_tile.foreground_item_id == 8986 {
                                             texture_x += 4;
@@ -447,33 +433,30 @@ impl WorldMap {
                 let uv_x_end = ((texture_x as f32 * 32.0) + 32.0) / width as f32;
                 let uv_y_end = ((texture_y as f32 * 32.0) + 32.0) / height as f32;
 
-                let uv_start = egui::Pos2::new(uv_x_start, uv_y_start);
-                let uv_end = egui::Pos2::new(uv_x_end, uv_y_end);
+                let (uv_start, uv_end) = if flipped {
+                    (
+                        egui::Pos2::new(uv_x_end, uv_y_start),
+                        egui::Pos2::new(uv_x_start, uv_y_end),
+                    )
+                } else {
+                    (
+                        egui::Pos2::new(uv_x_start, uv_y_start),
+                        egui::Pos2::new(uv_x_end, uv_y_end),
+                    )
+                };
 
                 let cell_min = Pos2::new(cell_min.x.round(), cell_min.y.round());
                 let cell_max = Pos2::new(cell_max.x.round(), cell_max.y.round());
 
-                if flipped {
-                    draw_list.image(
-                        texture.id(),
-                        Rect::from_min_max(
-                            Pos2::new(cell_max.x, cell_min.y),
-                            Pos2::new(cell_min.x, cell_max.y),
-                        ),
-                        egui::Rect::from_min_max(uv_end, uv_start),
-                        Color32::WHITE,
-                    );
-                } else {
-                    draw_list.image(
-                        texture.id(),
-                        Rect::from_min_max(
-                            Pos2::new(cell_min.x, cell_min.y),
-                            Pos2::new(cell_max.x, cell_max.y),
-                        ),
-                        egui::Rect::from_min_max(uv_start, uv_end),
-                        Color32::WHITE,
-                    );
-                }
+                draw_list.image(
+                    texture.id(),
+                    Rect::from_min_max(
+                        Pos2::new(cell_min.x, cell_min.y),
+                        Pos2::new(cell_max.x, cell_max.y),
+                    ),
+                    egui::Rect::from_min_max(uv_start, uv_end),
+                    Color32::WHITE,
+                );
             }
             None => (),
         }
