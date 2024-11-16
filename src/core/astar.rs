@@ -1,10 +1,10 @@
+use gtitem_r::structs::ItemDatabase;
+use std::sync::RwLock;
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap, HashSet},
     sync::Arc,
 };
-use std::sync::RwLock;
-use gtitem_r::structs::ItemDatabase;
 
 use super::Bot;
 
@@ -40,8 +40,7 @@ impl Node {
 
 impl Ord for Node {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.f.cmp(&self.f)
-            .then_with(|| other.h.cmp(&self.h))
+        other.f.cmp(&self.f).then_with(|| other.h.cmp(&self.h))
     }
 }
 
@@ -84,13 +83,7 @@ impl AStar {
         }
     }
 
-    pub fn find_path(
-        &self,
-        from_x: u32,
-        from_y: u32,
-        to_x: u32,
-        to_y: u32,
-    ) -> Option<Vec<Node>> {
+    pub fn find_path(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> Option<Vec<Node>> {
         let mut open_list = BinaryHeap::new();
         let mut came_from: HashMap<(u32, u32), (u32, u32)> = HashMap::new();
         let mut closed_set: HashSet<(u32, u32)> = HashSet::new();
@@ -191,15 +184,35 @@ impl AStar {
                 let index = (new_y as u32 * self.width + new_x as u32) as usize;
                 let neighbor = &self.grid[index];
 
-                if neighbor.collision_type == 2 {
-                    if dy == 1 {
+                if neighbor.collision_type == 1 || neighbor.collision_type == 6 {
+                    continue;
+                }
+
+                if dx != 0 && dy != 0 {
+                    let adj1_x = node.x as i32 + dx;
+                    let adj1_y = node.y as i32;
+                    let adj2_x = node.x as i32;
+                    let adj2_y = node.y as i32 + dy;
+
+                    if adj1_x < 0
+                        || adj1_x >= self.width as i32
+                        || adj2_y < 0
+                        || adj2_y >= self.height as i32
+                    {
+                        continue;
+                    }
+
+                    let adj1_index = (adj1_y as u32 * self.width + adj1_x as u32) as usize;
+                    let adj2_index = (adj2_y as u32 * self.width + adj2_x as u32) as usize;
+
+                    let adj1 = &self.grid[adj1_index];
+                    let adj2 = &self.grid[adj2_index];
+                    if adj1.collision_type == 1 || adj2.collision_type == 1 {
                         continue;
                     }
                 }
 
-                if neighbor.collision_type != 1 {
-                    neighbors.push(neighbor.clone());
-                }
+                neighbors.push(neighbor.clone());
             }
         }
 
