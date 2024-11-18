@@ -351,10 +351,24 @@ impl WorldMap {
                             if (player.position.x / 32.0).floor() == (world_x as f32)
                                 && (player.position.y / 32.0).floor() == (world_y as f32)
                             {
-                                draw_list.rect_filled(
-                                    Rect::from_min_max(cell_min, cell_max),
-                                    0.0,
-                                    Color32::from_rgb(255, 215, 0),
+                                let center_min = Pos2::new(
+                                    cell_min.x + cell_size * 0.25,
+                                    cell_min.y + cell_size * 0.25,
+                                );
+                                let center_max = Pos2::new(
+                                    cell_max.x - cell_size * 0.25,
+                                    cell_max.y - cell_size * 0.25,
+                                );
+                                self.draw_texture(
+                                    &draw_list,
+                                    texture_manager,
+                                    17,
+                                    5,
+                                    "player_cosmetics1.rttex".to_string(),
+                                    center_min,
+                                    center_max,
+                                    tile.flags.flipped_x,
+                                    Color32::WHITE,
                                 );
                             }
                         }
@@ -363,10 +377,16 @@ impl WorldMap {
                         if (bot_position.x / 32.0).floor() == (world_x as f32)
                             && (bot_position.y / 32.0).floor() == (world_y as f32)
                         {
-                            draw_list.rect_filled(
-                                Rect::from_min_max(cell_min, cell_max),
-                                0.0,
-                                Color32::from_rgb(255, 0, 0),
+                            self.draw_texture(
+                                &draw_list,
+                                texture_manager,
+                                3,
+                                4,
+                                "tiles_page1.rttex".to_string(),
+                                cell_min,
+                                cell_max,
+                                tile.flags.flipped_x,
+                                Color32::WHITE,
                             );
                         }
 
