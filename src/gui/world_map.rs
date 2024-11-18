@@ -116,6 +116,7 @@ impl WorldMap {
                                 cell_min,
                                 cell_max,
                                 tile.flags.flipped_x,
+                                Color32::WHITE,
                             );
                         }
 
@@ -274,16 +275,76 @@ impl WorldMap {
                                 }
                             }
 
-                            self.draw_texture(
-                                &draw_list,
-                                texture_manager,
-                                texture_x,
-                                texture_y,
-                                texture_name,
-                                cell_min,
-                                cell_max,
-                                tile.flags.flipped_x,
-                            );
+                            if item.id % 2 != 0 {
+                                let (b, g, r, a) = utils::color::extract_bgra(item.overlay_color);
+                                let (spread_x, spread_y) = match item.render_type {
+                                    2 | 5 => (4.0, 1.0),
+                                    4 => (4.0, 0.0),
+                                    3 | 7 | 8 | 9 | 10 => (3.0, 0.0),
+                                    _ => (0.0, 0.0),
+                                };
+
+                                self.draw_texture(
+                                    &draw_list,
+                                    texture_manager,
+                                    item.tree_base_sprite,
+                                    19,
+                                    "tiles_page1.rttex".to_string(),
+                                    cell_min,
+                                    cell_max,
+                                    tile.flags.flipped_x,
+                                    Color32::WHITE,
+                                );
+                                self.draw_texture(
+                                    &draw_list,
+                                    texture_manager,
+                                    item.tree_overlay_sprite,
+                                    18,
+                                    "tiles_page1.rttex".to_string(),
+                                    cell_min,
+                                    cell_max,
+                                    tile.flags.flipped_x,
+                                    Color32::from_rgba_unmultiplied(r, g, b, a),
+                                );
+                                let new_cell_min = Pos2::new(
+                                    cell_min.x + cell_size * 0.375,
+                                    cell_min.y + cell_size * 0.375,
+                                );
+                                let new_cell_max = Pos2::new(
+                                    cell_max.x - cell_size * 0.375,
+                                    cell_max.y - cell_size * 0.375,
+                                );
+
+                                self.draw_texture(
+                                    &draw_list,
+                                    texture_manager,
+                                    texture_x + spread_x as u8,
+                                    texture_y + spread_y as u8,
+                                    texture_name,
+                                    new_cell_min,
+                                    new_cell_max,
+                                    tile.flags.flipped_x,
+                                    Color32::WHITE,
+                                );
+
+                                draw_list.rect_stroke(
+                                    Rect::from_min_max(new_cell_min, new_cell_max),
+                                    0.2,
+                                    (2.0, Color32::WHITE),
+                                );
+                            } else {
+                                self.draw_texture(
+                                    &draw_list,
+                                    texture_manager,
+                                    texture_x,
+                                    texture_y,
+                                    texture_name,
+                                    cell_min,
+                                    cell_max,
+                                    tile.flags.flipped_x,
+                                    Color32::WHITE,
+                                );
+                            }
                         }
 
                         for player in bot.players.lock().unwrap().clone() {
@@ -424,6 +485,7 @@ impl WorldMap {
         cell_min: Pos2,
         cell_max: Pos2,
         flipped: bool,
+        color: Color32,
     ) {
         match texture_manager.get_texture(&texture_name) {
             Some(texture) => {
@@ -455,7 +517,7 @@ impl WorldMap {
                         Pos2::new(cell_max.x, cell_max.y),
                     ),
                     egui::Rect::from_min_max(uv_start, uv_end),
-                    Color32::WHITE,
+                    color,
                 );
             }
             None => (),

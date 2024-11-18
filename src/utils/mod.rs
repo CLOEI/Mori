@@ -1,4 +1,5 @@
 pub mod captcha;
+pub mod color;
 pub mod config;
 pub mod error;
 pub mod logging;
