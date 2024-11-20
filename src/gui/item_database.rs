@@ -140,9 +140,9 @@ impl ItemDatabase {
                                 if selected_item.id != 0 {
                                     ui.label(format!("ID: {}", selected_item.id));
                                 }
-                                if selected_item.flags != 0 {
-                                    ui.label(format!("Flags: {}", selected_item.flags));
-                                }
+                                // if selected_item.flags != 0 {
+                                //     ui.label(format!("Flags: {}", selected_item.flags));
+                                // }
                                 if selected_item.action_type != 0 {
                                     ui.label(format!("Action Type: {}", selected_item.action_type));
                                 }

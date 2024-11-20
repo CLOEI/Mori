@@ -197,7 +197,7 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                                 .unwrap()
                                                 .get_item(&tank_packet.value)
                                                 .unwrap();
-                                            if item.name.contains("Seed") {
+                                            if item.id % 2 != 0 {
                                                 tile.tile_type = TileType::Seed {
                                                     ready_to_harvest: false,
                                                     time_passed: 0,
