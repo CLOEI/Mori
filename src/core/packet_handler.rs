@@ -12,6 +12,7 @@ use regex::Regex;
 use std::io::{Cursor, Read};
 use std::time::Instant;
 use std::{fs, sync::Arc};
+use paris::error;
 
 pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {
@@ -329,6 +330,16 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                 let level = data.get("Level").unwrap();
                 let mut state = bot.state.lock().unwrap();
                 state.level = level.parse().unwrap();
+            }
+            if data.contains_key("Global_Playtime") {
+                let playtime = data.get("Global_Playtime").unwrap();
+                let mut state = bot.state.lock().unwrap();
+                state.playtime = playtime.parse().unwrap();
+            }
+            if data.contains_key("installDate") {
+                let install_date = data.get("installDate").unwrap();
+                let mut state = bot.state.lock().unwrap();
+                state.install_date = install_date.parse().unwrap();
             }
         }
         _ => (),

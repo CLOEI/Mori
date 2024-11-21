@@ -27,6 +27,8 @@ pub struct ProxyInfo {
 pub struct State {
     pub net_id: u32,
     pub level: i32,
+    pub playtime: u32,
+    pub install_date: u32,
     pub gems: i32,
     pub is_running: bool,
     pub is_redirecting: bool,

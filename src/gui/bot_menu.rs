@@ -257,6 +257,9 @@ impl BotMenu {
                                             ui.label("Token");
                                             ui.add(egui::Label::new(token).truncate());
                                             ui.end_row();
+                                            ui.label("Account age");
+                                            ui.add(egui::Label::new(self.format_duration(bot.state.lock().unwrap().install_date)));
+                                            ui.end_row();
                                             ui.label("Is Banned");
                                             ui.label(is_banned.to_string());
                                             ui.end_row();
@@ -361,5 +364,17 @@ impl BotMenu {
                 }
             },
         );
+    }
+
+    fn format_duration(&self, seconds: u32) -> String {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as u32;
+        let elapsed = current_time - seconds;
+        let years = elapsed / 31_536_000;
+        let months = (elapsed % 31_536_000) / 2_592_000;
+        let days = (elapsed % 2_592_000) / 86_400;
+        format!("{} years, {} months, {} days", years, months, days)
     }
 }
