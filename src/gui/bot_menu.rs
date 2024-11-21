@@ -158,14 +158,14 @@ impl BotMenu {
                                         );
                                     });
                                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                                        // if ui.button("Relog").clicked() {
-                                        //     if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
-                                        //         let bot_clone = bot.clone();
-                                        //         thread::spawn(move || {
-                                        //             bot_clone.relog();
-                                        //         });
-                                        //     }
-                                        // }
+                                        if ui.button("Relog").clicked() {
+                                            if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                                let bot_clone = bot.clone();
+                                                thread::spawn(move || {
+                                                    bot_clone.relog();
+                                                });
+                                            }
+                                        }
                                         if ui.button("Leave").clicked() {
                                             let bot_clone = bot.clone();
                                             thread::spawn(move || {

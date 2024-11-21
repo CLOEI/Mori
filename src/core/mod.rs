@@ -271,7 +271,7 @@ impl Bot {
         true
     }
 
-    pub fn relog(&self) {
+    pub fn relog(self: Arc<Self>) {
         self.log_info("Relogging core");
         {
             let mut state = self.state.lock().expect("Failed to lock state");
@@ -279,8 +279,12 @@ impl Bot {
             state.is_redirecting = false;
         }
         self.set_status("Relogging");
-        self.disconnect();
-        self.reconnect();
+        self.disconnect_now();
+        {
+            let mut state = self.state.lock().expect("Failed to lock state");
+            state.is_running = true;
+        }
+        self.process_events();
     }
 
     fn update_login_info(&self, data: String) {
@@ -683,6 +687,16 @@ impl Bot {
             if let Ok(mut host) = self.host.try_lock() {
                 let peer = host.peer_mut(peer_id);
                 peer.disconnect(0);
+            }
+        }
+    }
+
+    pub fn disconnect_now(&self) {
+        let peer_id = self.peer_id.lock().unwrap().clone();
+        if let Some(peer_id) = peer_id {
+            if let Ok(mut host) = self.host.try_lock() {
+                let peer = host.peer_mut(peer_id);
+                peer.disconnect_now(0);
             }
         }
     }
