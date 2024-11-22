@@ -951,6 +951,22 @@ impl Bot {
         let mut temp_data = self.temporary_data.write().unwrap();
         temp_data.trash = (item_id, amount);
     }
+
+    pub fn accept_access(&self) {
+        let net_id = {
+            let state = self.state.lock().unwrap();
+            state.net_id
+        };
+        self.wrench_player(net_id);
+        thread::sleep(Duration::from_millis(100));
+        self.send_packet(EPacketType::NetMessageGenericText, format!("action|dialog_return\ndialog_name|popup\nnetID|{}|\nbuttonClicked|acceptlock\n", net_id))
+        thread::sleep(Duration::from_millis(100));
+        self.send_packet(EPacketType::NetMessageGenericText, "action|dialog_return\ndialog_name|acceptaccess\n".to_string());
+    }
+
+    pub fn wrench_player(&self, net_id: u32) {
+        self.send_packet(EPacketType::NetMessageGenericText, format!("action|wrench\n|netid|{}\n", net_id));
+    }
 }
 
 fn poll(bot: Arc<Bot>) {
