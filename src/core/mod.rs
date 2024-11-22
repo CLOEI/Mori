@@ -959,7 +959,7 @@ impl Bot {
         };
         self.wrench_player(net_id);
         thread::sleep(Duration::from_millis(100));
-        self.send_packet(EPacketType::NetMessageGenericText, format!("action|dialog_return\ndialog_name|popup\nnetID|{}|\nbuttonClicked|acceptlock\n", net_id))
+        self.send_packet(EPacketType::NetMessageGenericText, format!("action|dialog_return\ndialog_name|popup\nnetID|{}|\nbuttonClicked|acceptlock\n", net_id));
         thread::sleep(Duration::from_millis(100));
         self.send_packet(EPacketType::NetMessageGenericText, "action|dialog_return\ndialog_name|acceptaccess\n".to_string());
     }
