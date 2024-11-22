@@ -94,6 +94,15 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnCountryState" => {}
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
+            let temp = bot.temporary_data.read().unwrap();
+
+            match temp.dialog_callback {
+                Some(callback) => {
+                    callback(&bot);
+                }
+                None => {}
+            }
+
             bot.log_info(format!("Received dialog request: {}", message).as_str());
             if message.contains("Gazette") {
                 bot.send_packet(

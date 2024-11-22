@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-
+use std::sync::Arc;
+use crate::core::Bot;
 use super::{elogin_method::ELoginMethod, login_info::LoginInfo};
 
 #[derive(Debug, Default)]
@@ -59,4 +60,5 @@ pub struct TemporaryData {
     pub timeout: u32,
     pub ping: u32,
     pub entered_world: bool,
+    pub dialog_callback: Option<fn(&Arc<Bot>)>,
 }
