@@ -7,7 +7,7 @@ use crate::manager::bot_manager::BotManager;
 use crate::manager::proxy_manager::ProxyManager;
 use crate::utils::config;
 use eframe::egui::ViewportBuilder;
-use egui::{vec2, Button, CentralPanel, Color32, Id, PointerButton, RichText, Sense, UiBuilder, ViewportCommand};
+use egui::{vec2, Button, CentralPanel, Id, PointerButton, RichText, Sense, UiBuilder, ViewportCommand};
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
@@ -35,7 +35,7 @@ fn init_config() {
             findpath_delay: 30,
             auto_collect: true,
             selected_bot: "".to_string(),
-            game_version: "4.70".to_string(),
+            game_version: "4.71".to_string(),
             use_alternate_server: false,
             theme: Theme::Dark,
             captcha: Default::default(),
@@ -87,15 +87,10 @@ impl App {
         let texture_manager = Arc::new(RwLock::new(TextureManager::new()));
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
         let bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
-
-        let bots = config::get_bots();
-        for bot in bots.clone() {
-            bot_manager.write().unwrap().add_bot(bot);
-        }
-
         let texture_loaded = Arc::new(AtomicBool::new(false));
 
         {
+            let bot_manager_clone = bot_manager.clone();
             let texture_manager_clone = texture_manager.clone();
             let texture_loaded_clone = texture_loaded.clone();
             let egui_ctx = cc.egui_ctx.clone();
@@ -103,6 +98,10 @@ impl App {
                 let mut texture_manager = texture_manager_clone.write().unwrap();
                 texture_manager.load_textures(&egui_ctx);
                 texture_loaded_clone.store(true, Ordering::Release);
+                let bots = config::get_bots();
+                for bot in bots.clone() {
+                    bot_manager_clone.write().unwrap().add_bot(bot);
+                }
             });
         }
 
