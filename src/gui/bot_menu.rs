@@ -24,7 +24,7 @@ pub struct BotMenu {
 }
 
 impl BotMenu {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>, texture_manager: &TextureManager) {
+    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>, texture_manager: &Arc<RwLock<TextureManager>>) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
         ui.add_space(4.0);

@@ -21,7 +21,7 @@ impl WorldMap {
         &mut self,
         ui: &mut Ui,
         manager: &Arc<RwLock<BotManager>>,
-        texture_manager: &TextureManager,
+        texture_manager: &Arc<RwLock<TextureManager>>,
     ) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
@@ -498,7 +498,7 @@ impl WorldMap {
     fn draw_texture(
         &self,
         draw_list: &Painter,
-        texture_manager: &TextureManager,
+        texture_manager: &Arc<RwLock<TextureManager>>,
         texture_x: u8,
         texture_y: u8,
         texture_name: String,
@@ -507,7 +507,7 @@ impl WorldMap {
         flipped: bool,
         color: Color32,
     ) {
-        match texture_manager.get_texture(&texture_name) {
+        match texture_manager.read().unwrap().get_texture(&texture_name) {
             Some(texture) => {
                 let [width, height] = texture.size();
                 let uv_x_start = (texture_x as f32 * 32.0) / width as f32;

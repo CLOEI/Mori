@@ -7,18 +7,15 @@ use crate::manager::bot_manager::BotManager;
 use crate::manager::proxy_manager::ProxyManager;
 use crate::utils::config;
 use eframe::egui::ViewportBuilder;
-use egui::{
-    vec2, Button, CentralPanel, Id, PointerButton, RichText, Sense, UiBuilder, ViewportCommand,
-};
+use egui::{vec2, Button, CentralPanel, Color32, Id, PointerButton, RichText, Sense, UiBuilder, ViewportCommand};
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
 use std::sync::{Arc, RwLock};
-use std::{
-    fs::{self, File},
-    io::Write,
-};
+use std::{fs::{self, File}, io::Write, thread};
+use std::sync::atomic::{AtomicBool, Ordering};
 use types::config::{Config, Theme};
+use crate::texture_manager::TextureManager;
 
 mod core;
 mod gui;
@@ -74,10 +71,11 @@ struct App {
     add_proxy_dialog: AddProxyDialog,
     bot_manager: Arc<RwLock<BotManager>>,
     proxy_manager: Arc<RwLock<ProxyManager>>,
-    texture_manager: texture_manager::TextureManager,
+    texture_manager: Arc<RwLock<TextureManager>>,
     proxy_list: ProxyList,
     settings: Settings,
     bot_menu: BotMenu,
+    texture_loaded: Arc<AtomicBool>,
 }
 
 impl App {
@@ -85,14 +83,27 @@ impl App {
         let mut fonts = egui::FontDefinitions::default();
         egui_remixicon::add_to_fonts(&mut fonts);
         cc.egui_ctx.set_fonts(fonts);
-        let mut texture_manager = texture_manager::TextureManager::new();
-        texture_manager.load_textures(&cc.egui_ctx);
 
+        let texture_manager = Arc::new(RwLock::new(TextureManager::new()));
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
         let bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
+
         let bots = config::get_bots();
         for bot in bots.clone() {
             bot_manager.write().unwrap().add_bot(bot);
+        }
+
+        let texture_loaded = Arc::new(AtomicBool::new(false));
+
+        {
+            let texture_manager_clone = texture_manager.clone();
+            let texture_loaded_clone = texture_loaded.clone();
+            let egui_ctx = cc.egui_ctx.clone();
+            thread::spawn(move || {
+                let mut texture_manager = texture_manager_clone.write().unwrap();
+                texture_manager.load_textures(&egui_ctx);
+                texture_loaded_clone.store(true, Ordering::Release);
+            });
         }
 
         Self {
@@ -114,6 +125,7 @@ impl App {
             proxy_manager,
             bot_manager,
             texture_manager,
+            texture_loaded,
         }
     }
 }
@@ -234,29 +246,44 @@ impl eframe::App for App {
                 rect.min.y = title_bar_rect.max.y;
                 rect
             }
-            .shrink(4.0);
+                .shrink(4.0);
 
             let mut content_ui = ui.new_child(UiBuilder::new().max_rect(content_rect));
-            match self.navbar.current_menu.as_str() {
-                "bots" => {
-                    self.bot_menu
-                        .render(&mut content_ui, &self.bot_manager, &self.texture_manager)
+            if self.texture_loaded.load(Ordering::Acquire) {
+                match self.navbar.current_menu.as_str() {
+                    "bots" => {
+                        self.bot_menu
+                            .render(&mut content_ui, &self.bot_manager, &self.texture_manager)
+                    }
+                    "item_database" => self.item_database.render(
+                        &mut content_ui,
+                        &self.bot_manager,
+                        &self.texture_manager,
+                        ctx,
+                    ),
+                    "proxy_list" => self.proxy_list.render(
+                        &mut content_ui,
+                        &self.proxy_manager,
+                        &mut self.add_proxy_dialog,
+                        ctx,
+                    ),
+                    "settings" => self.settings.render(&mut content_ui, ctx),
+                    _ => {}
                 }
-                "item_database" => self.item_database.render(
-                    &mut content_ui,
-                    &self.bot_manager,
-                    &self.texture_manager,
-                    ctx,
-                ),
-                "proxy_list" => self.proxy_list.render(
-                    &mut content_ui,
-                    &self.proxy_manager,
-                    &mut self.add_proxy_dialog,
-                    ctx,
-                ),
-                "settings" => self.settings.render(&mut content_ui, ctx),
-                _ => {}
+            } else {
+                ui.with_layout(
+                    egui::Layout::top_down_justified(egui::Align::Center),
+                    |ui| {
+                        ui.add_space(ui.available_height() / 2.0 - 25.0);
+                        ui.vertical_centered(|ui| {
+                            ui.add(egui::Label::new(RichText::new(egui_remixicon::icons::PUZZLE_2_FILL).size(50.0)));
+                            ui.add(egui::Label::new("Loading textures..."));
+                        });
+                        ui.add_space(ui.available_height() / 2.0 - 25.0);
+                    },
+                );
             }
+
             self.add_bot_dialog.render(&mut self.bot_manager, ctx);
             self.add_proxy_dialog.render(&mut self.proxy_manager, ctx);
         });

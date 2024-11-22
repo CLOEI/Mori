@@ -13,7 +13,7 @@ impl ItemDatabase {
         &mut self,
         ui: &mut Ui,
         manager: &Arc<RwLock<BotManager>>,
-        texture_manager: &TextureManager,
+        texture_manager: &Arc<RwLock<TextureManager>>,
         _ctx: &egui::Context,
     ) {
         let manager = manager.read().unwrap();
@@ -97,7 +97,7 @@ impl ItemDatabase {
                             if let Some(selected_index) = self.selected_item_index {
                                 let selected_item =
                                     { items_database.get_item(&selected_index).unwrap().clone() };
-                                match texture_manager.get_texture(&selected_item.texture_file_name)
+                                match texture_manager.read().unwrap().get_texture(&selected_item.texture_file_name)
                                 {
                                     Some(texture) => {
                                         let (spread_x, spread_y) = match selected_item.render_type {
