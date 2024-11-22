@@ -41,6 +41,42 @@ impl WorldMap {
                 let draw_list = ui.painter_at(rect);
 
                 draw_list.rect_filled(rect, 0.0, Color32::from_rgb(96, 215, 255));
+                match texture_manager.read().unwrap().get_texture("hills3.rttex") {
+                    Some(texture) => {
+                        let uv_start = Pos2::new(0.0, 0.0);
+                        let uv_end = Pos2::new(1.0, 1.0);
+                        draw_list.image(texture.id(), rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
+                    }
+                    None => (),
+                }
+                match texture_manager.read().unwrap().get_texture("hills2.rttex") {
+                    Some(texture) => {
+                        let uv_start = Pos2::new(0.0, 0.0);
+                        let uv_end = Pos2::new(1.0, 1.0);
+                        draw_list.image(texture.id(), rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
+                    }
+                    None => (),
+                }
+                match texture_manager.read().unwrap().get_texture("hills1.rttex") {
+                    Some(texture) => {
+                        let uv_start = Pos2::new(0.0, 0.0);
+                        let uv_end = Pos2::new(1.0, 1.0);
+                        draw_list.image(texture.id(), rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
+                    }
+                    None => (),
+                }
+                match texture_manager.read().unwrap().get_texture("sun.rttex") {
+                    Some(texture) => {
+                        let uv_start = Pos2::new(0.0, 0.0);
+                        let uv_end = Pos2::new(1.0, 1.0);
+                        let offset_rect = Rect::from_min_max(
+                            Pos2::new(rect.min.x - 20.0, rect.min.y - 20.0),
+                            Pos2::new(rect.min.x - 20.0 + 150.0, rect.min.y - 20.0 + 150.0),
+                        );
+                        draw_list.image(texture.id(), offset_rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
+                    }
+                    None => (),
+                }
 
                 if self.camera_pos == Pos2::default() {
                     let bot_position = bot.position.lock().unwrap();
