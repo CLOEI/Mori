@@ -258,7 +258,22 @@ impl BotMenu {
                                             ui.add(egui::Label::new(token).truncate());
                                             ui.end_row();
                                             ui.label("Account age");
-                                            ui.add(egui::Label::new(self.format_duration(bot.state.lock().unwrap().install_date)));
+                                            let (install_date, playtime) = {
+                                                let bot = bot.state.lock().unwrap();
+                                                (bot.install_date, bot.playtime)
+                                            };
+                                            if install_date > 0 {
+                                                ui.add(egui::Label::new(self.format_duration_from_epoch(install_date)).truncate());
+                                            } else {
+                                                ui.add(egui::Label::new("0").truncate());
+                                            }
+                                            ui.end_row();
+                                            ui.label("Account playtime");
+                                            if playtime > 0 {
+                                                ui.add(egui::Label::new(self.format_duration(playtime)).truncate());
+                                            } else {
+                                                ui.add(egui::Label::new("0").truncate());
+                                            }
                                             ui.end_row();
                                             ui.label("Is Banned");
                                             ui.label(is_banned.to_string());
@@ -366,7 +381,7 @@ impl BotMenu {
         );
     }
 
-    fn format_duration(&self, seconds: u32) -> String {
+    fn format_duration_from_epoch(&self, seconds: u32) -> String {
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
@@ -376,5 +391,12 @@ impl BotMenu {
         let months = (elapsed % 31_536_000) / 2_592_000;
         let days = (elapsed % 2_592_000) / 86_400;
         format!("{} years, {} months, {} days", years, months, days)
+    }
+
+    fn format_duration(&self, seconds: u32) -> String {
+        let hours = seconds / 3600;
+        let minutes = (seconds % 3600) / 60;
+        let seconds = seconds % 60;
+        format!("{:02} hours, {:02} minutes, {:02} seconds", hours, minutes, seconds)
     }
 }
