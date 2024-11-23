@@ -998,5 +998,5 @@ pub fn get_coordinate_to_touch_ground(y: f32) -> f32 {
     let colrect_bottom_center_y = y + 30.0;
     let block_y = ((colrect_bottom_center_y / 32.0).floor() + 1.0) * 32.0;
 
-    block_y - 30.0
+    (block_y - 30.0).floor()
 }

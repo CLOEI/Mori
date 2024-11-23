@@ -180,13 +180,13 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 && !is_warp_to_id
             {
                 position.x = main_door_x;
-                position.y = core::get_coordinate_to_touch_ground(main_door_y);
+                position.y = main_door_y;
                 temp.entered_world = true;
                 return;
             }
 
             position.x = pos.0;
-            position.y = core::get_coordinate_to_touch_ground(pos.1);
+            position.y = pos.1;
             temp.entered_world = true;
         }
         "SetHasGrowID" => {
