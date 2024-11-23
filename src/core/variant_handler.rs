@@ -94,13 +94,13 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnCountryState" => {}
         "OnDialogRequest" => {
             let message = variant.get(1).unwrap().as_string();
-            let temp = bot.temporary_data.read().unwrap();
+            let cb = {
+                let temp = bot.temporary_data.read().unwrap();
+                temp.dialog_callback.clone()
+            };
 
-            match temp.dialog_callback {
-                Some(callback) => {
-                    callback(&bot);
-                }
-                None => {}
+            if let Some(callback) = cb {
+                callback(&bot);
             }
 
             bot.log_info(format!("Received dialog request: {}", message).as_str());

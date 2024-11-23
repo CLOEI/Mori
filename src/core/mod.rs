@@ -20,7 +20,6 @@ use std::str::{self, FromStr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, RwLock};
 use std::{thread, time::Duration, vec};
-use paris::info;
 use urlencoding::encode;
 
 use crate::core::proxy::{SocketType, Socks5UdpSocket};
@@ -962,7 +961,11 @@ impl Bot {
         let mut temp_data = self.temporary_data.write().unwrap();
 
         temp_data.dialog_callback = Some(|bot: &Arc<Bot>| {
-            bot.send_packet(EPacketType::NetMessageGenericText, "action|dialog_return\ndialog_name|acceptaccess\n".to_string());
+            let net_id = {
+                let state = bot.state.lock().unwrap();
+                state.net_id
+            };
+            bot.send_packet(EPacketType::NetMessageGenericText, format!("action|dialog_return\ndialog_name|popup\nnetID|{}|\nbuttonClicked|acceptlock\n", net_id));
             let mut temp_data = bot.temporary_data.write().unwrap();
             temp_data.dialog_callback = Some(|bot: &Arc<Bot>| {
                 bot.send_packet(EPacketType::NetMessageGenericText, "action|dialog_return\ndialog_name|acceptaccess\n".to_string());
