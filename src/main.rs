@@ -277,6 +277,8 @@ impl eframe::App for App {
                         ui.vertical_centered(|ui| {
                             ui.add(egui::Label::new(RichText::new(egui_remixicon::icons::PUZZLE_2_FILL).size(50.0)));
                             ui.add(egui::Label::new("Loading textures..."));
+                            ui.add_space(8.0);
+                            ui.add(egui::Spinner::default());
                         });
                         ui.add_space(ui.available_height() / 2.0 - 25.0);
                     },
