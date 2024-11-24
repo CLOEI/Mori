@@ -978,6 +978,10 @@ impl Bot {
     pub fn wrench_player(&self, net_id: u32) {
         self.send_packet(EPacketType::NetMessageGenericText, format!("action|wrench\n|netid|{}\n", net_id));
     }
+
+    pub fn enter_door(&self) {
+        self.punch(0, 0);
+    }
 }
 
 fn poll(bot: Arc<Bot>) {
