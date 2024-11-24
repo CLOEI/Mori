@@ -36,3 +36,6 @@ catppuccin-egui = { version = "5.3", default-features = false, features = [
   "egui29",
 ] }
 rttex = { git = "https://github.com/CLOEI/rttex" }
+serenity = "0.12.4"
+tokio = { version = "1.41.1", features = ["full"] }
+

@@ -24,6 +24,7 @@ mod manager;
 mod texture_manager;
 mod types;
 mod utils;
+mod discord_server;
 
 fn init_config() {
     if !fs::metadata("config.json").is_ok() {
@@ -39,6 +40,7 @@ fn init_config() {
             use_alternate_server: false,
             theme: Theme::Dark,
             captcha: Default::default(),
+            discord_token: "".to_string(),
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
@@ -47,6 +49,13 @@ fn init_config() {
 
 fn main() {
     init_config();
+    let discord_token = config::get_discord_token();
+
+    if discord_token != "" {
+        thread::spawn(move || {
+            discord_server::start();
+        });
+    }
 
     let options = eframe::NativeOptions {
         centered: true,

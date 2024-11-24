@@ -14,6 +14,7 @@ pub struct Config {
     pub use_alternate_server: bool,
     pub theme: Theme,
     pub captcha: Captcha,
+    pub discord_token: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
