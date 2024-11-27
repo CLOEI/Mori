@@ -81,6 +81,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     );
                     let mut state = bot_clone.state.lock().unwrap();
                     state.is_redirecting = false;
+                    state.is_ingame = true;
                 });
             } else {
                 bot.send_packet(
@@ -89,6 +90,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 );
                 let mut state = bot.state.lock().unwrap();
                 state.is_redirecting = false;
+                state.is_ingame = true;
             }
         }
         "OnCountryState" => {}
@@ -224,7 +226,6 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             if data.contains_key("type") {
                 if data.get("type").unwrap() == "local" {
                     let mut state = bot.state.lock().unwrap();
-                    state.is_ingame = true;
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
 
                     bot.send_packet(
