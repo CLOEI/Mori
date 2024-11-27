@@ -658,6 +658,8 @@ impl Bot {
                             let mut world = self.world.write().unwrap();
                             let mut position = self.position.lock().unwrap();
                             let mut temp = self.temporary_data.write().unwrap();
+                            let mut state = self.state.lock().unwrap();
+                            state.is_ingame = false;
                             self.players.lock().unwrap().clear();
                             world.reset();
                             position.reset();
