@@ -195,9 +195,7 @@ impl ItemDatabase {
                                 if selected_item.action_type != 0 {
                                     ui.label(format!("Action Type: {}", selected_item.action_type));
                                 }
-                                if selected_item.material != 0 {
-                                    ui.label(format!("Material: {}", selected_item.material));
-                                }
+                                ui.label(format!("Material: {}", selected_item.material));
                                 if !selected_item.texture_file_name.is_empty() {
                                     ui.label(format!(
                                         "Texture File: {}",
@@ -216,33 +214,17 @@ impl ItemDatabase {
                                         selected_item.cooking_ingredient
                                     ));
                                 }
-                                if selected_item.visual_effect != 0 {
-                                    ui.label(format!(
-                                        "Visual Effect: {}",
-                                        selected_item.visual_effect
-                                    ));
-                                }
-                                if selected_item.texture_x != 0 {
-                                    ui.label(format!("Texture X: {}", selected_item.texture_x));
-                                }
-                                if selected_item.texture_y != 0 {
-                                    ui.label(format!("Texture Y: {}", selected_item.texture_y));
-                                }
-                                if selected_item.render_type != 0 {
-                                    ui.label(format!("Render Type: {}", selected_item.render_type));
-                                }
+                                ui.label(format!("Visual Effect: {}", selected_item.visual_effect));
+                                ui.label(format!("Texture X: {}", selected_item.texture_x));
+                                ui.label(format!("Texture Y: {}", selected_item.texture_y));
+                                ui.label(format!("Render Type: {}", selected_item.render_type));
                                 if selected_item.is_stripey_wallpaper != 0 {
                                     ui.label(format!(
                                         "Stripey Wallpaper: {}",
                                         selected_item.is_stripey_wallpaper
                                     ));
                                 }
-                                if selected_item.collision_type != 0 {
-                                    ui.label(format!(
-                                        "Collision Type: {}",
-                                        selected_item.collision_type
-                                    ));
-                                }
+                                ui.label(format!("Collision Type: {}", selected_item.collision_type));
                                 if selected_item.block_health != 0 {
                                     ui.label(format!(
                                         "Block Health: {}",
@@ -252,12 +234,7 @@ impl ItemDatabase {
                                 if selected_item.drop_chance != 0 {
                                     ui.label(format!("Drop Chance: {}", selected_item.drop_chance));
                                 }
-                                if selected_item.clothing_type != 0 {
-                                    ui.label(format!(
-                                        "Clothing Type: {}",
-                                        selected_item.clothing_type
-                                    ));
-                                }
+                                ui.label(format!("Clothing Type: {}", selected_item.clothing_type));
                                 if selected_item.rarity != 0 {
                                     ui.label(format!("Rarity: {}", selected_item.rarity));
                                 }
