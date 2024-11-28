@@ -6,6 +6,7 @@ use gtworld_r::TileType;
 use paris::info;
 use std::sync::{Arc, RwLock};
 use std::thread;
+use crate::core::Bot;
 use crate::utils::color;
 
 #[derive(Default)]
@@ -194,6 +195,13 @@ impl WorldMap {
                                     } else {
                                         false
                                     };
+
+                                    if let TileType::DisplayBlock {
+                                        item_id
+                                    } = tile.tile_type {
+                                        self.draw_display_block(&draw_list, &bot, &texture_manager, item_id, cell_min, cell_max);
+                                    }
+
                                     self.draw_texture(
                                         &draw_list,
                                         texture_manager,
@@ -205,7 +213,13 @@ impl WorldMap {
                                         flipped,
                                         Color32::WHITE,
                                         foreground_seed.base_color,
-                                    )
+                                    );
+
+                                    if let TileType::VendingMachine {
+                                        item_id, ..
+                                    } = tile.tile_type {
+                                        self.draw_vending_machine(&draw_list, &bot, &texture_manager, item_id, cell_min, cell_max);
+                                    }
                                 }
                             }
                         }
@@ -335,6 +349,63 @@ impl WorldMap {
                         });
                     });
             }
+        }
+    }
+
+    fn draw_vending_machine(&self, draw_list: &Painter, bot: &Arc<Bot>, texture_manager: &Arc<RwLock<TextureManager>>, item_id: u32, cell_min: Pos2, cell_max: Pos2) {
+        let (item, item_seed) = {
+            let item_database = bot.item_database.read().unwrap();
+            let item = item_database.get_item(&item_id).unwrap();
+            let item_seed = item_database.get_item(&(item_id + 1)).unwrap();
+            (item, item_seed)
+        };
+
+        let new_cell_min = Pos2::new(
+            cell_min.x + (cell_max.x - cell_min.x) * 0.25,
+            cell_min.y + (cell_max.y - cell_min.y) * 0.25,
+        );
+        let new_cell_max = Pos2::new(
+            cell_max.x - (cell_max.x - cell_min.x) * 0.25,
+            cell_max.y - (cell_max.y - cell_min.y) * 0.25,
+        );
+
+        if item.id != 0 {
+            self.draw_texture(
+                &draw_list,
+                texture_manager,
+                item.texture_x,
+                item.texture_y,
+                item.texture_file_name,
+                new_cell_min,
+                new_cell_max,
+                false,
+                Color32::WHITE,
+                item_seed.base_color,
+            )
+        }
+    }
+
+    fn draw_display_block(&self, draw_list: &Painter, bot: &Arc<Bot>, texture_manager: &Arc<RwLock<TextureManager>>, item_id: u32, cell_min: Pos2, cell_max: Pos2) {
+        let (item, item_seed) = {
+            let item_database = bot.item_database.read().unwrap();
+            let item = item_database.get_item(&item_id).unwrap();
+            let item_seed = item_database.get_item(&(item_id + 1)).unwrap();
+            (item, item_seed)
+        };
+
+        if item.id != 0 {
+            self.draw_texture(
+                &draw_list,
+                texture_manager,
+                item.texture_x,
+                item.texture_y,
+                item.texture_file_name,
+                cell_min,
+                cell_max,
+                false,
+                Color32::WHITE,
+                item_seed.base_color,
+            )
         }
     }
 

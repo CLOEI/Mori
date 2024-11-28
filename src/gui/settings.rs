@@ -152,6 +152,11 @@ impl Settings {
                                 .color(egui::Color32::from_rgb(30, 144, 255)),
                             "https://github.com/foite",
                         );
+                        ui.hyperlink_to(
+                            egui::RichText::new("bbangg")
+                                .color(egui::Color32::from_rgb(30, 144, 255)),
+                            "https://github.com/bbangg",
+                        )
                     });
                 });
                 ui.end_row();
