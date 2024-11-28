@@ -27,7 +27,7 @@ image = { version = "0.25.5", features = ["png"] }
 egui = "0.29.1"
 socks = "0.3.4"
 thiserror = "1.0.63"
-mlua = { version = "0.9.9", features = ["lua54", "vendored", "send"] }
+mlua = { version = "0.10.1", features = ["lua54", "vendored", "send"] }
 wait-timeout = "0.2.0"
 rust-otp = "2.0.0"
 egui-remixicon = "0.29.1"
@@ -38,4 +38,5 @@ catppuccin-egui = { version = "5.3", default-features = false, features = [
 rttex = { git = "https://github.com/CLOEI/rttex" }
 serenity = "0.12.4"
 tokio = { version = "1.41.1", features = ["full"] }
+dirs = "5.0.1"
 

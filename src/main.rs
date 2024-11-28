@@ -14,6 +14,7 @@ use gui::{
 use std::sync::{Arc, RwLock};
 use std::{fs::{self, File}, io::Write, thread};
 use std::sync::atomic::{AtomicBool, Ordering};
+use paris::{error, info, warn};
 use types::config::{Config, Theme};
 use crate::texture_manager::TextureManager;
 
@@ -103,15 +104,26 @@ impl App {
             let texture_manager_clone = texture_manager.clone();
             let texture_loaded_clone = texture_loaded.clone();
             let egui_ctx = cc.egui_ctx.clone();
-            thread::spawn(move || {
-                let mut texture_manager = texture_manager_clone.write().unwrap();
-                texture_manager.load_textures(&egui_ctx);
+            let growtopia_path = dirs::data_local_dir().unwrap().join("Growtopia/game");
+            if growtopia_path.exists() {
+                info!("Found Growtopia at path: {:?}", growtopia_path);
+                thread::spawn(move || {
+                    let mut texture_manager = texture_manager_clone.write().unwrap();
+                    texture_manager.load_textures(&egui_ctx, growtopia_path.as_path());
+                    texture_loaded_clone.store(true, Ordering::Release);
+                    let bots = config::get_bots();
+                    for bot in bots.clone() {
+                        bot_manager_clone.write().unwrap().add_bot(bot);
+                    }
+                });
+            } else {
                 texture_loaded_clone.store(true, Ordering::Release);
                 let bots = config::get_bots();
                 for bot in bots.clone() {
                     bot_manager_clone.write().unwrap().add_bot(bot);
                 }
-            });
+                warn!("Growtopia not found");
+            }
         }
 
         Self {

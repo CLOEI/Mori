@@ -2,6 +2,7 @@ use egui::{ColorImage, Context, TextureHandle};
 use paris::info;
 use std::collections::HashMap;
 use std::fs;
+use std::path::Path;
 
 pub struct TextureManager {
     pub textures: HashMap<String, TextureHandle>,
@@ -14,11 +15,14 @@ impl TextureManager {
         }
     }
 
-    pub fn load_textures(&mut self, ctx: &Context) {
-        let assets = fs::read_dir("game").expect("Failed to read assets directory");
+    pub fn load_textures(&mut self, ctx: &Context, path: &Path) {
+        let assets = fs::read_dir(path).expect("Failed to read assets directory");
         for asset in assets {
             let path = asset.unwrap().path();
             let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+            if !filename.ends_with(".rttex") {
+                continue;
+            }
 
             let image_buffer =
                 rttex::get_image_buffer(path.to_str().unwrap()).expect("Failed to load image");

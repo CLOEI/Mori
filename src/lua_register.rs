@@ -8,14 +8,14 @@ use std::time::Duration;
 fn register_bot_function<'lua, F, A, R>(
     lua: &'lua Lua,
     bot: &Arc<Bot>,
-    bot_table: &LuaTable<'lua>,
+    bot_table: &LuaTable,
     name: &str,
     func: F,
 ) -> LuaResult<()>
 where
     F: 'static + Send + Fn(&Arc<Bot>, A) -> LuaResult<R>,
-    A: FromLuaMulti<'lua>,
-    R: IntoLuaMulti<'lua>,
+    A: FromLuaMulti,
+    R: IntoLuaMulti,
 {
     let bot_clone = bot.clone();
     let lua_func = lua.create_function(move |_, args: A| func(&bot_clone, args))?;

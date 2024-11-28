@@ -6,6 +6,7 @@ use gtworld_r::TileType;
 use paris::info;
 use std::sync::{Arc, RwLock};
 use std::thread;
+use crate::utils::color;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -41,42 +42,6 @@ impl WorldMap {
                 let draw_list = ui.painter_at(rect);
 
                 draw_list.rect_filled(rect, 0.0, Color32::from_rgb(96, 215, 255));
-                match texture_manager.read().unwrap().get_texture("hills3.rttex") {
-                    Some(texture) => {
-                        let uv_start = Pos2::new(0.0, 0.0);
-                        let uv_end = Pos2::new(1.0, 1.0);
-                        draw_list.image(texture.id(), rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
-                    }
-                    None => (),
-                }
-                match texture_manager.read().unwrap().get_texture("hills2.rttex") {
-                    Some(texture) => {
-                        let uv_start = Pos2::new(0.0, 0.0);
-                        let uv_end = Pos2::new(1.0, 1.0);
-                        draw_list.image(texture.id(), rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
-                    }
-                    None => (),
-                }
-                match texture_manager.read().unwrap().get_texture("hills1.rttex") {
-                    Some(texture) => {
-                        let uv_start = Pos2::new(0.0, 0.0);
-                        let uv_end = Pos2::new(1.0, 1.0);
-                        draw_list.image(texture.id(), rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
-                    }
-                    None => (),
-                }
-                match texture_manager.read().unwrap().get_texture("sun.rttex") {
-                    Some(texture) => {
-                        let uv_start = Pos2::new(0.0, 0.0);
-                        let uv_end = Pos2::new(1.0, 1.0);
-                        let offset_rect = Rect::from_min_max(
-                            Pos2::new(rect.min.x - 20.0, rect.min.y - 20.0),
-                            Pos2::new(rect.min.x - 20.0 + 150.0, rect.min.y - 20.0 + 150.0),
-                        );
-                        draw_list.image(texture.id(), offset_rect, Rect::from_min_max(uv_start, uv_end), Color32::WHITE);
-                    }
-                    None => (),
-                }
 
                 if self.camera_pos == Pos2::default() {
                     let bot_position = bot.position.lock().unwrap();
@@ -130,256 +95,118 @@ impl WorldMap {
                             continue;
                         }
                         let tile = world.get_tile(world_x as u32, world_y as u32).unwrap();
-                        let item = {
+                        let (foreground, foreground_seed) = {
                             let item_database = bot.item_database.read().unwrap();
-                            item_database
+                            let foreground = item_database
                                 .get_item(&(tile.foreground_item_id as u32))
-                                .unwrap()
+                                .unwrap();
+                            let foreground_seed = item_database.get_item(&((tile.foreground_item_id + 1) as u32)).unwrap();
+                            (foreground, foreground_seed)
+                        };
+                        let (background, background_seed) = {
+                            let item_database = bot.item_database.read().unwrap();
+                            let background = item_database
+                                .get_item(&(tile.background_item_id as u32))
+                                .unwrap();
+                            let background_seed = item_database.get_item(&((tile.background_item_id + 1) as u32)).unwrap();
+                            (background, background_seed)
                         };
 
-                        if tile.background_item_id != 0 {
-                            let item_database = bot.item_database.read().unwrap();
-                            let background_item = item_database
-                                .get_item(&((tile.background_item_id + 1) as u32))
-                                .unwrap();
-
-                            self.draw_texture(
-                                &draw_list,
-                                texture_manager,
-                                background_item.texture_x,
-                                background_item.texture_y,
-                                background_item.texture_file_name.clone(),
-                                cell_min,
-                                cell_max,
-                                tile.flags.flipped_x,
-                                Color32::WHITE,
-                            );
-                        }
-
-                        if item.id != 0 {
-                            let mut texture_x = item.texture_x;
-                            let mut texture_y = item.texture_y;
-                            let texture_name = item.texture_file_name.clone();
-
-                            let left_tile = if world_x > 0 {
-                                world.get_tile(world_x as u32 - 1, world_y as u32)
-                            } else {
-                                None
-                            };
-                            let right_tile = if world_x < world.width as i32 - 1 {
-                                world.get_tile(world_x as u32 + 1, world_y as u32)
-                            } else {
-                                None
-                            };
-                            let top_tile = if world_y > 0 {
-                                world.get_tile(world_x as u32, world_y as u32 - 1)
-                            } else {
-                                None
-                            };
-                            let bottom_tile = if world_y < world.height as i32 - 1 {
-                                world.get_tile(world_x as u32, world_y as u32 + 1)
-                            } else {
-                                None
-                            };
-
-                            if item.render_type == 2 {
-                                if let (
-                                    Some(left_tile),
-                                    Some(right_tile),
-                                    Some(top_tile),
-                                    Some(bottom_tile),
-                                ) = (left_tile, right_tile, top_tile, bottom_tile)
-                                {
-                                    let left_match = left_tile.foreground_item_id == item.id as u16;
-                                    let right_match =
-                                        right_tile.foreground_item_id == item.id as u16;
-                                    let top_match = top_tile.foreground_item_id == item.id as u16;
-                                    let bottom_match =
-                                        bottom_tile.foreground_item_id == item.id as u16;
-
-                                    match (left_match, right_match, top_match, bottom_match) {
-                                        (true, true, true, true) => (),
-                                        (true, true, true, false) => texture_x += 2,
-                                        (true, true, false, true) => texture_x += 1,
-                                        (true, false, true, true) => texture_x += 4,
-                                        (false, true, true, true) => texture_x += 3,
-                                        (true, true, false, false) => texture_x += 1,
-                                        (true, false, false, true) => texture_x += 6,
-                                        (false, true, true, false) => texture_x += 7,
-                                        (false, true, false, true) => texture_x += 5,
-                                        (true, false, false, false) => texture_x += 6,
-                                        (false, false, false, true) => {
-                                            texture_x += 2;
-                                            texture_y += 1;
-                                        }
-                                        (false, true, false, false) => texture_x += 5,
-                                        _ => (),
-                                    }
-                                }
-
-                                if let (None, Some(right_tile), Some(top_tile), Some(bottom_tile)) =
-                                    (left_tile, right_tile, top_tile, bottom_tile)
-                                {
-                                    let right_match =
-                                        right_tile.foreground_item_id == item.id as u16;
-                                    let bottom_match =
-                                        bottom_tile.foreground_item_id == item.id as u16;
-                                    let top_match = top_tile.foreground_item_id != item.id as u16;
-
-                                    if right_match && bottom_match && top_match {
-                                        texture_x += 1;
-                                    }
-                                }
-
-                                if let (Some(left_tile), None, Some(top_tile), Some(bottom_tile)) =
-                                    (left_tile, right_tile, top_tile, bottom_tile)
-                                {
-                                    let left_match = left_tile.foreground_item_id == item.id as u16;
-                                    let bottom_match =
-                                        bottom_tile.foreground_item_id == item.id as u16;
-                                    let top_match = top_tile.foreground_item_id != item.id as u16;
-
-                                    if left_match && bottom_match && top_match {
-                                        texture_x += 1;
-                                    }
-                                }
-                            }
-
-                            if item.render_type == 7 {
-                                if let (Some(top_tile), Some(bottom_tile)) = (top_tile, bottom_tile)
-                                {
-                                    if top_tile.foreground_item_id != item.id as u16
-                                        && bottom_tile.foreground_item_id == item.id as u16
-                                    {
-                                        texture_x += 2;
-                                    }
-                                    if top_tile.foreground_item_id == item.id as u16
-                                        && bottom_tile.foreground_item_id == item.id as u16
-                                    {
-                                        texture_x += 1;
-                                    }
-                                    if top_tile.foreground_item_id != item.id as u16
-                                        && bottom_tile.foreground_item_id != item.id as u16
-                                    {
-                                        texture_x += 3;
-                                    }
-                                }
-                            }
-
-                            if item.render_type == 3 {
-                                if let (Some(left_tile), Some(right_tile), Some(top_tile)) =
-                                    (left_tile, right_tile, top_tile)
-                                {
-                                    if left_tile.foreground_item_id == item.id as u16
-                                        && right_tile.foreground_item_id == item.id as u16
-                                    {
-                                        texture_x += 1;
-                                    }
-                                    if left_tile.foreground_item_id != item.id as u16
-                                        || right_tile.foreground_item_id != item.id as u16
-                                    {
-                                        if top_tile.foreground_item_id == 8986 {
-                                            texture_x += 4;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if item.render_type == 5 {
-                                if let (
-                                    Some(left_tile),
-                                    Some(right_tile),
-                                    Some(top_tile),
-                                    Some(bottom_tile),
-                                ) = (left_tile, right_tile, top_tile, bottom_tile)
-                                {
-                                    let left_match = left_tile.foreground_item_id == item.id as u16;
-                                    let right_match =
-                                        right_tile.foreground_item_id == item.id as u16;
-                                    let top_match = top_tile.foreground_item_id == item.id as u16;
-                                    let bottom_match =
-                                        bottom_tile.foreground_item_id == item.id as u16;
-
-                                    if (left_match && !right_match && !top_match && !bottom_match)
-                                        || (!left_match
-                                            && right_match
-                                            && !top_match
-                                            && !bottom_match)
-                                    {
-                                        texture_x += 7;
-                                    }
-                                }
-                            }
-
-                            if item.id % 2 != 0 {
-                                let (b, g, r, a) = utils::color::extract_bgra(item.overlay_color);
-                                let (spread_x, spread_y) = match item.render_type {
-                                    2 | 5 => (4.0, 1.0),
-                                    4 => (4.0, 0.0),
-                                    3 | 7 | 8 | 9 | 10 => (3.0, 0.0),
-                                    _ => (0.0, 0.0),
-                                };
-
+                        if tile.background_item_id != 0 || tile.foreground_item_id != 0 {
+                            if tile.background_item_id != 0 {
                                 self.draw_texture(
                                     &draw_list,
                                     texture_manager,
-                                    item.tree_base_sprite,
-                                    19,
-                                    "tiles_page1.rttex".to_string(),
+                                    background.texture_x,
+                                    background.texture_y,
+                                    background.texture_file_name,
                                     cell_min,
                                     cell_max,
                                     tile.flags.flipped_x,
                                     Color32::WHITE,
-                                );
-                                self.draw_texture(
-                                    &draw_list,
-                                    texture_manager,
-                                    item.tree_overlay_sprite,
-                                    18,
-                                    "tiles_page1.rttex".to_string(),
-                                    cell_min,
-                                    cell_max,
-                                    tile.flags.flipped_x,
-                                    Color32::from_rgba_unmultiplied(r, g, b, a),
-                                );
-                                let new_cell_min = Pos2::new(
-                                    cell_min.x + cell_size * 0.375,
-                                    cell_min.y + cell_size * 0.375,
-                                );
-                                let new_cell_max = Pos2::new(
-                                    cell_max.x - cell_size * 0.375,
-                                    cell_max.y - cell_size * 0.375,
-                                );
+                                    background_seed.base_color,
+                                )
+                            }
+                            if tile.foreground_item_id != 0 {
+                                if tile.foreground_item_id % 2 != 0 {
+                                    let (b, g, r, a) = utils::color::extract_bgra(foreground.overlay_color);
+                                    let (spread_x, spread_y) = match foreground.render_type {
+                                        2 | 5 => (4.0, 1.0),
+                                        4 => (4.0, 0.0),
+                                        3 | 7 | 8 | 9 | 10 => (3.0, 0.0),
+                                        _ => (0.0, 0.0),
+                                    };
 
-                                self.draw_texture(
-                                    &draw_list,
-                                    texture_manager,
-                                    texture_x + spread_x as u8,
-                                    texture_y + spread_y as u8,
-                                    texture_name,
-                                    new_cell_min,
-                                    new_cell_max,
-                                    tile.flags.flipped_x,
-                                    Color32::WHITE,
-                                );
+                                    self.draw_texture(
+                                        &draw_list,
+                                        texture_manager,
+                                        foreground.tree_base_sprite,
+                                        19,
+                                        "tiles_page1.rttex".to_string(),
+                                        cell_min,
+                                        cell_max,
+                                        tile.flags.flipped_x,
+                                        Color32::WHITE,
+                                        foreground.base_color,
+                                    );
+                                    self.draw_texture(
+                                        &draw_list,
+                                        texture_manager,
+                                        foreground.tree_overlay_sprite,
+                                        18,
+                                        "tiles_page1.rttex".to_string(),
+                                        cell_min,
+                                        cell_max,
+                                        tile.flags.flipped_x,
+                                        Color32::from_rgba_unmultiplied(r, g, b, a),
+                                        foreground.overlay_color,
+                                    );
+                                    let new_cell_min = Pos2::new(
+                                        cell_min.x + cell_size * 0.375,
+                                        cell_min.y + cell_size * 0.375,
+                                    );
+                                    let new_cell_max = Pos2::new(
+                                        cell_max.x - cell_size * 0.375,
+                                        cell_max.y - cell_size * 0.375,
+                                    );
 
-                                draw_list.rect_stroke(
-                                    Rect::from_min_max(new_cell_min, new_cell_max),
-                                    0.2,
-                                    (2.0, Color32::WHITE),
-                                );
-                            } else {
-                                self.draw_texture(
-                                    &draw_list,
-                                    texture_manager,
-                                    texture_x,
-                                    texture_y,
-                                    texture_name,
-                                    cell_min,
-                                    cell_max,
-                                    tile.flags.flipped_x,
-                                    Color32::WHITE,
-                                );
+                                    self.draw_texture(
+                                        &draw_list,
+                                        texture_manager,
+                                        foreground.texture_x + spread_x as u8,
+                                        foreground.texture_y + spread_y as u8,
+                                        foreground.texture_file_name,
+                                        new_cell_min,
+                                        new_cell_max,
+                                        tile.flags.flipped_x,
+                                        Color32::WHITE,
+                                        foreground.base_color,
+                                    );
+
+                                    draw_list.rect_stroke(
+                                        Rect::from_min_max(new_cell_min, new_cell_max),
+                                        0.2,
+                                        (2.0, Color32::WHITE),
+                                    );
+                                } else {
+                                    let flipped = if foreground.flags.flippable && tile.flags.flipped_x {
+                                        true
+                                    } else {
+                                        false
+                                    };
+                                    self.draw_texture(
+                                        &draw_list,
+                                        texture_manager,
+                                        foreground.texture_x,
+                                        foreground.texture_y,
+                                        foreground.texture_file_name,
+                                        cell_min,
+                                        cell_max,
+                                        flipped,
+                                        Color32::WHITE,
+                                        foreground_seed.base_color,
+                                    )
+                                }
                             }
                         }
 
@@ -387,24 +214,10 @@ impl WorldMap {
                             if (player.position.x / 32.0).floor() == (world_x as f32)
                                 && (player.position.y / 32.0).floor() == (world_y as f32)
                             {
-                                let center_min = Pos2::new(
-                                    cell_min.x + cell_size * 0.25,
-                                    cell_min.y + cell_size * 0.25,
-                                );
-                                let center_max = Pos2::new(
-                                    cell_max.x - cell_size * 0.25,
-                                    cell_max.y - cell_size * 0.25,
-                                );
-                                self.draw_texture(
-                                    &draw_list,
-                                    texture_manager,
-                                    17,
-                                    5,
-                                    "player_cosmetics1.rttex".to_string(),
-                                    center_min,
-                                    center_max,
-                                    tile.flags.flipped_x,
-                                    Color32::WHITE,
+                                draw_list.rect_filled(
+                                    Rect::from_min_max(cell_min, cell_max),
+                                    0.0,
+                                    Color32::from_rgb(255, 215, 0),
                                 );
                             }
                         }
@@ -413,16 +226,10 @@ impl WorldMap {
                         if (bot_position.x / 32.0).floor() == (world_x as f32)
                             && (bot_position.y / 32.0).floor() == (world_y as f32)
                         {
-                            self.draw_texture(
-                                &draw_list,
-                                texture_manager,
-                                3,
-                                4,
-                                "tiles_page1.rttex".to_string(),
-                                cell_min,
-                                cell_max,
-                                tile.flags.flipped_x,
-                                Color32::WHITE,
+                            draw_list.rect_filled(
+                                Rect::from_min_max(cell_min, cell_max),
+                                0.0,
+                                Color32::from_rgb(255, 0, 0),
                             );
                         }
 
@@ -448,12 +255,12 @@ impl WorldMap {
                                 };
                                 data = format!(
                                     "Position: {}|{}\nItem name: {}\nCollision type: {}\nReady to harvest: {}\nTime passed: {}\nRender type: {}",
-                                    world_x, world_y, item.name, item.collision_type, ready_to_harvest, elapsed, item.render_type
+                                    world_x, world_y, foreground.name, foreground.collision_type, ready_to_harvest, elapsed, foreground.render_type
                                 )
                             } else {
                                 data = format!(
                                     "Position: {}|{}\nItem name: {}\nCollision type: {}\nRender type: {}",
-                                    world_x, world_y, item.name, item.collision_type, item.render_type
+                                    world_x, world_y, foreground.name, foreground.collision_type, foreground.render_type
                                 )
                             }
 
@@ -542,6 +349,7 @@ impl WorldMap {
         cell_max: Pos2,
         flipped: bool,
         color: Color32,
+        base_color: u32,
     ) {
         match texture_manager.read().unwrap().get_texture(&texture_name) {
             Some(texture) => {
@@ -576,7 +384,14 @@ impl WorldMap {
                     color,
                 );
             }
-            None => (),
+            None => {
+                let (b, g, r, _) = color::extract_bgra(base_color);
+                draw_list.rect_filled(
+                    Rect::from_min_max(cell_min, cell_max),
+                    0.0,
+                    Color32::from_rgb(r, g, b),
+                );
+            },
         }
     }
 }
