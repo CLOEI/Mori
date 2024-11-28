@@ -99,7 +99,19 @@ impl WorldMap {
                             );
                             continue;
                         }
-                        let tile = world.get_tile(world_x as u32, world_y as u32).unwrap();
+                        let tile = {
+                            match world.get_tile(world_x as u32, world_y as u32) {
+                                Some(tile) => tile.clone(),
+                                None => {
+                                    draw_list.rect_filled(
+                                        Rect::from_min_max(cell_min, cell_max),
+                                        0.0,
+                                        Color32::from_rgb(255, 215, 0),
+                                    );
+                                    continue;
+                                },
+                            }
+                        };
                         let (foreground, foreground_seed) = {
                             let item_database = bot.item_database.read().unwrap();
                             let foreground = item_database
@@ -401,7 +413,7 @@ impl WorldMap {
                                 let ready_to_harvest = if *ready_to_harvest {
                                     "Yes"
                                 } else {
-                                    if world.is_tile_harvestable(tile) {
+                                    if world.is_tile_harvestable(&tile) {
                                         "Yes"
                                     } else {
                                         "No"
