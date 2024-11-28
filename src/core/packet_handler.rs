@@ -291,10 +291,14 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                     ETankPacketType::NetGamePacketSendTileUpdateData => {
                         let tile = {
                             let world = bot.world.write().unwrap();
-                            world
-                                .get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32)
-                                .unwrap()
-                                .clone()
+                            match world.get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+                                Some(tile) => {
+                                    tile.clone()
+                                }
+                                None => {
+                                    return;
+                                }
+                            }
                         };
                         let data = &data[56..];
                         let mut cursor = Cursor::new(data);

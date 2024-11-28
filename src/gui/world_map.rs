@@ -73,18 +73,14 @@ impl WorldMap {
                         let world_x = camera_tile_x + x - tiles_in_view_x / 2;
                         let world_y = camera_tile_y + y - tiles_in_view_y / 2;
 
-                        if world_x <= 0 || world_y <= 0 || world_x >= world.width as i32 || world_y >= world.height as i32 {
-                            continue;
-                        }
-
                         let cell_min = Pos2::new(
                             rect.min.x + x as f32 * cell_size - offset_x,
                             rect.min.y + y as f32 * cell_size - offset_y,
                         );
                         let cell_max = Pos2::new(cell_min.x + cell_size, cell_min.y + cell_size);
 
-                        if world_x < 0
-                            || world_y < 0
+                        if world_x <= 0
+                            || world_y <= 0
                             || world_x >= world.width as i32
                             || world_y >= world.height as i32
                         {
