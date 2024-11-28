@@ -1,11 +1,11 @@
-use std::fs;
-use std::sync::{Arc, RwLock};
-use eframe::egui::{self};
 use crate::{
     manager::bot_manager::BotManager,
     types::{config::BotConfig, elogin_method::ELoginMethod},
     utils,
 };
+use eframe::egui::{self};
+use std::fs;
+use std::sync::{Arc, RwLock};
 
 #[derive(Default)]
 pub struct AddBotDialog {
@@ -78,7 +78,10 @@ impl AddBotDialog {
                         let config;
                         if self.method == ELoginMethod::STEAM {
                             config = BotConfig {
-                                payload: format!("{}|{}|{}|{}", self.username, self.password, self.steam_user, self.steam_pass),
+                                payload: format!(
+                                    "{}|{}|{}|{}",
+                                    self.username, self.password, self.steam_user, self.steam_pass
+                                ),
                                 recovery_code: self.code.clone(),
                                 login_method: self.method.clone(),
                                 token: "".to_string(),

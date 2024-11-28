@@ -142,7 +142,6 @@ impl BotMenu {
                                                 ui.label("Timeout");
                                                 ui.label(timeout.to_string());
                                                 ui.end_row();
-                                                
                                             });
                                     });
                                 });

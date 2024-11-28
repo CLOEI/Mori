@@ -23,7 +23,6 @@ gtitem-r = { git = "https://github.com/CLOEI/gtitem-r.git" }
 gtworld-r = { git = "https://github.com/CLOEI/gtworld-r.git" }
 eframe = "0.29.1"
 egui_extras = { version = "0.29.1", features = ["svg", "syntect"] }
-image = { version = "0.25.5", features = ["png"] }
 egui = "0.29.1"
 socks = "0.3.4"
 thiserror = "1.0.63"

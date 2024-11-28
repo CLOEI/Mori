@@ -1,8 +1,8 @@
-use std::sync::{Arc, RwLock};
-use eframe::egui::{self};
 use crate::manager::proxy_manager::ProxyManager;
 use crate::types::config;
 use crate::utils;
+use eframe::egui::{self};
+use std::sync::{Arc, RwLock};
 
 #[derive(Default)]
 pub struct AddProxyDialog {

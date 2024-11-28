@@ -98,31 +98,39 @@ impl ItemDatabase {
                                 let selected_item =
                                     { items_database.get_item(&selected_index).unwrap().clone() };
                                 if selected_item.id % 2 == 0 {
-                                    match texture_manager.read().unwrap().get_texture(&selected_item.texture_file_name)
+                                    match texture_manager
+                                        .read()
+                                        .unwrap()
+                                        .get_texture(&selected_item.texture_file_name)
                                     {
                                         Some(texture) => {
-                                            let (spread_x, spread_y) = match selected_item.render_type {
-                                                2 | 5 => (4.0, 1.0),
-                                                4 => (4.0, 0.0),
-                                                3 | 7 | 8 | 9 | 10 => (3.0, 0.0),
-                                                _ => (0.0, 0.0),
-                                            };
+                                            let (spread_x, spread_y) =
+                                                match selected_item.render_type {
+                                                    2 | 5 => (4.0, 1.0),
+                                                    4 => (4.0, 0.0),
+                                                    3 | 7 | 8 | 9 | 10 => (3.0, 0.0),
+                                                    _ => (0.0, 0.0),
+                                                };
 
                                             let [width, height] = texture.size();
-                                            let uv_x_start =
-                                                ((selected_item.texture_x as f32 + spread_x) * 32.0)
-                                                    / width as f32;
-                                            let uv_y_start =
-                                                ((selected_item.texture_y as f32 + spread_y) * 32.0)
-                                                    / height as f32;
-                                            let uv_x_end =
-                                                (((selected_item.texture_x as f32 + spread_x) * 32.0)
-                                                    + 32.0)
-                                                    / width as f32;
-                                            let uv_y_end =
-                                                (((selected_item.texture_y as f32 + spread_y) * 32.0)
-                                                    + 32.0)
-                                                    / height as f32;
+                                            let uv_x_start = ((selected_item.texture_x as f32
+                                                + spread_x)
+                                                * 32.0)
+                                                / width as f32;
+                                            let uv_y_start = ((selected_item.texture_y as f32
+                                                + spread_y)
+                                                * 32.0)
+                                                / height as f32;
+                                            let uv_x_end = (((selected_item.texture_x as f32
+                                                + spread_x)
+                                                * 32.0)
+                                                + 32.0)
+                                                / width as f32;
+                                            let uv_y_end = (((selected_item.texture_y as f32
+                                                + spread_y)
+                                                * 32.0)
+                                                + 32.0)
+                                                / height as f32;
 
                                             let uv_start = egui::Pos2::new(uv_x_start, uv_y_start);
                                             let uv_end = egui::Pos2::new(uv_x_end, uv_y_end);
@@ -136,7 +144,8 @@ impl ItemDatabase {
                                         None => (),
                                     }
                                 } else {
-                                    match texture_manager.read().unwrap().get_texture("seed.rttex") {
+                                    match texture_manager.read().unwrap().get_texture("seed.rttex")
+                                    {
                                         Some(texture) => {
                                             let [width, height] = texture.size();
                                             let tile_size = 16.0;
@@ -146,7 +155,8 @@ impl ItemDatabase {
                                             let tile_index = selected_item.seed_base_sprite as f32;
                                             let uv_x_start = (tile_index * 16.0) / width as f32;
                                             let uv_y_start = (0.0 * 16.0) / height as f32;
-                                            let uv_x_end = ((tile_index * 16.0) + 16.0) / width as f32;
+                                            let uv_x_end =
+                                                ((tile_index * 16.0) + 16.0) / width as f32;
                                             let uv_y_end = ((0.0 * 16.0) + 16.0) / height as f32;
 
                                             let uv_rect = egui::Rect::from_min_max(
@@ -154,8 +164,11 @@ impl ItemDatabase {
                                                 egui::Pos2::new(uv_x_end, uv_y_end),
                                             );
 
-                                            let (b, g, r, a) = utils::color::extract_bgra(selected_item.base_color);
-                                            let tint = egui::Color32::from_rgba_unmultiplied(r, g, b, a);
+                                            let (b, g, r, a) = utils::color::extract_bgra(
+                                                selected_item.base_color,
+                                            );
+                                            let tint =
+                                                egui::Color32::from_rgba_unmultiplied(r, g, b, a);
                                             let (rect, painter) = ui.allocate_painter(
                                                 egui::Vec2::new(scale_to_size, scale_to_size),
                                                 egui::Sense::hover(),
@@ -163,10 +176,12 @@ impl ItemDatabase {
 
                                             painter.image(texture.id(), rect.rect, uv_rect, tint);
 
-                                            let tile_index = selected_item.seed_overlay_sprite as f32;
+                                            let tile_index =
+                                                selected_item.seed_overlay_sprite as f32;
                                             let uv_x_start = (tile_index * 16.0) / width as f32;
                                             let uv_y_start = (1.0 * 16.0) / height as f32;
-                                            let uv_x_end = ((tile_index * 16.0) + 16.0) / width as f32;
+                                            let uv_x_end =
+                                                ((tile_index * 16.0) + 16.0) / width as f32;
                                             let uv_y_end = ((1.0 * 16.0) + 16.0) / height as f32;
 
                                             let uv_rect = egui::Rect::from_min_max(
@@ -174,11 +189,13 @@ impl ItemDatabase {
                                                 egui::Pos2::new(uv_x_end, uv_y_end),
                                             );
 
-                                            let (b, g, r, a) = utils::color::extract_bgra(selected_item.overlay_color);
-                                            let tint = egui::Color32::from_rgba_unmultiplied(r, g, b, a);
+                                            let (b, g, r, a) = utils::color::extract_bgra(
+                                                selected_item.overlay_color,
+                                            );
+                                            let tint =
+                                                egui::Color32::from_rgba_unmultiplied(r, g, b, a);
 
                                             painter.image(texture.id(), rect.rect, uv_rect, tint);
-
                                         }
                                         None => (),
                                     }
@@ -224,7 +241,10 @@ impl ItemDatabase {
                                         selected_item.is_stripey_wallpaper
                                     ));
                                 }
-                                ui.label(format!("Collision Type: {}", selected_item.collision_type));
+                                ui.label(format!(
+                                    "Collision Type: {}",
+                                    selected_item.collision_type
+                                ));
                                 if selected_item.block_health != 0 {
                                     ui.label(format!(
                                         "Block Health: {}",

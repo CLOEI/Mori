@@ -1,8 +1,8 @@
+use crate::manager::bot_manager::BotManager;
+use crate::utils;
+use eframe::egui::{self, Ui};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use crate::manager::bot_manager::BotManager;
-use eframe::egui::{self, Ui};
-use crate::utils;
 
 #[derive(Default)]
 pub struct Growscan {
@@ -25,66 +25,82 @@ impl Growscan {
                             (world.dropped.clone(), world.tiles.clone())
                         };
 
-                        egui::ScrollArea::vertical().id_source("objects_scroll").show(ui, |ui| {
-                            ui.heading("Objects");
+                        egui::ScrollArea::vertical()
+                            .id_source("objects_scroll")
+                            .show(ui, |ui| {
+                                ui.heading("Objects");
 
-                            let mut item_amounts = HashMap::new();
-                            for item in &objects.items {
-                                *item_amounts.entry(item.id).or_insert(0) += item.count;
-                            }
+                                let mut item_amounts = HashMap::new();
+                                for item in &objects.items {
+                                    *item_amounts.entry(item.id).or_insert(0) += item.count;
+                                }
 
-                            let mut sorted_items: Vec<_> = item_amounts.iter().collect();
-                            sorted_items.sort_by_key(|&(id, _)| id);
+                                let mut sorted_items: Vec<_> = item_amounts.iter().collect();
+                                sorted_items.sort_by_key(|&(id, _)| id);
 
-                            egui::Grid::new("objects_grid")
-                                .num_columns(2)
-                                .spacing([10.0, 10.0])
-                                .striped(true)
-                                .min_col_width(ui.available_width())
-                                .show(ui, |ui| {
-                                    for (id, count) in sorted_items {
-                                        if let Some(item_data) = bot.item_database.read().unwrap().get_item(&(*id as u32)) {
-                                            let item_name = &item_data.name;
-                                            ui.label(format!("{} {}", count, item_name));
-                                            ui.end_row();
+                                egui::Grid::new("objects_grid")
+                                    .num_columns(2)
+                                    .spacing([10.0, 10.0])
+                                    .striped(true)
+                                    .min_col_width(ui.available_width())
+                                    .show(ui, |ui| {
+                                        for (id, count) in sorted_items {
+                                            if let Some(item_data) = bot
+                                                .item_database
+                                                .read()
+                                                .unwrap()
+                                                .get_item(&(*id as u32))
+                                            {
+                                                let item_name = &item_data.name;
+                                                ui.label(format!("{} {}", count, item_name));
+                                                ui.end_row();
+                                            }
                                         }
-                                    }
-                                });
-                        });
+                                    });
+                            });
 
                         ui.add_space(20.0);
 
-                        egui::ScrollArea::vertical().id_source("tiles_scroll").show(ui, |ui| {
-                            ui.heading("Tiles");
+                        egui::ScrollArea::vertical()
+                            .id_source("tiles_scroll")
+                            .show(ui, |ui| {
+                                ui.heading("Tiles");
 
-                            let mut item_counts = HashMap::new();
-                            for tile in &tiles {
-                                if tile.foreground_item_id != 0 {
-                                    *item_counts.entry(tile.foreground_item_id).or_insert(0) += 1;
-                                }
-                                if tile.background_item_id != 0 {
-                                    *item_counts.entry(tile.background_item_id).or_insert(0) += 1;
-                                }
-                            }
-
-                            let mut sorted_tiles: Vec<_> = item_counts.iter().collect();
-                            sorted_tiles.sort_by_key(|&(id, _)| id);
-
-                            egui::Grid::new("tiles_grid")
-                                .num_columns(2)
-                                .spacing([10.0, 10.0])
-                                .striped(true)
-                                .min_col_width(ui.available_width())
-                                .show(ui, |ui| {
-                                    for (id, count) in sorted_tiles {
-                                        if let Some(item_data) = bot.item_database.read().unwrap().get_item(&(*id as u32)) {
-                                            let item_name = &item_data.name;
-                                            ui.label(format!("{} {}", count, item_name));
-                                            ui.end_row();
-                                        }
+                                let mut item_counts = HashMap::new();
+                                for tile in &tiles {
+                                    if tile.foreground_item_id != 0 {
+                                        *item_counts.entry(tile.foreground_item_id).or_insert(0) +=
+                                            1;
                                     }
-                                });
-                        });
+                                    if tile.background_item_id != 0 {
+                                        *item_counts.entry(tile.background_item_id).or_insert(0) +=
+                                            1;
+                                    }
+                                }
+
+                                let mut sorted_tiles: Vec<_> = item_counts.iter().collect();
+                                sorted_tiles.sort_by_key(|&(id, _)| id);
+
+                                egui::Grid::new("tiles_grid")
+                                    .num_columns(2)
+                                    .spacing([10.0, 10.0])
+                                    .striped(true)
+                                    .min_col_width(ui.available_width())
+                                    .show(ui, |ui| {
+                                        for (id, count) in sorted_tiles {
+                                            if let Some(item_data) = bot
+                                                .item_database
+                                                .read()
+                                                .unwrap()
+                                                .get_item(&(*id as u32))
+                                            {
+                                                let item_name = &item_data.name;
+                                                ui.label(format!("{} {}", count, item_name));
+                                                ui.end_row();
+                                            }
+                                        }
+                                    });
+                            });
                     });
                 });
             }

@@ -1,7 +1,7 @@
-use std::io;
-use std::net::{SocketAddr, UdpSocket};
 use rusty_enet::{PacketReceived, Socket, SocketOptions, MTU_MAX};
 use socks::{Socks5Datagram, TargetAddr};
+use std::io;
+use std::net::{SocketAddr, UdpSocket};
 
 pub struct Socks5UdpSocket {
     pub inner: Socks5Datagram,
@@ -27,12 +27,20 @@ impl Socket for Socks5UdpSocket {
         self.inner.send_to(buffer, address).map_err(|e| e.into())
     }
 
-    fn receive(&mut self, buffer: &mut [u8; MTU_MAX]) -> Result<Option<(Self::Address, PacketReceived)>, Self::Error> {
+    fn receive(
+        &mut self,
+        buffer: &mut [u8; MTU_MAX],
+    ) -> Result<Option<(Self::Address, PacketReceived)>, Self::Error> {
         match self.inner.recv_from(buffer) {
             Ok((size, addr)) => {
                 let socket_addr = match addr {
                     TargetAddr::Ip(socket_addr) => socket_addr,
-                    _ => return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid address type")),
+                    _ => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Invalid address type",
+                        ))
+                    }
                 };
                 let packet = PacketReceived::Complete(size);
                 Ok(Some((socket_addr, packet)))
@@ -66,7 +74,10 @@ impl Socket for SocketType {
         }
     }
 
-    fn receive(&mut self, buffer: &mut [u8; MTU_MAX]) -> Result<Option<(Self::Address, PacketReceived)>, Self::Error> {
+    fn receive(
+        &mut self,
+        buffer: &mut [u8; MTU_MAX],
+    ) -> Result<Option<(Self::Address, PacketReceived)>, Self::Error> {
         match self {
             SocketType::Socks5(s) => s.receive(buffer),
             SocketType::Udp(u) => u.receive(buffer),

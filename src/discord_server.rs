@@ -22,11 +22,12 @@ impl EventHandler for Handler {
 pub async fn start() {
     let token = config::get_discord_token();
 
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client =
-        Client::builder(&token, intents).event_handler(Handler).await.expect("Err creating client");
+    let mut client = Client::builder(&token, intents)
+        .event_handler(Handler)
+        .await
+        .expect("Err creating client");
 
     if let Err(why) = client.start().await {
         error!("Client error: {why:?}");

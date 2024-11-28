@@ -5,27 +5,33 @@ use crate::gui::proxy_list::ProxyList;
 use crate::gui::settings::Settings;
 use crate::manager::bot_manager::BotManager;
 use crate::manager::proxy_manager::ProxyManager;
+use crate::texture_manager::TextureManager;
 use crate::utils::config;
 use eframe::egui::ViewportBuilder;
-use egui::{vec2, Button, CentralPanel, Id, PointerButton, RichText, Sense, UiBuilder, ViewportCommand};
+use egui::{
+    vec2, Button, CentralPanel, Id, PointerButton, RichText, Sense, UiBuilder, ViewportCommand,
+};
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
-use std::sync::{Arc, RwLock};
-use std::{fs::{self, File}, io::Write, thread};
-use std::sync::atomic::{AtomicBool, Ordering};
 use paris::{error, info, warn};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
+use std::{
+    fs::{self, File},
+    io::Write,
+    thread,
+};
 use types::config::{Config, Theme};
-use crate::texture_manager::TextureManager;
 
 mod core;
+mod discord_server;
 mod gui;
 mod lua_register;
 mod manager;
 mod texture_manager;
 mod types;
 mod utils;
-mod discord_server;
 
 fn init_config() {
     if !fs::metadata("config.json").is_ok() {
@@ -266,15 +272,16 @@ impl eframe::App for App {
                 rect.min.y = title_bar_rect.max.y;
                 rect
             }
-                .shrink(4.0);
+            .shrink(4.0);
 
             let mut content_ui = ui.new_child(UiBuilder::new().max_rect(content_rect));
             if self.texture_loaded.load(Ordering::Acquire) {
                 match self.navbar.current_menu.as_str() {
-                    "bots" => {
-                        self.bot_menu
-                            .render(&mut content_ui, &self.bot_manager, &self.texture_manager)
-                    }
+                    "bots" => self.bot_menu.render(
+                        &mut content_ui,
+                        &self.bot_manager,
+                        &self.texture_manager,
+                    ),
                     "item_database" => self.item_database.render(
                         &mut content_ui,
                         &self.bot_manager,
@@ -296,7 +303,9 @@ impl eframe::App for App {
                     |ui| {
                         ui.add_space(ui.available_height() / 2.0 - 25.0);
                         ui.vertical_centered(|ui| {
-                            ui.add(egui::Label::new(RichText::new(egui_remixicon::icons::PUZZLE_2_FILL).size(50.0)));
+                            ui.add(egui::Label::new(
+                                RichText::new(egui_remixicon::icons::PUZZLE_2_FILL).size(50.0),
+                            ));
                             ui.add(egui::Label::new("Loading textures..."));
                             ui.add_space(8.0);
                             ui.add(egui::Spinner::default());

@@ -1,5 +1,5 @@
-use std::sync::mpsc::Sender;
 use paris::{error, info, warn};
+use std::sync::mpsc::Sender;
 
 pub fn info(message: &str, sender: &Sender<String>) {
     info!("{}", message);

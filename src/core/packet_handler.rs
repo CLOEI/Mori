@@ -8,11 +8,11 @@ use crate::{
 };
 use flate2::read::ZlibDecoder;
 use gtworld_r::TileType;
+use paris::error;
 use regex::Regex;
 use std::io::{Cursor, Read};
 use std::time::Instant;
 use std::{fs, sync::Arc};
-use paris::error;
 
 pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
     match packet_type {

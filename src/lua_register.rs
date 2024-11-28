@@ -55,20 +55,38 @@ pub fn register(lua: &Lua, bot: &Arc<Bot>) -> LuaResult<()> {
         Ok(())
     })?;
 
-    register_bot_function(lua, &bot, &globals, "wrench_player", |bot, player_id: u32| {
-        bot.wrench_player(player_id);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "wrench_player",
+        |bot, player_id: u32| {
+            bot.wrench_player(player_id);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, &bot, &globals, "wrench", |bot, (offset_x, offset_y): (i32, i32)| {
-        bot.wrench(offset_x, offset_y);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "wrench",
+        |bot, (offset_x, offset_y): (i32, i32)| {
+            bot.wrench(offset_x, offset_y);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, &bot, &globals, "punch", |bot, (offset_x, offset_y): (i32, i32)| {
-        bot.punch(offset_x, offset_y);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "punch",
+        |bot, (offset_x, offset_y): (i32, i32)| {
+            bot.punch(offset_x, offset_y);
+            Ok(())
+        },
+    )?;
 
     register_bot_function(lua, &bot, &globals, "wear", |bot, item_id: u32| {
         bot.wear(item_id);
@@ -86,36 +104,72 @@ pub fn register(lua: &Lua, bot: &Arc<Bot>) -> LuaResult<()> {
     })?;
 
     // Register functions with multiple arguments
-    register_bot_function(lua, &bot, &globals, "trash", |bot, (item_id, amount): (u32, u32)| {
-        bot.trash_item(item_id, amount);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "trash",
+        |bot, (item_id, amount): (u32, u32)| {
+            bot.trash_item(item_id, amount);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, &bot, &globals, "drop", |bot, (item_id, amount): (u32, u32)| {
-        bot.drop_item(item_id, amount);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "drop",
+        |bot, (item_id, amount): (u32, u32)| {
+            bot.drop_item(item_id, amount);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, &bot, &globals, "find_path", |bot, (x, y): (u32, u32)| {
-        bot.find_path(x, y);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "find_path",
+        |bot, (x, y): (u32, u32)| {
+            bot.find_path(x, y);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, &bot, &globals, "walk", |bot, (offset_x, offset_y): (i32, i32)| {
-        bot.walk(offset_x, offset_y, false);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "walk",
+        |bot, (offset_x, offset_y): (i32, i32)| {
+            bot.walk(offset_x, offset_y, false);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, &bot, &globals, "place", |bot, (offset_x, offset_y, item_id): (i32, i32, u32)| {
-        bot.place(offset_x, offset_y, item_id);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "place",
+        |bot, (offset_x, offset_y, item_id): (i32, i32, u32)| {
+            bot.place(offset_x, offset_y, item_id);
+            Ok(())
+        },
+    )?;
 
-    register_bot_function(lua, &bot, &globals, "send_packet", |bot, (pkt_type, data): (u32, String)| {
-        let packet = EPacketType::from(pkt_type);
-        bot.send_packet(packet, data);
-        Ok(())
-    })?;
+    register_bot_function(
+        lua,
+        &bot,
+        &globals,
+        "send_packet",
+        |bot, (pkt_type, data): (u32, String)| {
+            let packet = EPacketType::from(pkt_type);
+            bot.send_packet(packet, data);
+            Ok(())
+        },
+    )?;
 
     register_bot_function(lua, &bot, &globals, "is_inworld", |bot, ()| {
         let is_inworld = bot.is_inworld();

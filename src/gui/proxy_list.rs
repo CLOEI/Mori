@@ -1,14 +1,20 @@
-use std::sync::{Arc, RwLock};
-use eframe::egui::{self, Ui};
-use paris::info;
 use crate::gui::add_proxy_dialog::AddProxyDialog;
 use crate::manager::proxy_manager::ProxyManager;
+use eframe::egui::{self, Ui};
+use paris::info;
+use std::sync::{Arc, RwLock};
 
 #[derive(Default)]
 pub struct ProxyList {}
 
 impl ProxyList {
-    pub fn render(&mut self, ui: &mut Ui, proxy_manager: &Arc<RwLock<ProxyManager>>, add_proxy_dialog: &mut AddProxyDialog, _ctx: &egui::Context) {
+    pub fn render(
+        &mut self,
+        ui: &mut Ui,
+        proxy_manager: &Arc<RwLock<ProxyManager>>,
+        add_proxy_dialog: &mut AddProxyDialog,
+        _ctx: &egui::Context,
+    ) {
         ui.vertical(|ui| {
             if ui.button("Add proxy").clicked() {
                 add_proxy_dialog.open = true;
@@ -34,9 +40,11 @@ impl ProxyList {
                         ui.label(proxy.port.to_string());
                         ui.label(proxy.username.to_string());
                         ui.label(proxy.password.to_string());
-                        let response = ui.group(|ui| {
-                            ui.label(proxy_data.status.to_string());
-                        }).response;
+                        let response = ui
+                            .group(|ui| {
+                                ui.label(proxy_data.status.to_string());
+                            })
+                            .response;
                         ui.end_row();
 
                         response.context_menu(|ui| {
@@ -54,4 +62,3 @@ impl ProxyList {
         });
     }
 }
-

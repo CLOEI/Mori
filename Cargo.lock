@@ -19,7 +19,6 @@ dependencies = [
  "gtitem-r",
  "gtworld-r",
  "hex",
- "image",
  "md5",
  "mlua",
  "paris",

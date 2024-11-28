@@ -970,7 +970,10 @@ impl Bot {
             bot.send_packet(EPacketType::NetMessageGenericText, format!("action|dialog_return\ndialog_name|popup\nnetID|{}|\nbuttonClicked|acceptlock\n", net_id));
             let mut temp_data = bot.temporary_data.write().unwrap();
             temp_data.dialog_callback = Some(|bot: &Arc<Bot>| {
-                bot.send_packet(EPacketType::NetMessageGenericText, "action|dialog_return\ndialog_name|acceptaccess\n".to_string());
+                bot.send_packet(
+                    EPacketType::NetMessageGenericText,
+                    "action|dialog_return\ndialog_name|acceptaccess\n".to_string(),
+                );
                 let mut temp_data = bot.temporary_data.write().unwrap();
                 temp_data.dialog_callback = None;
             });
@@ -978,7 +981,10 @@ impl Bot {
     }
 
     pub fn wrench_player(&self, net_id: u32) {
-        self.send_packet(EPacketType::NetMessageGenericText, format!("action|wrench\n|netid|{}\n", net_id));
+        self.send_packet(
+            EPacketType::NetMessageGenericText,
+            format!("action|wrench\n|netid|{}\n", net_id),
+        );
     }
 
     pub fn enter_door(&self) {

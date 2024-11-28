@@ -55,7 +55,10 @@ impl Inventory {
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
                                             if ui
-                                                .add_enabled(!wear_disabled, egui::Button::new("Wear"))
+                                                .add_enabled(
+                                                    !wear_disabled,
+                                                    egui::Button::new("Wear"),
+                                                )
                                                 .clicked()
                                             {
                                                 let bot_clone = bot.clone();

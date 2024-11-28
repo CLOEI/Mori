@@ -1,7 +1,7 @@
+use super::{elogin_method::ELoginMethod, login_info::LoginInfo};
+use crate::core::Bot;
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::core::Bot;
-use super::{elogin_method::ELoginMethod, login_info::LoginInfo};
 
 #[derive(Debug, Default)]
 pub struct Info {

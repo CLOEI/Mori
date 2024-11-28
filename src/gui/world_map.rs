@@ -1,13 +1,13 @@
+use crate::core::Bot;
 use crate::texture_manager::TextureManager;
+use crate::utils::color;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
-use egui::{Painter, TextBuffer};
+use egui::Painter;
 use gtworld_r::TileType;
 use paris::info;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use crate::core::Bot;
-use crate::utils::color;
 
 #[derive(Default)]
 pub struct WorldMap {
@@ -101,7 +101,9 @@ impl WorldMap {
                             let foreground = item_database
                                 .get_item(&(tile.foreground_item_id as u32))
                                 .unwrap();
-                            let foreground_seed = item_database.get_item(&((tile.foreground_item_id + 1) as u32)).unwrap();
+                            let foreground_seed = item_database
+                                .get_item(&((tile.foreground_item_id + 1) as u32))
+                                .unwrap();
                             (foreground, foreground_seed)
                         };
                         let (background, background_seed) = {
@@ -109,7 +111,9 @@ impl WorldMap {
                             let background = item_database
                                 .get_item(&(tile.background_item_id as u32))
                                 .unwrap();
-                            let background_seed = item_database.get_item(&((tile.background_item_id + 1) as u32)).unwrap();
+                            let background_seed = item_database
+                                .get_item(&((tile.background_item_id + 1) as u32))
+                                .unwrap();
                             (background, background_seed)
                         };
 
@@ -130,7 +134,8 @@ impl WorldMap {
                             }
                             if tile.foreground_item_id != 0 {
                                 if tile.foreground_item_id % 2 != 0 {
-                                    let (b, g, r, a) = utils::color::extract_bgra(foreground.overlay_color);
+                                    let (b, g, r, a) =
+                                        utils::color::extract_bgra(foreground.overlay_color);
                                     let (spread_x, spread_y) = match foreground.render_type {
                                         2 | 5 => (4.0, 1.0),
                                         4 => (4.0, 0.0),
@@ -190,22 +195,38 @@ impl WorldMap {
                                         (2.0, Color32::WHITE),
                                     );
                                 } else {
-                                    let flipped = if foreground.flags.flippable && tile.flags.flipped_x {
-                                        true
-                                    } else {
-                                        false
-                                    };
+                                    let flipped =
+                                        if foreground.flags.flippable && tile.flags.flipped_x {
+                                            true
+                                        } else {
+                                            false
+                                        };
+                                    let activated =
+                                        if tile.flags.is_on && foreground.render_type == 1 {
+                                            true
+                                        } else {
+                                            false
+                                        };
 
-                                    if let TileType::DisplayBlock {
-                                        item_id
-                                    } = tile.tile_type {
-                                        self.draw_display_block(&draw_list, &bot, &texture_manager, item_id, cell_min, cell_max);
+                                    if let TileType::DisplayBlock { item_id } = tile.tile_type {
+                                        self.draw_display_block(
+                                            &draw_list,
+                                            &bot,
+                                            &texture_manager,
+                                            item_id,
+                                            cell_min,
+                                            cell_max,
+                                        );
                                     }
 
                                     self.draw_texture(
                                         &draw_list,
                                         texture_manager,
-                                        foreground.texture_x,
+                                        if activated {
+                                            foreground.texture_x + 1
+                                        } else {
+                                            foreground.texture_x
+                                        },
                                         foreground.texture_y,
                                         foreground.texture_file_name,
                                         cell_min,
@@ -215,10 +236,35 @@ impl WorldMap {
                                         foreground_seed.base_color,
                                     );
 
-                                    if let TileType::VendingMachine {
-                                        item_id, ..
-                                    } = tile.tile_type {
-                                        self.draw_vending_machine(&draw_list, &bot, &texture_manager, item_id, cell_min, cell_max);
+                                    if let TileType::VendingMachine { item_id, .. } = tile.tile_type
+                                    {
+                                        self.draw_vending_machine(
+                                            &draw_list,
+                                            &bot,
+                                            &texture_manager,
+                                            item_id,
+                                            cell_min,
+                                            cell_max,
+                                        );
+                                    }
+                                    if let TileType::Shelf {
+                                        top_left_item_id,
+                                        top_right_item_id,
+                                        bottom_left_item_id,
+                                        bottom_right_item_id,
+                                    } = tile.tile_type
+                                    {
+                                        self.draw_display_shelf(
+                                            &draw_list,
+                                            &bot,
+                                            &texture_manager,
+                                            top_left_item_id,
+                                            top_right_item_id,
+                                            bottom_left_item_id,
+                                            bottom_right_item_id,
+                                            cell_min,
+                                            cell_max,
+                                        );
                                     }
                                 }
                             }
@@ -352,7 +398,131 @@ impl WorldMap {
         }
     }
 
-    fn draw_vending_machine(&self, draw_list: &Painter, bot: &Arc<Bot>, texture_manager: &Arc<RwLock<TextureManager>>, item_id: u32, cell_min: Pos2, cell_max: Pos2) {
+    fn draw_display_shelf(
+        &self,
+        draw_list: &Painter,
+        bot: &Arc<Bot>,
+        texture_manager: &Arc<RwLock<TextureManager>>,
+        top_left_item_id: u32,
+        top_right_item_id: u32,
+        bottom_left_item_id: u32,
+        bottom_right_item_id: u32,
+        cell_min: Pos2,
+        cell_max: Pos2,
+    ) {
+        let (top_left_item, top_left_item_seed) = {
+            let item_database = bot.item_database.read().unwrap();
+            let top_left_item = item_database.get_item(&top_left_item_id).unwrap();
+            let top_left_item_seed = item_database.get_item(&(top_left_item_id + 1)).unwrap();
+            (top_left_item, top_left_item_seed)
+        };
+
+        let (top_right_item, top_right_item_seed) = {
+            let item_database = bot.item_database.read().unwrap();
+            let top_right_item = item_database.get_item(&top_right_item_id).unwrap();
+            let top_right_item_seed = item_database.get_item(&(top_right_item_id + 1)).unwrap();
+            (top_right_item, top_right_item_seed)
+        };
+
+        let (bottom_left_item, bottom_left_item_seed) = {
+            let item_database = bot.item_database.read().unwrap();
+            let bottom_left_item = item_database.get_item(&bottom_left_item_id).unwrap();
+            let bottom_left_item_seed = item_database.get_item(&(bottom_left_item_id + 1)).unwrap();
+            (bottom_left_item, bottom_left_item_seed)
+        };
+
+        let (bottom_right_item, bottom_right_item_seed) = {
+            let item_database = bot.item_database.read().unwrap();
+            let bottom_right_item = item_database.get_item(&bottom_right_item_id).unwrap();
+            let bottom_right_item_seed = item_database.get_item(&(bottom_right_item_id + 1)).unwrap();
+            (bottom_right_item, bottom_right_item_seed)
+        };
+
+        let half_width = (cell_max.x - cell_min.x) / 2.0;
+        let half_height = (cell_max.y - cell_min.y) / 2.0;
+
+        let top_left_min = cell_min;
+        let top_left_max = Pos2::new(cell_min.x + half_width, cell_min.y + half_height);
+
+        let top_right_min = Pos2::new(cell_min.x + half_width, cell_min.y);
+        let top_right_max = Pos2::new(cell_max.x, cell_min.y + half_height);
+
+        let bottom_left_min = Pos2::new(cell_min.x, cell_min.y + half_height);
+        let bottom_left_max = Pos2::new(cell_min.x + half_width, cell_max.y);
+
+        let bottom_right_min = Pos2::new(cell_min.x + half_width, cell_min.y + half_height);
+        let bottom_right_max = cell_max;
+
+        if top_left_item.id != 0 {
+            self.draw_texture(
+                &draw_list,
+                texture_manager,
+                top_left_item.texture_x,
+                top_left_item.texture_y,
+                top_left_item.texture_file_name,
+                top_right_min,
+                top_right_max,
+                false,
+                Color32::WHITE,
+                top_left_item_seed.base_color,
+            )
+        }
+
+        if top_right_item.id != 0 {
+            self.draw_texture(
+                &draw_list,
+                texture_manager,
+                top_right_item.texture_x,
+                top_right_item.texture_y,
+                top_right_item.texture_file_name,
+                top_left_min,
+                top_left_max,
+                false,
+                Color32::WHITE,
+                top_right_item_seed.base_color,
+            );
+        }
+
+        if bottom_left_item.id != 0 {
+            self.draw_texture(
+                &draw_list,
+                texture_manager,
+                bottom_left_item.texture_x,
+                bottom_left_item.texture_y,
+                bottom_left_item.texture_file_name,
+                bottom_left_min,
+                bottom_left_max,
+                false,
+                Color32::WHITE,
+                bottom_left_item_seed.base_color,
+            );
+        }
+
+        if bottom_right_item.id != 0 {
+            self.draw_texture(
+                &draw_list,
+                texture_manager,
+                bottom_right_item.texture_x,
+                bottom_right_item.texture_y,
+                bottom_right_item.texture_file_name,
+                bottom_right_min,
+                bottom_right_max,
+                false,
+                Color32::WHITE,
+                bottom_right_item_seed.base_color,
+            );
+        }
+    }
+
+    fn draw_vending_machine(
+        &self,
+        draw_list: &Painter,
+        bot: &Arc<Bot>,
+        texture_manager: &Arc<RwLock<TextureManager>>,
+        item_id: u32,
+        cell_min: Pos2,
+        cell_max: Pos2,
+    ) {
         let (item, item_seed) = {
             let item_database = bot.item_database.read().unwrap();
             let item = item_database.get_item(&item_id).unwrap();
@@ -385,7 +555,15 @@ impl WorldMap {
         }
     }
 
-    fn draw_display_block(&self, draw_list: &Painter, bot: &Arc<Bot>, texture_manager: &Arc<RwLock<TextureManager>>, item_id: u32, cell_min: Pos2, cell_max: Pos2) {
+    fn draw_display_block(
+        &self,
+        draw_list: &Painter,
+        bot: &Arc<Bot>,
+        texture_manager: &Arc<RwLock<TextureManager>>,
+        item_id: u32,
+        cell_min: Pos2,
+        cell_max: Pos2,
+    ) {
         let (item, item_seed) = {
             let item_database = bot.item_database.read().unwrap();
             let item = item_database.get_item(&item_id).unwrap();
@@ -462,7 +640,7 @@ impl WorldMap {
                     0.0,
                     Color32::from_rgb(r, g, b),
                 );
-            },
+            }
         }
     }
 }
