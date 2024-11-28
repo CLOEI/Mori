@@ -73,6 +73,10 @@ impl WorldMap {
                         let world_x = camera_tile_x + x - tiles_in_view_x / 2;
                         let world_y = camera_tile_y + y - tiles_in_view_y / 2;
 
+                        if world_x <= 0 || world_y <= 0 || world_x >= world.width as i32 || world_y >= world.height as i32 {
+                            continue;
+                        }
+
                         let cell_min = Pos2::new(
                             rect.min.x + x as f32 * cell_size - offset_x,
                             rect.min.y + y as f32 * cell_size - offset_y,
@@ -207,6 +211,96 @@ impl WorldMap {
                                         } else {
                                             false
                                         };
+                                    let (mut texture_x, mut texture_y) = (
+                                        foreground.texture_x,
+                                        foreground.texture_y,
+                                    );
+
+                                    let top_left_tile = world.get_tile(world_x as u32 - 1, world_y as u32 - 1).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let top_center_tile = world.get_tile(world_x as u32, world_y as u32 - 1).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let top_right_tile = world.get_tile(world_x as u32 + 1, world_y as u32 - 1).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let center_left_tile = world.get_tile(world_x as u32 - 1, world_y as u32).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let center_right_tile = world.get_tile(world_x as u32 + 1, world_y as u32).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let bottom_left_tile = world.get_tile(world_x as u32 - 1, world_y as u32 + 1).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let bottom_center_tile = world.get_tile(world_x as u32, world_y as u32 + 1).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let bottom_right_tile = world.get_tile(world_x as u32 + 1, world_y as u32 + 1).map_or(None, |tile| {
+                                        if tile.foreground_item_id != foreground.id as u16 {
+                                            None
+                                        } else {
+                                            Some(tile)
+                                        }
+                                    });
+                                    let top_center_item = world.get_tile(world_x as u32, world_y as u32 - 1).map_or(None, |tile| {
+                                        Some(tile)
+                                    });
+
+                                    if foreground.render_type == 2 {
+                                        self.add_render_type2(
+                                            &mut texture_x,
+                                            &mut texture_y,
+                                            top_center_tile,
+                                            center_left_tile,
+                                            center_right_tile,
+                                            bottom_center_tile,
+                                        );
+                                    } else if foreground.render_type == 7 {
+                                        self.add_render_type7(
+                                            &mut texture_x,
+                                            top_center_tile,
+                                            bottom_center_tile,
+                                        )
+                                    } else if foreground.render_type == 3 {
+                                        self.add_render_type3(
+                                            &mut texture_x,
+                                            top_center_tile,
+                                            center_left_tile,
+                                            center_right_tile,
+                                            bottom_center_tile,
+                                            top_center_item
+                                        )
+                                    }
 
                                     if let TileType::DisplayBlock { item_id } = tile.tile_type {
                                         self.draw_display_block(
@@ -223,11 +317,11 @@ impl WorldMap {
                                         &draw_list,
                                         texture_manager,
                                         if activated {
-                                            foreground.texture_x + 1
+                                            texture_x + 1
                                         } else {
-                                            foreground.texture_x
+                                            texture_x
                                         },
-                                        foreground.texture_y,
+                                        texture_y,
                                         foreground.texture_file_name,
                                         cell_min,
                                         cell_max,
@@ -395,6 +489,160 @@ impl WorldMap {
                         });
                     });
             }
+        }
+    }
+
+    fn add_render_type3(
+        &self,
+        texture_x: &mut u8,
+        top_center_tile: Option<&gtworld_r::Tile>,
+        center_left_tile: Option<&gtworld_r::Tile>,
+        center_right_tile: Option<&gtworld_r::Tile>,
+        bottom_center_tile: Option<&gtworld_r::Tile>,
+        top_center_item: Option<&gtworld_r::Tile>,
+    ) {
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none()  && bottom_center_tile.is_none() {
+            *texture_x += 3;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some()  && bottom_center_tile.is_none() {
+            match top_center_item {
+                Some(tile) => {
+                    if tile.foreground_item_id == 8986 {
+                        *texture_x += 4;
+                    } else {
+                        *texture_x += 0;
+                    }
+                }
+                None => {
+                    *texture_x += 0;
+                }
+            }
+        }
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some()  && bottom_center_tile.is_some() {
+            match top_center_item {
+                Some(tile) => {
+                    if tile.foreground_item_id == 8986 {
+                        *texture_x += 4;
+                    } else {
+                        *texture_x += 0;
+                    }
+                }
+                None => {
+                    *texture_x += 0;
+                }
+            }
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none()  && bottom_center_tile.is_none() {
+            match top_center_item {
+                Some(tile) => {
+                    if tile.foreground_item_id == 8986 {
+                        *texture_x += 5;
+                    } else {
+                        *texture_x += 0;
+                    }
+                }
+                None => {
+                    *texture_x += 0;
+                }
+            }
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none()  && bottom_center_tile.is_some() {
+            match top_center_item {
+                Some(tile) => {
+                    if tile.foreground_item_id == 8986 {
+                        *texture_x += 5;
+                    } else {
+                        *texture_x += 0;
+                    }
+                }
+                None => {
+                    *texture_x += 0;
+                }
+            }
+        }
+        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_none() {
+            *texture_x += 1;
+        }
+        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_some() {
+            *texture_x += 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_none() {
+            *texture_x += 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_some() {
+            *texture_x += 1;
+        }
+    }
+
+    fn add_render_type7(
+        &self,
+        texture_x: &mut u8,
+        top_center_tile: Option<&gtworld_r::Tile>,
+        bottom_center_tile: Option<&gtworld_r::Tile>,
+    ) {
+        if top_center_tile.is_none() && bottom_center_tile.is_none() {
+            *texture_x += 3;
+        }
+        if top_center_tile.is_none() && bottom_center_tile.is_some() {
+            *texture_x += 2;
+        }
+        if top_center_tile.is_some() && bottom_center_tile.is_some() {
+            *texture_x += 1;
+        }
+    }
+
+    fn add_render_type2(
+        &self,
+        texture_x: &mut u8,
+        texture_y: &mut u8,
+        top_center_tile: Option<&gtworld_r::Tile>,
+        center_left_tile: Option<&gtworld_r::Tile>,
+        center_right_tile: Option<&gtworld_r::Tile>,
+        bottom_center_tile: Option<&gtworld_r::Tile>,
+    ) {
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none()  && bottom_center_tile.is_none() {
+            *texture_x += 4;
+            *texture_y += 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+            *texture_x += 5;
+            *texture_y += 3;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+            *texture_x += 6;
+            *texture_y += 3;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+            *texture_x += 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_some() {
+            *texture_x += 2;
+            *texture_y += 1;
+        }
+        if top_center_tile.is_some() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+            *texture_x += 3;
+            *texture_y += 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some() && bottom_center_tile.is_some() {
+            *texture_x += 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_some() {
+            *texture_x += 6;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_some() {
+            *texture_x += 5;
+        }
+        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_some() {
+            *texture_x += 4;
+        }
+        if top_center_tile.is_some() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_some() {
+            *texture_x += 3;
+        }
+        if top_center_tile.is_some() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+            *texture_x += 7;
+        }
+        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+            *texture_y += 1;
         }
     }
 

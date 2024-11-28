@@ -36,7 +36,7 @@ impl TextureManager {
                 .collect();
             let image = ColorImage { size, pixels };
 
-            let handler = ctx.load_texture(&filename, image, egui::TextureOptions::default());
+            let handler = ctx.load_texture(&filename, image, egui::TextureOptions::NEAREST);
             self.textures.insert(filename.clone(), handler);
 
             info!("Loaded texture: {}", filename);
