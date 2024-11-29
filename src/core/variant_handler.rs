@@ -57,6 +57,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                             let mut state = bot.state.lock().unwrap();
                             state.is_redirecting = false;
                             state.is_ingame = true;
+                            state.is_allowed_to_warp = true;
                             return;
                         }
                     }
@@ -87,6 +88,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     let mut state = bot_clone.state.lock().unwrap();
                     state.is_redirecting = false;
                     state.is_ingame = true;
+                    state.is_allowed_to_warp = true;
                 });
             } else {
                 bot.send_packet(
@@ -96,6 +98,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 let mut state = bot.state.lock().unwrap();
                 state.is_redirecting = false;
                 state.is_ingame = true;
+                state.is_allowed_to_warp = true;
             }
         }
         "OnCountryState" => {}
@@ -232,7 +235,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 if data.get("type").unwrap() == "local" {
                     let mut state = bot.state.lock().unwrap();
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
-
+                    state.is_allowed_to_warp = true;
                     bot.send_packet(
                         EPacketType::NetMessageGenericText,
                         "action|getDRAnimations\n".to_string(),
@@ -315,6 +318,9 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnRequestWorldSelectMenu" => {
             bot.world.write().unwrap().reset();
             bot.players.lock().unwrap().clear();
+        }
+        "OnFailedToEnterWorld" => {
+            bot.state.lock().unwrap().is_allowed_to_warp = true;
         }
         _ => {}
     }
