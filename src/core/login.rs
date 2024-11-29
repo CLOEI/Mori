@@ -315,7 +315,7 @@ pub fn get_google_token(url: &str, username: &str, password: &str) -> Result<Str
 }
 
 pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<String, ureq::Error> {
-    let agent = ureq::AgentBuilder::new().build();
+    let agent = ureq::AgentBuilder::new().redirects(0).build();
     let body = agent
         .get(url)
         .set("User-Agent", USER_AGENT)
@@ -335,9 +335,17 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
             ("password", &password),
         ])?;
 
-    let body = req.into_string()?;
-    let json: Value = serde_json::from_str(&body).unwrap();
-    Ok(json["token"].as_str().unwrap().to_string())
+    if req.status() == 200 {
+        let body = req.into_string()?;
+        let json: Value = serde_json::from_str(&body).unwrap();
+        Ok(json["token"].as_str().unwrap().to_string())
+    } else {
+        // 302 is possible invalid credentials redirection
+        Err(ureq::Error::Status(
+            403,
+            ureq::Response::new(403, "forbidden", "invalid_credentials")?,
+        ))
+    }
 }
 
 pub fn extract_token_from_html(body: &str) -> Option<String> {
