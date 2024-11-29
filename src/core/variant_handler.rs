@@ -21,6 +21,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let user_id = variant.get(3).unwrap().as_int32();
             let server_data = variant.get(4).unwrap().as_string();
             let parsed_server_data = textparse::parse_and_store_as_vec(&server_data);
+            let aat = variant.get(5).unwrap().as_int32();
 
             let mut state = bot.state.lock().unwrap();
             let mut server = bot.server.lock().unwrap();
@@ -33,6 +34,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             info.login_info.user = user_id.to_string();
             info.login_info.door_id = parsed_server_data.get(1).unwrap().to_string();
             info.login_info.uuid = parsed_server_data.get(2).unwrap().to_string();
+            info.login_info.aat = aat.to_string();
             bot.disconnect();
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
@@ -55,6 +57,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                             let mut state = bot.state.lock().unwrap();
                             state.is_redirecting = false;
                             state.is_ingame = true;
+                            state.is_allowed_to_warp = true;
                             return;
                         }
                     }
@@ -85,6 +88,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     let mut state = bot_clone.state.lock().unwrap();
                     state.is_redirecting = false;
                     state.is_ingame = true;
+                    state.is_allowed_to_warp = true;
                 });
             } else {
                 bot.send_packet(
@@ -94,6 +98,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 let mut state = bot.state.lock().unwrap();
                 state.is_redirecting = false;
                 state.is_ingame = true;
+                state.is_allowed_to_warp = true;
             }
         }
         "OnCountryState" => {}
@@ -230,8 +235,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 if data.get("type").unwrap() == "local" {
                     let mut state = bot.state.lock().unwrap();
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
-                    state.is_not_allowed_to_warp = false;
-
+                    state.is_allowed_to_warp = true;
                     bot.send_packet(
                         EPacketType::NetMessageGenericText,
                         "action|getDRAnimations\n".to_string(),
@@ -314,9 +318,10 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnRequestWorldSelectMenu" => {
             bot.world.write().unwrap().reset();
             bot.players.lock().unwrap().clear();
+            bot.state.lock().unwrap().is_allowed_to_warp = true;
         }
         "OnFailedToEnterWorld" => {
-            bot.state.lock().unwrap().is_not_allowed_to_warp = false;
+            bot.state.lock().unwrap().is_allowed_to_warp = true;
         }
         _ => {}
     }

@@ -31,6 +31,7 @@ pub struct LoginInfo {
     pub country: String,
     pub user: String,
     pub wk: String,
+    pub aat: String,
 }
 
 impl LoginInfo {
@@ -39,19 +40,19 @@ impl LoginInfo {
             uuid: String::new(),
             tank_id_name: String::new(),
             tank_id_pass: String::new(),
-            protocol: "209".to_string(),
+            protocol: "210".to_string(),
             fhash: "-716928004".to_string(),
             mac: utils::random::mac_address(),
             requested_name: "BraveDuck".to_string(),
             hash2: String::new(),
-            fz: "47142936".to_string(),
+            fz: "20743704".to_string(),
             f: "1".to_string(),
             player_age: "20".to_string(),
             game_version: utils::config::get_game_version(),
             lmode: "1".to_string(),
             cbits: "1040".to_string(),
             rid: utils::random::hex(32, true),
-            gdpr: "3".to_string(),
+            gdpr: "2".to_string(),
             hash: "0".to_string(),
             category: "_-5100".to_string(),
             token: String::new(),
@@ -61,10 +62,11 @@ impl LoginInfo {
             meta: String::new(),
             platform_id: "0,1,1".to_string(),
             device_version: "0".to_string(),
-            zf: "-821693372".to_string(),
+            zf: "31631978".to_string(),
             country: "jp".to_string(),
             user: String::new(),
             wk: utils::random::hex(32, true),
+            aat: "0".to_string(),
         }
     }
 
