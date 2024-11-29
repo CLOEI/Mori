@@ -67,6 +67,62 @@ impl WorldMap {
                 let tiles_in_view_x = (size.x / cell_size).ceil() as i32 + 1;
                 let tiles_in_view_y = (size.y / cell_size).ceil() as i32 + 1;
 
+                self.draw_whole_scaled(
+                    &draw_list,
+                    texture_manager,
+                    "sun.rttex".to_string(),
+                    Pos2::new(rect.min.x, rect.min.y),
+                    Pos2::new(rect.max.x, rect.max.y),
+                    true,
+                    0.5,
+                    20.0,
+                    0.0,
+                    0.0,
+                    0.0
+                );
+
+                self.draw_whole_texture(
+                    &draw_list,
+                    texture_manager,
+                    "hills3.rttex".to_string(),
+                    Pos2::new(rect.min.x, rect.min.y),
+                    Pos2::new(rect.max.x, rect.max.y),
+                    true,
+                    false,
+                    0.0,
+                    0.0,
+                    0.0,
+                    120.0
+                );
+
+                self.draw_whole_texture(
+                    &draw_list,
+                    texture_manager,
+                    "hills2.rttex".to_string(),
+                    Pos2::new(rect.min.x, rect.min.y),
+                    Pos2::new(rect.max.x, rect.max.y),
+                    true,
+                    false,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                );
+
+                self.draw_whole_texture(
+                    &draw_list,
+                    texture_manager,
+                    "hills1.rttex".to_string(),
+                    Pos2::new(rect.min.x, rect.min.y),
+                    Pos2::new(rect.max.x, rect.max.y),
+                    true,
+                    false,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                );
+
                 let world = bot.world.read().unwrap();
                 for y in 0..tiles_in_view_y {
                     for x in 0..tiles_in_view_x {
@@ -507,7 +563,7 @@ impl WorldMap {
             }
         }
     }
-    
+
     fn add_render_type5(
         &self,
         texture_x: &mut u8,
@@ -523,7 +579,7 @@ impl WorldMap {
             *texture_y = init_texture_y + 1;
         }
         if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some() && bottom_center_tile.is_none() {
-            *texture_x = init_texture_x + 1;
+            *texture_x = init_texture_x + 2;
         }
         if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_none() {
             *texture_x = init_texture_x + 6;
@@ -857,6 +913,104 @@ impl WorldMap {
                 Color32::WHITE,
                 item_seed.base_color,
             )
+        }
+    }
+
+    fn draw_whole_scaled(
+        &self,
+        draw_list: &Painter,
+        texture_manager: &Arc<RwLock<TextureManager>>,
+        texture_name: String,
+        cell_min: Pos2,
+        cell_max: Pos2,
+        from_right: bool,
+        scale_factor: f32,
+        offset_top: f32,
+        offset_left: f32,
+        offset_right: f32,
+        offset_bottom: f32,
+    ) {
+        match texture_manager.read().unwrap().get_texture(&texture_name) {
+            Some(texture) => {
+                let [width, height] = texture.size();
+                let scaled_width = width as f32 * scale_factor;
+                let scaled_height = height as f32 * scale_factor;
+                let uv_x_start = 0.0;
+                let uv_y_start = 0.0;
+                let uv_x_end = 1.0;
+                let uv_y_end = 1.0;
+
+                let (uv_start, uv_end) = (
+                    egui::Pos2::new(uv_x_start, uv_y_start),
+                    egui::Pos2::new(uv_x_end, uv_y_end),
+                );
+
+                let cell_min = if from_right {
+                    Pos2::new(cell_max.x.round() - scaled_width - offset_right, cell_min.y.round() + offset_top)
+                } else {
+                    Pos2::new(cell_min.x.round() + offset_left, cell_min.y.round() + offset_top)
+                };
+
+                let cell_max = Pos2::new(cell_min.x + scaled_width, cell_min.y + scaled_height - offset_bottom);
+
+                draw_list.image(
+                    texture.id(),
+                    Rect::from_min_max(cell_min, cell_max),
+                    egui::Rect::from_min_max(uv_start, uv_end),
+                    Color32::WHITE,
+                );
+            }
+            None => ()
+        }
+    }
+
+    fn draw_whole_texture(
+        &self,
+        draw_list: &Painter,
+        texture_manager: &Arc<RwLock<TextureManager>>,
+        texture_name: String,
+        cell_min: Pos2,
+        cell_max: Pos2,
+        from_bottom: bool,
+        from_right: bool,
+        offset_top: f32,
+        offset_left: f32,
+        offset_right: f32,
+        offset_bottom: f32,
+    ) {
+        match texture_manager.read().unwrap().get_texture(&texture_name) {
+            Some(texture) => {
+                let [_, height] = texture.size();
+                let uv_x_start = 0.0;
+                let uv_y_start = 0.0;
+                let uv_x_end = 1.0;
+                let uv_y_end = 1.0;
+
+                let (uv_start, uv_end) = (
+                    egui::Pos2::new(uv_x_start, uv_y_start),
+                    egui::Pos2::new(uv_x_end, uv_y_end),
+                );
+
+                let cell_min = if from_bottom {
+                    Pos2::new(cell_min.x.round(), cell_max.y.round() - height as f32 - offset_bottom)
+                } else {
+                    Pos2::new(cell_min.x.round(), cell_min.y.round() + offset_top)
+                };
+
+                let cell_max = if from_right {
+                    Pos2::new(cell_max.x.round() - offset_right, cell_min.y + height as f32)
+                } else {
+                    Pos2::new(cell_max.x.round() + offset_left, cell_min.y + height as f32)
+                };
+
+                draw_list.image(
+                    texture.id(),
+                    Rect::from_min_max(cell_min, cell_max),
+                    egui::Rect::from_min_max(uv_start, uv_end),
+                    Color32::WHITE,
+                );
+            }
+            None => ()
         }
     }
 
