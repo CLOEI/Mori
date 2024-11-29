@@ -57,6 +57,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                             let mut state = bot.state.lock().unwrap();
                             state.is_redirecting = false;
                             state.is_ingame = true;
+                            state.is_allowed_to_warp = true;
                             return;
                         }
                     }
@@ -87,6 +88,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                     let mut state = bot_clone.state.lock().unwrap();
                     state.is_redirecting = false;
                     state.is_ingame = true;
+                    state.is_allowed_to_warp = true;
                 });
             } else {
                 bot.send_packet(
@@ -96,6 +98,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 let mut state = bot.state.lock().unwrap();
                 state.is_redirecting = false;
                 state.is_ingame = true;
+                state.is_allowed_to_warp = true;
             }
         }
         "OnCountryState" => {}
