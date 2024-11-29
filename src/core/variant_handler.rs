@@ -172,6 +172,8 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             bot.log_info(format!("Received position: {:?}", pos).as_str());
             let mut position = bot.position.lock().unwrap();
             let mut temp = bot.temporary_data.write().unwrap();
+            let mut state = bot.state.lock().unwrap();
+            state.is_allowed_to_warp = true;
             let (world_name, main_door_x, main_door_y) = {
                 let world = bot.world.read().unwrap();
                 let mut data = (0.0, 0.0);
