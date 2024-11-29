@@ -307,6 +307,15 @@ impl WorldMap {
                                             top_center_item,
                                             flipped
                                         )
+                                    } else if foreground.render_type == 5 {
+                                        self.add_render_type5(
+                                            &mut texture_x,
+                                            &mut texture_y,
+                                            top_center_tile,
+                                            center_left_tile,
+                                            center_right_tile,
+                                            bottom_center_tile,
+                                        )
                                     }
 
                                     if let TileType::DisplayBlock { item_id } = tile.tile_type {
@@ -496,6 +505,37 @@ impl WorldMap {
                         });
                     });
             }
+        }
+    }
+    
+    fn add_render_type5(
+        &self,
+        texture_x: &mut u8,
+        texture_y: &mut u8,
+        top_center_tile: Option<&gtworld_r::Tile>,
+        center_left_tile: Option<&gtworld_r::Tile>,
+        center_right_tile: Option<&gtworld_r::Tile>,
+        bottom_center_tile: Option<&gtworld_r::Tile>,
+    ) {
+        let (init_texture_x, init_texture_y) = (texture_x.clone(), texture_y.clone());
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+            *texture_x = init_texture_x + 3;
+            *texture_y = init_texture_y + 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+            *texture_x = init_texture_x + 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+            *texture_x = init_texture_x + 6;
+            *texture_y = init_texture_y + 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+            *texture_x = init_texture_x + 7;
+            *texture_y = init_texture_y + 1;
+        }
+        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+            *texture_x = init_texture_x + 3;
+            *texture_y = init_texture_y + 1;
         }
     }
 
