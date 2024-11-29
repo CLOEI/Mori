@@ -302,11 +302,10 @@ impl WorldMap {
                                     } else if foreground.render_type == 3 {
                                         self.add_render_type3(
                                             &mut texture_x,
-                                            top_center_tile,
                                             center_left_tile,
                                             center_right_tile,
-                                            bottom_center_tile,
-                                            top_center_item
+                                            top_center_item,
+                                            flipped
                                         )
                                     }
 
@@ -503,81 +502,59 @@ impl WorldMap {
     fn add_render_type3(
         &self,
         texture_x: &mut u8,
-        top_center_tile: Option<&gtworld_r::Tile>,
         center_left_tile: Option<&gtworld_r::Tile>,
         center_right_tile: Option<&gtworld_r::Tile>,
-        bottom_center_tile: Option<&gtworld_r::Tile>,
         top_center_item: Option<&gtworld_r::Tile>,
+        flipped: bool
     ) {
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none()  && bottom_center_tile.is_none() {
+        if center_left_tile.is_none() && center_right_tile.is_none() {
             *texture_x += 3;
         }
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some()  && bottom_center_tile.is_none() {
+        if center_left_tile.is_none() && center_right_tile.is_some() {
             match top_center_item {
                 Some(tile) => {
                     if tile.foreground_item_id == 8986 {
                         *texture_x += 4;
                     } else {
-                        *texture_x += 0;
+                        if flipped {
+                            *texture_x += 2;
+                        } else {
+                            *texture_x += 0;
+                        }
                     }
                 }
                 None => {
-                    *texture_x += 0;
-                }
-            }
-        }
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some()  && bottom_center_tile.is_some() {
-            match top_center_item {
-                Some(tile) => {
-                    if tile.foreground_item_id == 8986 {
-                        *texture_x += 4;
+                    if flipped {
+                        *texture_x += 2;
                     } else {
                         *texture_x += 0;
                     }
                 }
-                None => {
-                    *texture_x += 0;
-                }
             }
         }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none()  && bottom_center_tile.is_none() {
+        if center_left_tile.is_some() && center_right_tile.is_none() {
             match top_center_item {
                 Some(tile) => {
                     if tile.foreground_item_id == 8986 {
                         *texture_x += 5;
                     } else {
-                        *texture_x += 0;
+                        if flipped {
+                            *texture_x += 0;
+                        } else {
+                            *texture_x += 2;
+                        }
                     }
                 }
                 None => {
-                    *texture_x += 0;
-                }
-            }
-        }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none()  && bottom_center_tile.is_some() {
-            match top_center_item {
-                Some(tile) => {
-                    if tile.foreground_item_id == 8986 {
-                        *texture_x += 5;
+                    if flipped {
+                        *texture_x += 0;
                     } else {
-                        *texture_x += 0;
+                        *texture_x += 2;
                     }
-                }
-                None => {
-                    *texture_x += 0;
                 }
             }
         }
-        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_none() {
-            *texture_x += 1;
-        }
-        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_some() {
-            *texture_x += 1;
-        }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_none() {
-            *texture_x += 1;
-        }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some()  && bottom_center_tile.is_some() {
+        if center_left_tile.is_some() && center_right_tile.is_some() {
             *texture_x += 1;
         }
     }
