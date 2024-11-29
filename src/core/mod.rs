@@ -660,6 +660,7 @@ impl Bot {
                             let mut temp = self.temporary_data.write().unwrap();
                             let mut state = self.state.lock().unwrap();
                             state.is_ingame = false;
+                            state.is_not_allowed_to_warp = false;
                             self.players.lock().unwrap().clear();
                             world.reset();
                             position.reset();
@@ -863,6 +864,7 @@ impl Bot {
             return;
         }
         self.log_info(&format!("Warping to world: {}", world_name));
+        self.state.lock().unwrap().is_not_allowed_to_warp = true;
         self.send_packet(
             EPacketType::NetMessageGameMessage,
             format!("action|join_request\nname|{}\ninvitedWorld|0\n", world_name),
