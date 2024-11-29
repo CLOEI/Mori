@@ -34,7 +34,7 @@ pub struct State {
     pub is_running: bool,
     pub is_redirecting: bool,
     pub is_ingame: bool,
-    pub is_not_allowed_to_warp: bool,
+    pub is_allowed_to_warp: bool,
     pub is_banned: bool,
     pub is_tutorial: bool,
 }
