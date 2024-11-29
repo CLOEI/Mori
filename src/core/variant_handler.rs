@@ -318,6 +318,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnRequestWorldSelectMenu" => {
             bot.world.write().unwrap().reset();
             bot.players.lock().unwrap().clear();
+            bot.state.lock().unwrap().is_allowed_to_warp = true;
         }
         "OnFailedToEnterWorld" => {
             bot.state.lock().unwrap().is_allowed_to_warp = true;
