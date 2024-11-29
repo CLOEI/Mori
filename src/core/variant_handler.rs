@@ -52,6 +52,9 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                                 EPacketType::NetMessageGenericText,
                                 "action|enter_game\n".to_string(),
                             );
+                            let mut state = bot.state.lock().unwrap();
+                            state.is_redirecting = false;
+                            state.is_ingame = true;
                             return;
                         }
                     }
