@@ -230,6 +230,7 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                 if data.get("type").unwrap() == "local" {
                     let mut state = bot.state.lock().unwrap();
                     state.net_id = data.get("netID").unwrap().parse().unwrap();
+                    state.is_not_allowed_to_warp = false;
 
                     bot.send_packet(
                         EPacketType::NetMessageGenericText,
@@ -313,6 +314,9 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
         "OnRequestWorldSelectMenu" => {
             bot.world.write().unwrap().reset();
             bot.players.lock().unwrap().clear();
+        }
+        "OnFailedToEnterWorld" => {
+            bot.state.lock().unwrap().is_not_allowed_to_warp = false;
         }
         _ => {}
     }
