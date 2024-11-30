@@ -855,14 +855,6 @@ impl Bot {
     }
 
     pub fn warp(&self, world_name: String) {
-        if self
-            .state
-            .lock()
-            .expect("Failed to lock state")
-            .is_allowed_to_warp
-        {
-            return;
-        }
         self.log_info(&format!("Warping to world: {}", world_name));
         self.state.lock().unwrap().is_allowed_to_warp = false;
         self.send_packet(

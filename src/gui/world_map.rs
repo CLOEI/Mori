@@ -3,7 +3,7 @@ use crate::texture_manager::TextureManager;
 use crate::utils::color;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
-use egui::Painter;
+use egui::{Image, Painter, Vec2};
 use gtworld_r::TileType;
 use paris::info;
 use std::sync::{Arc, RwLock};
@@ -78,7 +78,7 @@ impl WorldMap {
                     20.0,
                     0.0,
                     0.0,
-                    0.0
+                    0.0,
                 );
 
                 self.draw_whole_texture(
@@ -92,7 +92,7 @@ impl WorldMap {
                     0.0,
                     0.0,
                     0.0,
-                    120.0
+                    120.0,
                 );
 
                 self.draw_whole_texture(
@@ -106,7 +106,7 @@ impl WorldMap {
                     0.0,
                     0.0,
                     0.0,
-                    0.0
+                    0.0,
                 );
 
                 self.draw_whole_texture(
@@ -120,7 +120,7 @@ impl WorldMap {
                     0.0,
                     0.0,
                     0.0,
-                    0.0
+                    0.0,
                 );
 
                 let world = bot.world.read().unwrap();
@@ -161,7 +161,7 @@ impl WorldMap {
                                         Color32::from_rgb(255, 215, 0),
                                     );
                                     continue;
-                                },
+                                }
                             }
                         };
                         let (foreground, foreground_seed) = {
@@ -275,70 +275,84 @@ impl WorldMap {
                                         } else {
                                             false
                                         };
-                                    let (mut texture_x, mut texture_y) = (
-                                        foreground.texture_x,
-                                        foreground.texture_y,
-                                    );
+                                    let (mut texture_x, mut texture_y) =
+                                        (foreground.texture_x, foreground.texture_y);
 
-                                    let top_left_tile = world.get_tile(world_x as u32 - 1, world_y as u32 - 1).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let top_center_tile = world.get_tile(world_x as u32, world_y as u32 - 1).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let top_right_tile = world.get_tile(world_x as u32 + 1, world_y as u32 - 1).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let center_left_tile = world.get_tile(world_x as u32 - 1, world_y as u32).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let center_right_tile = world.get_tile(world_x as u32 + 1, world_y as u32).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let bottom_left_tile = world.get_tile(world_x as u32 - 1, world_y as u32 + 1).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let bottom_center_tile = world.get_tile(world_x as u32, world_y as u32 + 1).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let bottom_right_tile = world.get_tile(world_x as u32 + 1, world_y as u32 + 1).map_or(None, |tile| {
-                                        if tile.foreground_item_id != foreground.id as u16 {
-                                            None
-                                        } else {
-                                            Some(tile)
-                                        }
-                                    });
-                                    let top_center_item = world.get_tile(world_x as u32, world_y as u32 - 1).map_or(None, |tile| {
-                                        Some(tile)
-                                    });
+                                    let top_left_tile = world
+                                        .get_tile(world_x as u32 - 1, world_y as u32 - 1)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let top_center_tile = world
+                                        .get_tile(world_x as u32, world_y as u32 - 1)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let top_right_tile = world
+                                        .get_tile(world_x as u32 + 1, world_y as u32 - 1)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let center_left_tile = world
+                                        .get_tile(world_x as u32 - 1, world_y as u32)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let center_right_tile = world
+                                        .get_tile(world_x as u32 + 1, world_y as u32)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let bottom_left_tile = world
+                                        .get_tile(world_x as u32 - 1, world_y as u32 + 1)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let bottom_center_tile = world
+                                        .get_tile(world_x as u32, world_y as u32 + 1)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let bottom_right_tile = world
+                                        .get_tile(world_x as u32 + 1, world_y as u32 + 1)
+                                        .map_or(None, |tile| {
+                                            if tile.foreground_item_id != foreground.id as u16 {
+                                                None
+                                            } else {
+                                                Some(tile)
+                                            }
+                                        });
+                                    let top_center_item = world
+                                        .get_tile(world_x as u32, world_y as u32 - 1)
+                                        .map_or(None, |tile| Some(tile));
 
                                     if foreground.render_type == 2 {
                                         self.add_render_type2(
@@ -361,7 +375,7 @@ impl WorldMap {
                                             center_left_tile,
                                             center_right_tile,
                                             top_center_item,
-                                            flipped
+                                            flipped,
                                         )
                                     } else if foreground.render_type == 5 {
                                         self.add_render_type5(
@@ -388,11 +402,7 @@ impl WorldMap {
                                     self.draw_texture(
                                         &draw_list,
                                         texture_manager,
-                                        if activated {
-                                            texture_x + 1
-                                        } else {
-                                            texture_x
-                                        },
+                                        if activated { texture_x + 1 } else { texture_x },
                                         texture_y,
                                         foreground.texture_file_name,
                                         cell_min,
@@ -452,10 +462,17 @@ impl WorldMap {
                         if (bot_position.x / 32.0).floor() == (world_x as f32)
                             && (bot_position.y / 32.0).floor() == (world_y as f32)
                         {
-                            draw_list.rect_filled(
-                                Rect::from_min_max(cell_min, cell_max),
-                                0.0,
-                                Color32::from_rgb(255, 0, 0),
+                            // draw_list.rect_filled(
+                            //     Rect::from_min_max(cell_min, cell_max),
+                            //     0.0,
+                            //     Color32::from_rgb(255, 0, 0),
+                            // );
+                            self.draw_player(
+                                &draw_list,
+                                texture_manager,
+                                cell_min,
+                                cell_max,
+                                false,
                             );
                         }
 
@@ -574,22 +591,42 @@ impl WorldMap {
         bottom_center_tile: Option<&gtworld_r::Tile>,
     ) {
         let (init_texture_x, init_texture_y) = (texture_x.clone(), texture_y.clone());
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_none()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_none()
+        {
             *texture_x = init_texture_x + 3;
             *texture_y = init_texture_y + 1;
         }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_some()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_none()
+        {
             *texture_x = init_texture_x + 2;
         }
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_none()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_none()
+        {
             *texture_x = init_texture_x + 6;
             *texture_y = init_texture_y + 1;
         }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_some()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_none()
+        {
             *texture_x = init_texture_x + 7;
             *texture_y = init_texture_y + 1;
         }
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_none()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_none()
+        {
             *texture_x = init_texture_x + 3;
             *texture_y = init_texture_y + 1;
         }
@@ -601,7 +638,7 @@ impl WorldMap {
         center_left_tile: Option<&gtworld_r::Tile>,
         center_right_tile: Option<&gtworld_r::Tile>,
         top_center_item: Option<&gtworld_r::Tile>,
-        flipped: bool
+        flipped: bool,
     ) {
         if center_left_tile.is_none() && center_right_tile.is_none() {
             *texture_x += 3;
@@ -681,48 +718,100 @@ impl WorldMap {
         center_right_tile: Option<&gtworld_r::Tile>,
         bottom_center_tile: Option<&gtworld_r::Tile>,
     ) {
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none()  && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_none()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_none()
+        {
             *texture_x += 4;
             *texture_y += 1;
         }
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_none()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_none()
+        {
             *texture_x += 5;
             *texture_y += 3;
         }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_some()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_none()
+        {
             *texture_x += 6;
             *texture_y += 3;
         }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_some()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_none()
+        {
             *texture_x += 1;
         }
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_some() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_none()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_some()
+        {
             *texture_x += 2;
             *texture_y += 1;
         }
-        if top_center_tile.is_some() && center_left_tile.is_none() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+        if top_center_tile.is_some()
+            && center_left_tile.is_none()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_none()
+        {
             *texture_x += 3;
             *texture_y += 1;
         }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_some() && bottom_center_tile.is_some() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_some()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_some()
+        {
             *texture_x += 1;
         }
-        if top_center_tile.is_none() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_some() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_some()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_some()
+        {
             *texture_x += 6;
         }
-        if top_center_tile.is_none() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_some() {
+        if top_center_tile.is_none()
+            && center_left_tile.is_none()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_some()
+        {
             *texture_x += 5;
         }
-        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_some() {
+        if top_center_tile.is_some()
+            && center_left_tile.is_some()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_some()
+        {
             *texture_x += 4;
         }
-        if top_center_tile.is_some() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_some() {
+        if top_center_tile.is_some()
+            && center_left_tile.is_none()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_some()
+        {
             *texture_x += 3;
         }
-        if top_center_tile.is_some() && center_left_tile.is_none() && center_right_tile.is_some() && bottom_center_tile.is_none() {
+        if top_center_tile.is_some()
+            && center_left_tile.is_none()
+            && center_right_tile.is_some()
+            && bottom_center_tile.is_none()
+        {
             *texture_x += 7;
         }
-        if top_center_tile.is_some() && center_left_tile.is_some() && center_right_tile.is_none() && bottom_center_tile.is_none() {
+        if top_center_tile.is_some()
+            && center_left_tile.is_some()
+            && center_right_tile.is_none()
+            && bottom_center_tile.is_none()
+        {
             *texture_y += 1;
         }
     }
@@ -763,7 +852,8 @@ impl WorldMap {
         let (bottom_right_item, bottom_right_item_seed) = {
             let item_database = bot.item_database.read().unwrap();
             let bottom_right_item = item_database.get_item(&bottom_right_item_id).unwrap();
-            let bottom_right_item_seed = item_database.get_item(&(bottom_right_item_id + 1)).unwrap();
+            let bottom_right_item_seed =
+                item_database.get_item(&(bottom_right_item_id + 1)).unwrap();
             (bottom_right_item, bottom_right_item_seed)
         };
 
@@ -946,12 +1036,21 @@ impl WorldMap {
                 );
 
                 let cell_min = if from_right {
-                    Pos2::new(cell_max.x.round() - scaled_width - offset_right, cell_min.y.round() + offset_top)
+                    Pos2::new(
+                        cell_max.x.round() - scaled_width - offset_right,
+                        cell_min.y.round() + offset_top,
+                    )
                 } else {
-                    Pos2::new(cell_min.x.round() + offset_left, cell_min.y.round() + offset_top)
+                    Pos2::new(
+                        cell_min.x.round() + offset_left,
+                        cell_min.y.round() + offset_top,
+                    )
                 };
 
-                let cell_max = Pos2::new(cell_min.x + scaled_width, cell_min.y + scaled_height - offset_bottom);
+                let cell_max = Pos2::new(
+                    cell_min.x + scaled_width,
+                    cell_min.y + scaled_height - offset_bottom,
+                );
 
                 draw_list.image(
                     texture.id(),
@@ -960,7 +1059,7 @@ impl WorldMap {
                     Color32::WHITE,
                 );
             }
-            None => ()
+            None => (),
         }
     }
 
@@ -992,13 +1091,19 @@ impl WorldMap {
                 );
 
                 let cell_min = if from_bottom {
-                    Pos2::new(cell_min.x.round(), cell_max.y.round() - height as f32 - offset_bottom)
+                    Pos2::new(
+                        cell_min.x.round(),
+                        cell_max.y.round() - height as f32 - offset_bottom,
+                    )
                 } else {
                     Pos2::new(cell_min.x.round(), cell_min.y.round() + offset_top)
                 };
 
                 let cell_max = if from_right {
-                    Pos2::new(cell_max.x.round() - offset_right, cell_min.y + height as f32)
+                    Pos2::new(
+                        cell_max.x.round() - offset_right,
+                        cell_min.y + height as f32,
+                    )
                 } else {
                     Pos2::new(cell_max.x.round() + offset_left, cell_min.y + height as f32)
                 };
@@ -1010,7 +1115,7 @@ impl WorldMap {
                     Color32::WHITE,
                 );
             }
-            None => ()
+            None => (),
         }
     }
 
@@ -1069,5 +1174,114 @@ impl WorldMap {
                 );
             }
         }
+    }
+
+    fn draw_player(
+        &self,
+        draw_list: &Painter,
+        texture_manager: &Arc<RwLock<TextureManager>>,
+        cell_min: Pos2,
+        cell_max: Pos2,
+        flipped: bool,
+    ) {
+        let w_h = (cell_max.x - cell_min.x).max(cell_max.y - cell_min.y);
+
+        let skin_color = Color32::from_rgb(195, 149, 130);
+        let head_texture = "player_head.rttex";
+        let arm_texture = "player_arm.rttex";
+        let feet_texture = "player_feet.rttex";
+        let extra_leg_texture = "player_extraleg.rttex";
+
+        let texture_manager = texture_manager.read().unwrap();
+        let head_texture = texture_manager.get_texture(head_texture);
+        let arm_texture = texture_manager.get_texture(arm_texture);
+        let feet_texture = texture_manager.get_texture(feet_texture);
+        let extra_leg_texture = texture_manager.get_texture(extra_leg_texture);
+
+        if let (
+            Some(head_texture),
+            Some(arm_texture),
+            Some(feet_texture),
+            Some(extra_leg_texture),
+        ) = (head_texture, arm_texture, feet_texture, extra_leg_texture)
+        {
+            let (uv_start, uv_end) =
+                self.get_uv(0.0, 0.0, [32.0, 32.0], head_texture.size(), false);
+            draw_list.image(
+                head_texture.id(),
+                Rect::from_min_max(
+                    Pos2::new(cell_min.x, cell_min.y),
+                    Pos2::new(cell_max.x, cell_max.y),
+                ),
+                egui::Rect::from_min_max(uv_start, uv_end),
+                skin_color,
+            );
+            let (uv_start, uv_end) =
+                self.get_uv(0.0, 0.0, [32.0, 32.0], feet_texture.size(), false);
+            draw_list.image(
+                feet_texture.id(),
+                Rect::from_min_max(
+                    Pos2::new(cell_min.x, cell_min.y),
+                    Pos2::new(cell_max.x, cell_max.y),
+                ),
+                egui::Rect::from_min_max(uv_start, uv_end),
+                skin_color,
+            );
+            let (uv_start, uv_end) =
+                self.get_uv(0.0, 1.0, [32.0, 32.0], feet_texture.size(), false);
+            draw_list.image(
+                feet_texture.id(),
+                Rect::from_min_max(
+                    Pos2::new(cell_min.x, cell_min.y),
+                    Pos2::new(cell_max.x, cell_max.y),
+                ),
+                egui::Rect::from_min_max(uv_start, uv_end),
+                skin_color,
+            );
+            let (uv_start, uv_end) = self.get_uv(0.0, 0.0, [16.0, 32.0], arm_texture.size(), false);
+            draw_list.image(
+                arm_texture.id(),
+                Rect::from_min_max(
+                    Pos2::new(cell_min.x, cell_min.y),
+                    Pos2::new(cell_max.x, cell_max.y),
+                ),
+                egui::Rect::from_min_max(uv_start, uv_end),
+                skin_color,
+            );
+        } else {
+            draw_list.rect_filled(
+                Rect::from_min_max(cell_min, cell_max),
+                0.0,
+                Color32::from_rgb(255, 0, 0),
+            );
+        }
+    }
+
+    fn get_uv(
+        &self,
+        texture_x: f32,
+        texture_y: f32,
+        texture_size: [f32; 2],
+        size: [usize; 2],
+        flipped: bool,
+    ) -> (egui::Pos2, egui::Pos2) {
+        let uv_x_start = (texture_x * texture_size[0]) / size[0] as f32;
+        let uv_y_start = (texture_y * texture_size[1]) / size[1] as f32;
+        let uv_x_end = ((texture_x * texture_size[0]) + texture_size[0]) / size[0] as f32;
+        let uv_y_end = ((texture_y * texture_size[1]) + texture_size[1]) / size[1] as f32;
+
+        let (uv_start, uv_end) = if flipped {
+            (
+                egui::Pos2::new(uv_x_end, uv_y_start),
+                egui::Pos2::new(uv_x_start, uv_y_end),
+            )
+        } else {
+            (
+                egui::Pos2::new(uv_x_start, uv_y_start),
+                egui::Pos2::new(uv_x_end, uv_y_end),
+            )
+        };
+
+        (uv_start, uv_end)
     }
 }

@@ -38,4 +38,5 @@ rttex = { git = "https://github.com/CLOEI/rttex" }
 serenity = "0.12.4"
 tokio = { version = "1.41.1", features = ["full"] }
 dirs = "5.0.1"
+image = "0.25.5"
 

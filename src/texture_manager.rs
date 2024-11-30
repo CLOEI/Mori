@@ -1,4 +1,6 @@
 use egui::{ColorImage, Context, TextureHandle};
+use image::imageops::FilterType;
+use image::DynamicImage;
 use paris::info;
 use std::collections::HashMap;
 use std::fs;
@@ -24,8 +26,20 @@ impl TextureManager {
                 continue;
             }
 
-            let image_buffer =
+            let mut image_buffer =
                 rttex::get_image_buffer(path.to_str().unwrap()).expect("Failed to load image");
+            if filename == "player_extraleg.rttex" {
+                let dynamic_image = DynamicImage::ImageRgba8(image_buffer);
+                let resized_image = dynamic_image.resize(32, 32, FilterType::Nearest);
+                image_buffer = resized_image.to_rgba8();
+                // svae to file .png
+                let _ = resized_image.save("player_extraleg.png");
+            }
+            if filename == "player_arm.rttex" {
+                let dynamic_image = DynamicImage::ImageRgba8(image_buffer);
+                let resized_image = dynamic_image.resize(16, 32, FilterType::Nearest);
+                image_buffer = resized_image.to_rgba8();
+            }
             let size = [
                 image_buffer.width() as usize,
                 image_buffer.height() as usize,
@@ -34,6 +48,7 @@ impl TextureManager {
                 .pixels()
                 .map(|p| egui::Color32::from_rgba_unmultiplied(p[0], p[1], p[2], p[3]))
                 .collect();
+
             let image = ColorImage { size, pixels };
 
             let handler = ctx.load_texture(&filename, image, egui::TextureOptions::NEAREST);
