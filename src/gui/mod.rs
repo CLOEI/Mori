@@ -9,3 +9,4 @@ pub mod proxy_list;
 mod scripting;
 pub mod settings;
 pub mod world_map;
+pub mod auto_farm_menu;

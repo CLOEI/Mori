@@ -3,6 +3,7 @@ use std::thread;
 
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
+use crate::core::features::auto_farm::Autofarm_c;
 use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
 use crate::texture_manager::TextureManager;
@@ -17,6 +18,7 @@ pub struct BotMenu {
     pub warp_name: String,
     pub bots: Vec<BotConfig>,
     pub current_menu: String,
+    pub auto_farm: Autofarm_c,
     pub world_map: WorldMap,
     pub inventory: Inventory,
     pub growscan: Growscan,
@@ -327,7 +329,7 @@ impl BotMenu {
                     });
                 } else if self.current_menu == "features" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
-                        ui.label("Not implemented yet");
+                        self.auto_farm.render(ui, manager.clone());
                     });
                 } else if self.current_menu == "scripting" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
