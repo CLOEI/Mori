@@ -1187,17 +1187,20 @@ impl WorldMap {
         let w_h = (cell_max.x - cell_min.x).max(cell_max.y - cell_min.y);
 
         let skin_color = Color32::from_rgb(195, 149, 130);
+        let skin_color_layer = Color32::from_rgba_unmultiplied(195, 149, 130, 153);
         let head_texture = "player_head.rttex";
         let arm_texture = "player_arm.rttex";
         let feet_texture = "player_feet.rttex";
         let extra_leg_texture = "player_extraleg.rttex";
-        let face_texture = "player_eyes.rttex";
+        let eye_texture = "player_eyes.rttex";
+        let face_texture = "player_face.rttex";
 
         let texture_manager = texture_manager.read().unwrap();
         let head_texture = texture_manager.get_texture(head_texture);
         let arm_texture = texture_manager.get_texture(arm_texture);
         let feet_texture = texture_manager.get_texture(feet_texture);
         let extra_leg_texture = texture_manager.get_texture(extra_leg_texture);
+        let eye_texture = texture_manager.get_texture(eye_texture);
         let face_texture = texture_manager.get_texture(face_texture);
 
         if let (
@@ -1205,13 +1208,14 @@ impl WorldMap {
             Some(arm_texture),
             Some(feet_texture),
             Some(extra_leg_texture),
+            Some(eye_texture),
             Some(face_texture),
-        ) = (head_texture, arm_texture, feet_texture, extra_leg_texture, face_texture)
+        ) = (head_texture, arm_texture, feet_texture, extra_leg_texture, eye_texture, face_texture)
         {
             draw_list.image(
                 arm_texture.id(),
                 Rect::from_min_max(
-                    Pos2::new(cell_min.x + w_h * 0.65, cell_min.y + w_h * 0.6),
+                    Pos2::new(cell_min.x + w_h * 0.65, cell_min.y + w_h * 0.5),
                     Pos2::new(cell_min.x + w_h * 0.90, cell_max.y),
                 ),
                 egui::Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)),
@@ -1222,7 +1226,7 @@ impl WorldMap {
             draw_list.image(
                 head_texture.id(),
                 Rect::from_min_max(
-                    Pos2::new(cell_min.x, cell_min.y + w_h * 0.15),
+                    Pos2::new(cell_min.x, cell_min.y),
                     Pos2::new(cell_max.x, cell_max.y),
                 ),
                 egui::Rect::from_min_max(uv_start, uv_end),
@@ -1253,7 +1257,7 @@ impl WorldMap {
             draw_list.image(
                 extra_leg_texture.id(),
                 Rect::from_min_max(
-                    Pos2::new(cell_min.x + w_h * 0.25, cell_min.y + w_h * 0.90),
+                    Pos2::new(cell_min.x + w_h * 0.25, cell_min.y + w_h * 0.75),
                     Pos2::new(cell_min.x + w_h * 0.75, cell_max.y),
                 ),
                 egui::Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)),
@@ -1262,22 +1266,44 @@ impl WorldMap {
             draw_list.image(
                 arm_texture.id(),
                 Rect::from_min_max(
-                    Pos2::new(cell_min.x + w_h * 0.2, cell_min.y + w_h * 0.6),
+                    Pos2::new(cell_min.x + w_h * 0.2, cell_min.y + w_h * 0.5),
                     Pos2::new(cell_min.x + w_h * 0.45, cell_max.y),
                 ),
                 egui::Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)),
                 skin_color,
             );
             let (uv_start, uv_end) =
-                self.get_uv(0.0, 1.0, [32.0, 32.0], face_texture.size(), false);
+                self.get_uv(0.0, 0.0, [32.0, 32.0], face_texture.size(), false);
             draw_list.image(
-                face_texture.id(),
+                eye_texture.id(),
                 Rect::from_min_max(
-                    Pos2::new(cell_min.x, cell_min.y + w_h * 0.15),
+                    Pos2::new(cell_min.x, cell_min.y),
                     Pos2::new(cell_max.x, cell_max.y),
                 ),
                 egui::Rect::from_min_max(uv_start, uv_end),
                 Color32::WHITE,
+            );
+            let (uv_start, uv_end) =
+                self.get_uv(0.0, 0.0, [32.0, 32.0], face_texture.size(), false);
+            draw_list.image(
+                eye_texture.id(),
+                Rect::from_min_max(
+                    Pos2::new(cell_min.x, cell_min.y),
+                    Pos2::new(cell_max.x, cell_max.y),
+                ),
+                egui::Rect::from_min_max(uv_start, uv_end),
+                skin_color,
+            );
+            let (uv_start, uv_end) =
+                self.get_uv(0.0, 0.0, [32.0, 32.0], face_texture.size(), false);
+            draw_list.image(
+                face_texture.id(),
+                Rect::from_min_max(
+                    Pos2::new(cell_min.x, cell_min.y),
+                    Pos2::new(cell_max.x, cell_max.y),
+                ),
+                egui::Rect::from_min_max(uv_start, uv_end),
+                skin_color_layer,
             );
         } else {
             draw_list.rect_filled(
