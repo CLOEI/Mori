@@ -10,3 +10,4 @@ mod scripting;
 pub mod settings;
 pub mod world_map;
 pub mod auto_farm_menu;
+pub mod auto_spam_menu;

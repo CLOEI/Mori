@@ -7,9 +7,12 @@ use crate::core::features::auto_farm::Autofarm_c;
 use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
 use crate::texture_manager::TextureManager;
+use crate::core::features::auto_spam::Autospamv1;
+use crate::gui::auto_spam_menu;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Ui};
 use egui::scroll_area::ScrollBarVisibility;
+
 use egui::{Color32, UiBuilder};
 
 #[derive(Default)]
@@ -18,7 +21,9 @@ pub struct BotMenu {
     pub warp_name: String,
     pub bots: Vec<BotConfig>,
     pub current_menu: String,
+    pub current_feature: String,
     pub auto_farm: Autofarm_c,
+    pub auto_spam: Autospamv1,
     pub world_map: WorldMap,
     pub inventory: Inventory,
     pub growscan: Growscan,
@@ -328,8 +333,34 @@ impl BotMenu {
                         self.growscan.render(ui, &manager);
                     });
                 } else if self.current_menu == "features" {
-                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
-                        self.auto_farm.render(ui, manager.clone());
+                    ui.vertical(|ui| {
+                        ui.heading("Features - Module version: 1.0.0");
+                        ui.horizontal(|ui| {
+                            if ui.button("Autofarm").clicked() {
+                                self.current_feature = "autofarm".to_string();
+                            }
+                            if ui.button("AutoSpam").clicked() {
+                                self.current_feature = "autospam".to_string();
+                            }
+                        });
+                        ui.separator();
+                        match self.current_feature.as_str() {
+                            "autofarm" => {
+                                ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
+                                    self.auto_farm.render(ui, manager.clone());
+                                });
+                            }
+                            "autospam" => {
+                                ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
+                                    self.auto_spam.render(ui, manager.clone());
+                                });
+                            }
+                            _ => {
+                                ui.centered_and_justified(|ui| {
+                                    ui.label("Please select a valid feature.");
+                                });
+                            }
+                        }
                     });
                 } else if self.current_menu == "scripting" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
