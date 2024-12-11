@@ -40,7 +40,7 @@ impl LoginInfo {
             uuid: String::new(),
             tank_id_name: String::new(),
             tank_id_pass: String::new(),
-            protocol: "210".to_string(),
+            protocol: "211".to_string(),
             fhash: "-716928004".to_string(),
             mac: utils::random::mac_address(),
             requested_name: "BraveDuck".to_string(),
