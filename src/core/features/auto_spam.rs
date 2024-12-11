@@ -11,13 +11,15 @@ pub struct Autospamv1 {
     pub is_paused: Arc<AtomicBool>,
     pub selected_xy_of_world: Vec<(i32, i32)>,
     pub temp_spam_text: String,
-}
+    pub temp_x_input: String,
+    pub temp_y_input: String,
 
+}
 
 impl Autospamv1 {
     pub fn start_autospam(&mut self, manager: Arc<RwLock<BotManager>>) {
         if self.selected_xy_of_world.is_empty() || self.is_talking || self.temp_spam_text.is_empty() {
-            println!("Autospam started with errors: settings has been updated to 'zero'");
+            println!("Autospam started with errors: settings have been updated to 'zero'");
             return;
         }
 
@@ -36,6 +38,7 @@ impl Autospamv1 {
                         println!("Autospam paused.");
                         return;
                     }
+
                     let local = {
                         let position = bot.position.lock().unwrap();
                         position.clone()
@@ -43,14 +46,15 @@ impl Autospamv1 {
 
                     let current_x = (local.x / 32.0) as i32;
                     let current_y = (local.y / 32.0) as i32;
+
                     if current_x != *target_x || current_y != *target_y {
-                        println!("travelling to target position: ({}, {})", target_x, target_y);
+                        println!("Travelling to target position: ({}, {})", target_x, target_y);
                         bot.find_path(*target_x as u32, *target_y as u32);
-                        thread::sleep(Duration::from_secs(2));
                     } else {
-                        println!("Bot Already in the right position: ({}, {})", target_x, target_y);
+                        println!("Bot already in the right position: ({}, {})", target_x, target_y);
                     }
-                    println!("text spamming: {}", spam_text);
+
+                    println!("Text spamming: {}", spam_text);
                     bot.talk(spam_text.clone());
                     thread::sleep(Duration::from_secs(5));
                     if !is_paused.load(Ordering::SeqCst) {
@@ -67,5 +71,10 @@ impl Autospamv1 {
         println!("Autospam pausing...");
         self.is_paused.store(true, Ordering::SeqCst);
         self.is_talking = false;
+    }
+
+    pub fn add_position(&mut self, x: i32, y: i32) {
+        self.selected_xy_of_world.push((x, y));
+        println!("Added position: ({}, {})", x, y);
     }
 }

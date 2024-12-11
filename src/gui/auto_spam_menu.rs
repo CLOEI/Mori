@@ -1,5 +1,5 @@
-use crate::manager::bot_manager::BotManager;
 use crate::core::features::auto_spam::Autospamv1;
+use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::Ordering;
@@ -16,7 +16,7 @@ impl Autospamv1 {
         }
 
         ui.vertical(|ui| {
-            ui.heading("Auto Spam - module version: 1.0.0");
+            ui.heading("Auto Spam - module version: 1.1.0");
 
             ui.horizontal(|ui| {
                 if self.is_talking {
@@ -47,17 +47,31 @@ impl Autospamv1 {
 
             ui.separator();
 
-            // Hedef pozisyonları
             ui.heading("Target Positions:");
+            let mut x_input = self.temp_x_input.clone();
+            let mut y_input = self.temp_y_input.clone();
+            
             ui.horizontal(|ui| {
-                if ui.button("Add Position").clicked() {
-                    self.selected_xy_of_world.push((0, 0)); 
+                ui.label("X:");
+                if ui.add(egui::TextEdit::singleline(&mut x_input).hint_text("X coordinate")).changed() {
+                    self.temp_x_input = x_input.clone();
                 }
-                if ui.button("Remove Position").clicked() {
-                    self.selected_xy_of_world.pop();
+            
+                ui.label("Y:");
+                if ui.add(egui::TextEdit::singleline(&mut y_input).hint_text("Y coordinate")).changed() {
+                    self.temp_y_input = y_input.clone();
+                }
+            
+                if ui.button("Add Position").clicked() {
+                    if let (Ok(x), Ok(y)) = (x_input.parse::<i32>(), y_input.parse::<i32>()) {
+                        self.add_position(x, y);
+                        self.temp_x_input.clear();
+                        self.temp_y_input.clear();
+                    } else {
+                        println!("Invalid input for coordinates.");
+                    }
                 }
             });
-
             ui.separator();
             if !self.selected_xy_of_world.is_empty() {
                 ui.group(|ui| {
