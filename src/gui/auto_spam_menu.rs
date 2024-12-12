@@ -14,9 +14,8 @@ impl Autospamv1 {
             });
             return;
         }
-
         ui.vertical(|ui| {
-            ui.heading("Auto Spam - module version: 1.1.0");
+            ui.heading("Auto Spam AI || module version: 2");
 
             ui.horizontal(|ui| {
                 if self.is_talking {
@@ -43,6 +42,9 @@ impl Autospamv1 {
             ui.horizontal(|ui| {
                 ui.label("Spam Message:");
                 ui.add(egui::TextEdit::singleline(&mut self.temp_spam_text).hint_text("Enter message"));
+                let mut checkbox = egui::Checkbox::new(&mut self.is_anti_positive_enabled, "Enable AI Power");
+                checkbox = checkbox.indeterminate(self.is_enabled);
+                ui.add(checkbox);
             });
 
             ui.separator();
