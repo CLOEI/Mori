@@ -1,11 +1,11 @@
 use crate::manager::bot_manager::BotManager;
 use crate::utils::logging::{info, warn};
-use crate::core::features::auto_farm::Autofarm_c;
+use crate::core::features::auto_farm::AutofarmC;
 use eframe::egui::{self, Ui};
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::Ordering;
 
-impl Autofarm_c {
+impl AutofarmC {
     pub fn render(&mut self, ui: &mut Ui, manager: Arc<RwLock<BotManager>>) {
         self.selected_bot = crate::utils::config::get_selected_bot();
 

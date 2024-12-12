@@ -3,7 +3,7 @@ use std::thread;
 
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
-use crate::core::features::auto_farm::Autofarm_c;
+use crate::core::features::auto_farm::AutofarmC;
 use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
 use crate::texture_manager::TextureManager;
@@ -22,7 +22,7 @@ pub struct BotMenu {
     pub bots: Vec<BotConfig>,
     pub current_menu: String,
     pub current_feature: String,
-    pub auto_farm: Autofarm_c,
+    pub auto_farm: AutofarmC,
     pub auto_spam: Autospamv1,
     pub world_map: WorldMap,
     pub inventory: Inventory,
