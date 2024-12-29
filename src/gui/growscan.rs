@@ -30,10 +30,11 @@ impl Growscan {
                             .show(ui, |ui| {
                                 ui.heading("Objects");
 
-                                let mut item_amounts = HashMap::new();
+                                let mut item_amounts: HashMap<u32, u64> = HashMap::new();
                                 for item in &objects.items {
-                                    *item_amounts.entry(item.id).or_insert(0) += item.count;
+                                    *item_amounts.entry(item.id.into()).or_insert(0) += item.count as u64;
                                 }
+                                
 
                                 let mut sorted_items: Vec<_> = item_amounts.iter().collect();
                                 sorted_items.sort_by_key(|&(id, _)| id);
