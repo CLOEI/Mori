@@ -9,6 +9,7 @@ use crate::gui::world_map::WorldMap;
 use crate::texture_manager::TextureManager;
 use crate::core::features::auto_spam::Autospamv1;
 use crate::gui::auto_spam_menu;
+use crate::gui::players::PlayersScan;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Ui};
 use egui::scroll_area::ScrollBarVisibility;
@@ -22,6 +23,7 @@ pub struct BotMenu {
     pub bots: Vec<BotConfig>,
     pub current_menu: String,
     pub current_feature: String,
+    pub players_in_world: PlayersScan,
     pub auto_farm: AutofarmC,
     pub auto_spam: Autospamv1,
     pub world_map: WorldMap,
@@ -92,6 +94,11 @@ impl BotMenu {
                             egui::RichText::new(egui_remixicon::icons::RADAR_FILL),
                         )).clicked() {
                             self.current_menu = "radar".to_string();
+                        }
+                        if ui.add_sized([30.0, 30.0], egui::Button::new(
+                            egui::RichText::new(egui_remixicon::icons::INFO_I),
+                        )).clicked() {
+                            self.current_menu = "players_in_world".to_string();
                         }
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
                             egui::RichText::new(egui_remixicon::icons::LAYOUT_GRID_FILL),
@@ -320,7 +327,13 @@ impl BotMenu {
                             ui.add_space(ui.available_height() / 2.0 - 25.0);
                         });
                     }
-                } else if self.current_menu == "world_map" {
+                }
+                else if self.current_menu == "players_in_world" {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
+                        self.players_in_world.render(ui, &manager);
+                    });
+                }
+                else if self.current_menu == "world_map" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.world_map.render(ui, &manager, &texture_manager);
                     });
