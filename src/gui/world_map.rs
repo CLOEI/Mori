@@ -1,10 +1,8 @@
-use std::ops::Add;
-use crate::core::Bot;
 use crate::texture_manager::TextureManager;
 use crate::utils::color;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Color32, Pos2, Rect, Ui};
-use egui::{FontFamily, FontId, Image, Painter, Vec2};
+use egui::{Painter};
 use gtworld_r::TileType;
 use paris::info;
 use std::sync::{Arc, RwLock};
@@ -39,7 +37,6 @@ impl WorldMap {
                 let available_size = ui.available_size();
                 let world = bot.world.read().unwrap();
 
-                // Calculate dynamic tile size
                 let tile_width = available_size.x / world.width as f32;
                 let tile_height = available_size.y / world.height as f32;
 

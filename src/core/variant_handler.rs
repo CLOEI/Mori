@@ -295,6 +295,9 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
                         }
                     },
                 };
+                if player.invis {
+                    bot.leave();
+                }
                 let mut players = bot.players.lock().unwrap();
                 players.push(player);
             }

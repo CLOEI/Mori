@@ -52,4 +52,8 @@ impl TextureManager {
             None => None,
         }
     }
+
+    pub fn reset_textures(&mut self) {
+        self.textures.clear();
+    }
 }

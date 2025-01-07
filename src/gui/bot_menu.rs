@@ -11,6 +11,7 @@ use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Ui};
 use egui::scroll_area::ScrollBarVisibility;
 use egui::{Color32, UiBuilder};
+use crate::core::features;
 
 #[derive(Default)]
 pub struct BotMenu {
@@ -23,6 +24,7 @@ pub struct BotMenu {
     pub inventory: Inventory,
     pub growscan: Growscan,
     pub scripting: Scripting,
+    pub selected_feature: String,
 }
 
 impl BotMenu {
@@ -329,7 +331,22 @@ impl BotMenu {
                     });
                 } else if self.current_menu == "features" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
-                        self.auto_farm.render(ui, manager.clone());
+                        ui.horizontal(|ui| {
+                            if ui.button("Auto Provider").clicked() {
+                                self.selected_feature = "auto_provider".to_string();
+                                let bot = {
+                                    let manager = manager.read().unwrap();
+                                    manager.get_bot(&self.selected_bot).unwrap().clone()
+                                };
+                                features::auto_provider::start(&bot, 928);
+                            }
+                            if ui.button("PNB").clicked() {
+                                self.selected_feature = "pnb".to_string();
+                            }
+                            if ui.button("Rotation").clicked() {
+                                self.selected_feature = "rotation".to_string();
+                            }
+                        });
                     });
                 } else if self.current_menu == "scripting" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
