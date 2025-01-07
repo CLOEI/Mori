@@ -12,8 +12,53 @@ pub struct Info {
     pub server_data: HashMap<String, String>,
     pub token: String,
     pub login_info: LoginInfo,
-    pub status: String,
+    pub status: EStatus,
     pub proxy: Option<ProxyInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EStatus {
+    Unauthorized,
+    TwoFAFailed,
+    ParsingServer,
+    FetchingServer,
+    CheckingToken,
+    GettingToken,
+    GettingOAuth,
+    UpdatingData,
+    SpoofingData,
+    Disconnected,
+    Reconnecting,
+    Connecting,
+    Connected,
+    Banned
+}
+
+impl Default for EStatus {
+    fn default() -> Self {
+        EStatus::Disconnected
+    }
+}
+
+impl EStatus {
+    pub fn to_string(&self) -> String {
+        match self {
+            EStatus::Unauthorized => "Unauthorized".to_string(),
+            EStatus::TwoFAFailed => "2FA Failed".to_string(),
+            EStatus::ParsingServer => "Parsing server".to_string(),
+            EStatus::FetchingServer => "Fetching server".to_string(),
+            EStatus::CheckingToken => "Checking token".to_string(),
+            EStatus::GettingToken => "Getting token".to_string(),
+            EStatus::GettingOAuth => "Getting OAuth".to_string(),
+            EStatus::UpdatingData => "Updating data".to_string(),
+            EStatus::SpoofingData => "Spoofing data".to_string(),
+            EStatus::Disconnected => "Disconnected".to_string(),
+            EStatus::Reconnecting => "Reconnecting".to_string(),
+            EStatus::Connecting => "Connecting".to_string(),
+            EStatus::Connected => "Connected".to_string(),
+            EStatus::Banned => "Banned".to_string(),
+        }
+    }
 }
 
 #[derive(Debug)]

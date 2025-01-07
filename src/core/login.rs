@@ -13,6 +13,7 @@ use std::{env, io, process::Command, time::Duration};
 use ureq::Agent;
 use urlencoding::encode;
 use wait_timeout::ChildExt;
+use crate::types::bot_info::EStatus;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -121,7 +122,7 @@ pub fn get_ubisoft_session(
                     let mut state = bot.state.lock().expect("Failed to lock state");
                     let mut info = bot.info.lock().expect("Failed to lock info");
                     state.is_running = false;
-                    info.status = "2FA Failed".to_string();
+                    info.status = EStatus::TwoFAFailed;
                 }
                 Err(err)
             }
@@ -182,7 +183,7 @@ pub fn get_ubisoft_token(
             Err(err) => {
                 if err.to_string().contains("code 401") {
                     bot.state.lock().unwrap().is_running = false;
-                    bot.info.lock().unwrap().status = "Unauthorized".to_string();
+                    bot.info.lock().unwrap().status = EStatus::Unauthorized;
                 }
                 return Err(error::CustomError::Other(format!(
                     "Failed to get ubisoft session: {}",

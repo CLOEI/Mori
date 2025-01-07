@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::thread;
 use crate::core::Bot;
+use crate::types::bot_info::EStatus;
 
 pub fn start(bot: &Arc<Bot>, id: u16) {
     let bot = bot.clone();
@@ -23,8 +24,8 @@ pub fn start(bot: &Arc<Bot>, id: u16) {
                     world.name.clone()
                 };
                 let info = bot.info.lock().unwrap().status.clone();
-                if info != "Disconnected" && world_name != "EXIT" {
-                    break;
+                if info == EStatus::Disconnected || world_name == "EXIT" {
+                    continue;
                 }
                 bot.log_warn("Currently disconnected, waiting for reconnection...");
                 thread::sleep(std::time::Duration::from_secs(5));

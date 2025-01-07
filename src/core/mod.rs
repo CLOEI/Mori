@@ -24,7 +24,7 @@ use urlencoding::encode;
 
 use crate::core::proxy::{SocketType, Socks5UdpSocket};
 use crate::manager::proxy_manager::ProxyManager;
-use crate::types::bot_info::{TemporaryData, FTUE};
+use crate::types::bot_info::{EStatus, TemporaryData, FTUE};
 use crate::types::{etank_packet_type::ETankPacketType, player::Player, tank_packet::TankPacket};
 use crate::utils::safe_check;
 use crate::{
@@ -193,7 +193,7 @@ impl Bot {
             let lua = self.lua.lock().expect("Failed to lock Lua");
             let _ = lua_register::register(&lua, &self);
         }
-        self.set_status("Logging in...");
+        self.set_status(EStatus::Connecting);
         if data.is_empty() {
             self.spoof();
         } else {
@@ -207,13 +207,13 @@ impl Bot {
         self.process_events();
     }
 
-    pub fn set_status(&self, message: &str) {
+    pub fn set_status(&self, status: EStatus) {
         let mut info = self.info.lock().expect("Failed to lock info");
-        info.status = message.to_string();
+        info.status = status
     }
 
     pub fn reconnect(&self) -> bool {
-        self.set_status("Reconnecting...");
+        self.set_status(EStatus::Reconnecting);
         self.to_http();
 
         let (meta, login_method, oauth_links_empty) = {
@@ -278,7 +278,7 @@ impl Bot {
             state.is_running = false;
             state.is_redirecting = false;
         }
-        self.set_status("Relogging");
+        self.set_status(EStatus::Reconnecting);
         self.disconnect_now();
         {
             let mut state = self.state.lock().expect("Failed to lock state");
@@ -288,7 +288,7 @@ impl Bot {
     }
 
     fn update_login_info(&self, data: String) {
-        self.set_status("Updating login info");
+        self.set_status(EStatus::UpdatingData);
         let mut info = self.info.lock().expect("Failed to lock info");
         let parsed_data = utils::textparse::parse_and_store_as_map(&data);
         for (key, value) in parsed_data {
@@ -329,7 +329,7 @@ impl Bot {
 
     fn token_still_valid(&self) -> bool {
         self.log_info("Checking if token is still valid");
-        self.set_status("Checking refresh token");
+        self.set_status(EStatus::CheckingToken);
 
         let (token, login_info) = {
             let info = self.info.lock().unwrap();
@@ -401,7 +401,7 @@ impl Bot {
         }
 
         self.log_info("Getting token for bot");
-        self.set_status("Getting token");
+        self.set_status(EStatus::GettingToken);
         let (payload, recovery_code, method, oauth_links) = {
             let info = self.info.lock().unwrap();
             (
@@ -475,7 +475,7 @@ impl Bot {
 
     pub fn get_oauth_links(&self) -> Result<Vec<String>, ureq::Error> {
         self.log_info("Getting OAuth links");
-        self.set_status("Getting OAuth links");
+        self.set_status(EStatus::GettingOAuth);
 
         let login_info = {
             let info = self.info.lock().unwrap().login_info.to_string();
@@ -517,7 +517,7 @@ impl Bot {
 
     pub fn spoof(&self) {
         self.log_info("Spoofing core data");
-        self.set_status("Spoofing core data");
+        self.set_status(EStatus::SpoofingData);
         let mut info = self.info.lock().unwrap();
         info.login_info.klv = proton::generate_klv(
             &info.login_info.protocol,
@@ -537,7 +537,7 @@ impl Bot {
         } else {
             "https://www.growtopia1.com/growtopia/server_data.php"
         };
-        self.set_status("Fetching server data");
+        self.set_status(EStatus::FetchingServer);
         loop {
             let req = ureq::post(server)
                 .set(
@@ -568,7 +568,7 @@ impl Bot {
 
     pub fn parse_server_data(&self, data: String) {
         self.log_info("Parsing server data");
-        self.set_status("Parsing server data");
+        self.set_status(EStatus::ParsingServer);
         let mut info = self.info.lock().unwrap();
         info.server_data = data
             .lines()
@@ -584,7 +584,7 @@ impl Bot {
 
     fn connect_to_server(&self, ip: &str, port: &str) {
         self.log_info(&format!("Connecting to the server {}:{}", ip, port));
-        self.set_status("Connecting to the server");
+        self.set_status(EStatus::Connecting);
 
         let socket_address = SocketAddr::from_str(&format!("{}:{}", ip, port)).unwrap();
 
@@ -649,13 +649,13 @@ impl Bot {
                     match event {
                         enet::EventNoRef::Connect { peer, .. } => {
                             self.log_info("Connected to the server");
-                            self.set_status("Connected");
+                            self.set_status(EStatus::Connected);
                             let mut peer_id = self.peer_id.lock().unwrap();
                             *peer_id = Some(peer);
                         }
                         enet::EventNoRef::Disconnect { .. } => {
                             self.log_warn("Disconnected from the server");
-                            self.set_status("Disconnected");
+                            self.set_status(EStatus::Disconnected);
                             let mut world = self.world.write().unwrap();
                             let mut position = self.position.lock().unwrap();
                             let mut temp = self.temporary_data.write().unwrap();

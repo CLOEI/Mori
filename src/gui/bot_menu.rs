@@ -135,7 +135,7 @@ impl BotMenu {
                                                 ui.add(egui::Label::new(username).truncate());
                                                 ui.end_row();
                                                 ui.label("Status");
-                                                ui.add(egui::Label::new(status).truncate());
+                                                ui.add(egui::Label::new(status.to_string()).truncate());
                                                 ui.end_row();
                                                 ui.label("Ping");
                                                 ui.label(ping);
