@@ -17,7 +17,7 @@ impl Scripting {
             if ui
                 .add_sized(
                     [30.0, 30.0],
-                    egui::Button::new(egui::RichText::new(egui_remixicon::icons::PLAY_FILL)),
+                    egui::Button::new(egui::RichText::new(egui_phosphor::variants::fill::PLAY)),
                 )
                 .clicked()
             {
@@ -49,7 +49,7 @@ impl Scripting {
             if ui
                 .add_sized(
                     [30.0, 30.0],
-                    egui::Button::new(egui::RichText::new(egui_remixicon::icons::STOP_FILL)),
+                    egui::Button::new(egui::RichText::new(egui_phosphor::variants::fill::STOP)),
                 )
                 .clicked()
             {}

@@ -69,37 +69,37 @@ impl BotMenu {
                 if let Some(_) = bot {
                     ui.vertical(|ui| {
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
-                            egui::RichText::new(egui_remixicon::icons::INFORMATION_FILL),
+                            egui::RichText::new(egui_phosphor::variants::fill::INFO),
                         )).clicked() {
                             self.current_menu = "bot_info".to_string();
                         }
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
-                            egui::RichText::new(egui_remixicon::icons::GLOBAL_FILL)
+                            egui::RichText::new(egui_phosphor::variants::fill::PLANET)
                         )).clicked() {
                             self.current_menu = "world_map".to_string();
                         }
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
-                            egui::RichText::new(egui_remixicon::icons::ARCHIVE_FILL),
+                            egui::RichText::new(egui_phosphor::variants::fill::BACKPACK),
                         )).clicked() {
                             self.current_menu = "inventory".to_string();
                         }
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
-                            egui::RichText::new(egui_remixicon::icons::RADAR_FILL),
+                            egui::RichText::new(egui_phosphor::variants::fill::TARGET),
                         )).clicked() {
                             self.current_menu = "radar".to_string();
                         }
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
-                            egui::RichText::new(egui_remixicon::icons::LAYOUT_GRID_FILL),
+                            egui::RichText::new(egui_phosphor::variants::fill::DIAMONDS_FOUR),
                         )).clicked() {
                             self.current_menu = "features".to_string();
                         }
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
-                            egui::RichText::new(egui_remixicon::icons::CODE_FILL),
+                            egui::RichText::new(egui_phosphor::variants::fill::CODE),
                         )).clicked() {
                             self.current_menu = "scripting".to_string();
                         }
                         if ui.add_sized([30.0, 30.0], egui::Button::new(
-                            egui::RichText::new(egui_remixicon::icons::TERMINAL_BOX_FILL),
+                            egui::RichText::new(egui_phosphor::variants::fill::TERMINAL_WINDOW),
                         )).clicked() {
                             self.current_menu = "terminal".to_string();
                         }
@@ -309,7 +309,7 @@ impl BotMenu {
                         ui.with_layout(egui::Layout::top_down_justified(egui::Align::Center), |ui| {
                             ui.add_space(ui.available_height() / 2.0 - 25.0);
                             ui.vertical_centered(|ui| {
-                                ui.add(egui::Label::new(egui::RichText::new(egui_remixicon::icons::ROBOT_2_FILL).size(50.0)));
+                                ui.add(egui::Label::new(egui::RichText::new(egui_phosphor::variants::fill::USER).size(50.0)));
                                 ui.label("Select a bot to view info");
                             });
                             ui.add_space(ui.available_height() / 2.0 - 25.0);
@@ -361,15 +361,15 @@ impl BotMenu {
                                             ui.horizontal(|ui| {
                                                 match data[0] {
                                                     "info" => {
-                                                        ui.label(egui::RichText::new(egui_remixicon::icons::INFORMATION_FILL).color(Color32::from_rgb(0, 123, 255)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_phosphor::variants::fill::INFO).color(Color32::from_rgb(0, 123, 255)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     "warn" => {
-                                                        ui.label(egui::RichText::new(egui_remixicon::icons::ERROR_WARNING_FILL).color(Color32::from_rgb(255, 193, 7)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_phosphor::variants::fill::WARNING).color(Color32::from_rgb(255, 193, 7)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     "error" => {
-                                                        ui.label(egui::RichText::new(egui_remixicon::icons::BUG_FILL).color(Color32::from_rgb(220, 53, 69)).size(16.0));
+                                                        ui.label(egui::RichText::new(egui_phosphor::variants::fill::BUG).color(Color32::from_rgb(220, 53, 69)).size(16.0));
                                                         ui.add(egui::Label::new(data[1]).wrap());
                                                     }
                                                     _ => {

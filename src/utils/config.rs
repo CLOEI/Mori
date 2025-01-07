@@ -3,7 +3,7 @@ use std::{
     io::{Read, Write},
 };
 
-use crate::types::config::{BotConfig, Config, Theme};
+use crate::types::config::{BotConfig, Config};
 use crate::utils;
 
 use super::captcha::CaptchaProvider;
@@ -154,19 +154,6 @@ pub fn get_bot_use_proxy(username: String) -> bool {
     false
 }
 
-pub fn set_theme(theme: Theme) {
-    let mut config = parse_config().unwrap();
-    config.theme = theme;
-    let j = serde_json::to_string_pretty(&config).unwrap();
-    let mut file = File::create("config.json").unwrap();
-    file.write_all(j.as_bytes()).unwrap();
-}
-
-pub fn get_theme() -> Theme {
-    let config = parse_config().unwrap();
-    config.theme
-}
-
 pub fn set_auto_collect(auto_collect: bool) {
     let mut config = parse_config().unwrap();
     config.auto_collect = auto_collect;
@@ -201,19 +188,6 @@ pub fn set_captcha_provider(provider: CaptchaProvider) {
 pub fn set_captcha_api_key(api_key: String) {
     let mut config = parse_config().unwrap();
     config.captcha.api_key = api_key;
-    let j = serde_json::to_string_pretty(&config).unwrap();
-    let mut file = File::create("config.json").unwrap();
-    file.write_all(j.as_bytes()).unwrap();
-}
-
-pub fn get_discord_token() -> String {
-    let config = parse_config().unwrap();
-    config.discord_token
-}
-
-pub fn set_discord_token(token: String) {
-    let mut config = parse_config().unwrap();
-    config.discord_token = token;
     let j = serde_json::to_string_pretty(&config).unwrap();
     let mut file = File::create("config.json").unwrap();
     file.write_all(j.as_bytes()).unwrap();

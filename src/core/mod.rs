@@ -412,6 +412,7 @@ impl Bot {
             )
         };
 
+
         let token_result = match method {
             ELoginMethod::GOOGLE => match login::get_google_token(
                 oauth_links.get(1).unwrap_or(&"".to_string()),

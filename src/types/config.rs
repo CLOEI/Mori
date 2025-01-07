@@ -12,25 +12,7 @@ pub struct Config {
     pub selected_bot: String,
     pub game_version: String,
     pub use_alternate_server: bool,
-    pub theme: Theme,
     pub captcha: Captcha,
-    pub discord_token: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub enum Theme {
-    Dark,
-    Light,
-    Macchiato,
-    Latte,
-    Frappe,
-    Mocha,
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Theme::Dark
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

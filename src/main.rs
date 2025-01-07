@@ -20,12 +20,10 @@ use std::sync::{Arc, RwLock};
 use std::{
     fs::{self, File},
     io::Write,
-    thread,
 };
-use types::config::{Config, Theme};
+use types::config::{Config};
 
 mod core;
-mod discord_server;
 mod gui;
 mod lua_register;
 mod manager;
@@ -45,9 +43,7 @@ fn init_config() {
             selected_bot: "".to_string(),
             game_version: "4.71".to_string(),
             use_alternate_server: false,
-            theme: Theme::Dark,
             captcha: Default::default(),
-            discord_token: "".to_string(),
         };
         let j = serde_json::to_string_pretty(&config).unwrap();
         file.write_all(j.as_bytes()).unwrap();
@@ -56,13 +52,6 @@ fn init_config() {
 
 fn main() {
     init_config();
-    let discord_token = config::get_discord_token();
-
-    if discord_token != "" {
-        thread::spawn(move || {
-            discord_server::start();
-        });
-    }
 
     let options = eframe::NativeOptions {
         centered: true,
@@ -97,39 +86,45 @@ struct App {
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut fonts = egui::FontDefinitions::default();
-        egui_remixicon::add_to_fonts(&mut fonts);
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
         cc.egui_ctx.set_fonts(fonts);
 
         let texture_manager = Arc::new(RwLock::new(TextureManager::new()));
         let proxy_manager = Arc::new(RwLock::new(ProxyManager::new()));
         let bot_manager = Arc::new(RwLock::new(BotManager::new(proxy_manager.clone())));
-        let texture_loaded = Arc::new(AtomicBool::new(false));
+        let texture_loaded = Arc::new(AtomicBool::new(true));
+        let bot_manager_clone = bot_manager.clone();
 
-        {
-            let bot_manager_clone = bot_manager.clone();
-            let texture_manager_clone = texture_manager.clone();
-            let texture_loaded_clone = texture_loaded.clone();
-            let egui_ctx = cc.egui_ctx.clone();
-            let growtopia_path = dirs::data_local_dir().unwrap().join("Growtopia/game");
-            if growtopia_path.exists() {
-                info!("Found Growtopia at path: {:?}", growtopia_path);
-                thread::spawn(move || {
-                    let mut texture_manager = texture_manager_clone.write().unwrap();
-                    texture_manager.load_textures(&egui_ctx, growtopia_path.as_path());
-                    texture_loaded_clone.store(true, Ordering::Release);
-                    let bots = config::get_bots();
-                    for bot in bots.clone() {
-                        bot_manager_clone.write().unwrap().add_bot(bot);
-                    }
-                });
-            } else {
-                texture_loaded_clone.store(true, Ordering::Release);
-                let bots = config::get_bots();
-                for bot in bots.clone() {
-                    bot_manager_clone.write().unwrap().add_bot(bot);
-                }
-                warn!("Growtopia not found");
-            }
+        // {
+        //     let bot_manager_clone = bot_manager.clone();
+        //     let texture_manager_clone = texture_manager.clone();
+        //     let texture_loaded_clone = texture_loaded.clone();
+        //     let egui_ctx = cc.egui_ctx.clone();
+        //     let growtopia_path = dirs::data_local_dir().unwrap().join("Growtopia/game");
+        //     if growtopia_path.exists() {
+        //         info!("Found Growtopia at path: {:?}", growtopia_path);
+        //         thread::spawn(move || {
+        //             let mut texture_manager = texture_manager_clone.write().unwrap();
+        //             texture_manager.load_textures(&egui_ctx, growtopia_path.as_path());
+        //             texture_loaded_clone.store(true, Ordering::Release);
+        //             let bots = config::get_bots();
+        //             for bot in bots.clone() {
+        //                 bot_manager_clone.write().unwrap().add_bot(bot);
+        //             }
+        //         });
+        //     } else {
+        //         texture_loaded_clone.store(true, Ordering::Release);
+        //         let bots = config::get_bots();
+        //         for bot in bots.clone() {
+        //             bot_manager_clone.write().unwrap().add_bot(bot);
+        //         }
+        //         warn!("Growtopia not found");
+        //     }
+        // }
+
+        let bots = config::get_bots();
+        for bot in bots.clone() {
+            bot_manager_clone.write().unwrap().add_bot(bot);
         }
 
         Self {
@@ -144,7 +139,6 @@ impl App {
                 timeout_delay: config::get_timeout(),
                 findpath_delay: config::get_findpath_delay(),
                 auto_collect: config::get_auto_collect(),
-                theme: config::get_theme(),
                 captcha_provider: config::get_captcha_provider(),
                 captcha_api_key: config::get_captcha_api_key(),
             },
@@ -159,29 +153,6 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint();
-
-        match self.settings.theme {
-            Theme::Dark => {
-                ctx.set_visuals(egui::Visuals::dark());
-            }
-            Theme::Light => {
-                ctx.set_visuals(egui::Visuals::light());
-            }
-            Theme::Macchiato => {
-                catppuccin_egui::set_theme(ctx, catppuccin_egui::MACCHIATO);
-            }
-            Theme::Latte => {
-                catppuccin_egui::set_theme(ctx, catppuccin_egui::LATTE);
-            }
-            Theme::Frappe => {
-                catppuccin_egui::set_theme(ctx, catppuccin_egui::FRAPPE);
-            }
-            Theme::Mocha => {
-                catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
-            }
-            _ => ctx.set_visuals(egui::Visuals::dark()),
-        }
-
         egui_extras::install_image_loaders(ctx);
 
         let panel_frame = egui::Frame {
@@ -245,7 +216,7 @@ impl eframe::App for App {
 
                     if ui
                         .add(Button::new(
-                            RichText::new(egui_remixicon::icons::SHUT_DOWN_LINE)
+                            RichText::new(egui_phosphor::variants::fill::POWER)
                                 .size(button_height),
                         ))
                         .on_hover_text("Close the app")
@@ -256,7 +227,7 @@ impl eframe::App for App {
 
                     if ui
                         .add(Button::new(
-                            RichText::new(egui_remixicon::icons::ARROW_DROP_DOWN_LINE)
+                            RichText::new(egui_phosphor::variants::fill::CARET_DOWN)
                                 .size(button_height),
                         ))
                         .on_hover_text("Minimize the window")
@@ -304,7 +275,7 @@ impl eframe::App for App {
                         ui.add_space(ui.available_height() / 2.0 - 25.0);
                         ui.vertical_centered(|ui| {
                             ui.add(egui::Label::new(
-                                RichText::new(egui_remixicon::icons::PUZZLE_2_FILL).size(50.0),
+                                RichText::new(egui_phosphor::variants::fill::PUZZLE_PIECE).size(50.0),
                             ));
                             ui.add(egui::Label::new("Loading textures..."));
                             ui.add_space(8.0);

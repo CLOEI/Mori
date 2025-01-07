@@ -206,7 +206,7 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
                                                     ready_to_harvest: false,
                                                     time_passed: 0,
                                                     item_on_tree: 0,
-                                                    timer: Instant::now(),
+                                                    elapsed: Instant::now().elapsed()
                                                 };
                                             }
                                         }

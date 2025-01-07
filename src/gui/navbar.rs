@@ -26,7 +26,7 @@ impl Navbar {
         ui.horizontal(|ui| {
             if ui
                 .add(egui::Button::new(
-                    egui_remixicon::icons::ROBOT_2_FILL.to_owned() + " Bots",
+                    egui_phosphor::variants::fill::USER.to_owned() + " Bots",
                 ))
                 .clicked()
             {
@@ -34,7 +34,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::new(egui::RichText::new(
-                    egui_remixicon::icons::DATABASE_2_FILL.to_owned() + " Item database",
+                    egui_phosphor::variants::fill::DATABASE.to_owned() + " Item database",
                 )))
                 .clicked()
             {
@@ -42,7 +42,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::new(
-                    egui_remixicon::icons::PIN_DISTANCE_FILL.to_owned() + " Proxy",
+                    egui_phosphor::variants::fill::GPS.to_owned() + " Proxy",
                 ))
                 .clicked()
             {
@@ -50,7 +50,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::new(
-                    egui_remixicon::icons::SETTINGS_FILL.to_owned() + " Settings",
+                    egui_phosphor::variants::fill::GEAR_SIX.to_owned() + " Settings",
                 ))
                 .clicked()
             {
@@ -59,7 +59,7 @@ impl Navbar {
             ui.separator();
             if ui
                 .add(egui::Button::new(
-                    egui_remixicon::icons::ADD_FILL.to_owned() + " Add bot",
+                    egui_phosphor::variants::fill::PLUS.to_owned() + " Add bot",
                 ))
                 .clicked()
             {
@@ -67,7 +67,7 @@ impl Navbar {
             }
             if ui
                 .add(egui::Button::new(
-                    egui_remixicon::icons::SUBTRACT_FILL.to_owned() + "  Remove bot",
+                    egui_phosphor::variants::fill::MINUS.to_owned() + "  Remove bot",
                 ))
                 .clicked()
             {

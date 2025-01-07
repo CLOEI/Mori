@@ -364,7 +364,7 @@ impl ItemDatabase {
                     ui.add_space(ui.available_height() / 2.0 - 25.0);
                     ui.vertical_centered(|ui| {
                         ui.add(egui::Label::new(
-                            egui::RichText::new(egui_remixicon::icons::DATABASE_2_FILL).size(50.0),
+                            egui::RichText::new(egui_phosphor::variants::fill::DATABASE).size(50.0),
                         ));
                         ui.label("Database is not loaded. logon to the game to load the database.");
                     });
