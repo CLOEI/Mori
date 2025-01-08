@@ -9,6 +9,6 @@ pub mod proxy_list;
 mod scripting;
 pub mod settings;
 pub mod world_map;
-pub mod auto_farm_menu;
-pub mod auto_spam_menu;
+pub mod pnb_feature_menu;
+pub mod spam_feature_menu;
 pub mod players;

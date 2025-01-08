@@ -3,12 +3,12 @@ use std::thread;
 
 use crate::gui::growscan::Growscan;
 use crate::gui::inventory::Inventory;
-use crate::core::features::auto_farm::AutofarmC;
+use crate::core::features::auto_pnb::AutoPNB;
 use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
 use crate::texture_manager::TextureManager;
-use crate::core::features::auto_spam::Autospamv1;
-use crate::gui::auto_spam_menu;
+use crate::core::features::auto_spam::AutoSpam;
+use crate::gui::spam_feature_menu;
 use crate::gui::players::PlayersScan;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Ui};
@@ -24,8 +24,8 @@ pub struct BotMenu {
     pub current_menu: String,
     pub current_feature: String,
     pub players_in_world: PlayersScan,
-    pub auto_farm: AutofarmC,
-    pub auto_spam: Autospamv1,
+    pub auto_farm: AutoPNB,
+    pub auto_spam: AutoSpam,
     pub world_map: WorldMap,
     pub inventory: Inventory,
     pub growscan: Growscan,
@@ -336,29 +336,46 @@ impl BotMenu {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.inventory.render(ui, &manager);
                     });
+                } else if self.current_menu == "players_in_world" {
+                    ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
+                        self.players_in_world.render(ui, &manager);
+                    });
                 } else if self.current_menu == "radar" {
                     ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                         self.growscan.render(ui, &manager);
                     });
                 } else if self.current_menu == "features" {
                     ui.vertical(|ui| {
-                        ui.heading("Features - Module version: 1.0.0");
+                        ui.heading("Features");
                         ui.horizontal(|ui| {
-                            if ui.button("Autofarm").clicked() {
-                                self.current_feature = "autofarm".to_string();
+                            if ui.button("PNB").clicked() {
+                                self.current_feature = "pnb".to_string();
                             }
-                            if ui.button("AutoSpam").clicked() {
-                                self.current_feature = "autospam".to_string();
+                            if ui.button("Spam").clicked() {
+                                self.current_feature = "spam".to_string();
+                            }
+                            if ui.button("Auto Provider").clicked() {
+                                self.selected_feature = "auto_provider".to_string();
+                                let bot = {
+                                    let manager = manager.read().unwrap();
+                                    manager.get_bot(&self.selected_bot).unwrap().clone()
+                                };
+                                features::auto_provider::start(&bot, 928);
                             }
                         });
                         ui.separator();
                         match self.current_feature.as_str() {
-                            "autofarm" => {
+                            "pnb" => {
                                 ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                                     self.auto_farm.render(ui, manager.clone());
                                 });
                             }
-                            "autospam" => {
+                            "spam" => {
+                                ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
+                                    self.auto_spam.render(ui, manager.clone());
+                                });
+                            }
+                            "auto_provider" => {
                                 ui.allocate_ui(egui::vec2(ui.available_width(), ui.available_height()), |ui| {
                                     self.auto_spam.render(ui, manager.clone());
                                 });

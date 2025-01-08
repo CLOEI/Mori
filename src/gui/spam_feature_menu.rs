@@ -1,10 +1,10 @@
-use crate::core::features::auto_spam::Autospamv1;
+use crate::core::features::auto_spam::AutoSpam;
 use crate::manager::bot_manager::BotManager;
 use eframe::egui::{self, Ui};
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::Ordering;
 
-impl Autospamv1 {
+impl AutoSpam {
     pub fn render(&mut self, ui: &mut Ui, manager: Arc<RwLock<BotManager>>) {
         self.selected_bot = crate::utils::config::get_selected_bot();
 
@@ -15,7 +15,7 @@ impl Autospamv1 {
             return;
         }
         ui.vertical(|ui| {
-            ui.heading("Auto Spam AI || module version: 2");
+            ui.heading("Spam");
 
             ui.horizontal(|ui| {
                 if self.is_talking {

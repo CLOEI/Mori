@@ -6,7 +6,7 @@ use std::time::Duration;
 use rand::Rng;
 
 #[derive(Default, Clone)]
-pub struct Autospamv1 {
+pub struct AutoSpam {
     pub selected_bot: String,
     pub is_talking: bool,
     pub is_enabled: bool,
@@ -19,7 +19,7 @@ pub struct Autospamv1 {
     pub temp_y_input: String,
 }
 
-impl Autospamv1 {
+impl AutoSpam {
     pub fn start_autospam(&mut self, manager: Arc<RwLock<BotManager>>) {
         if self.selected_xy_of_world.is_empty() || self.is_talking || self.temp_spam_text.is_empty() {
             println!("Autospam started with errors: settings have been updated to 'zero'");
@@ -79,7 +79,7 @@ impl Autospamv1 {
                                 println!("Bot already in the right position: ({}, {})", target_x, target_y);
                             }
 
-                            let modern_text = Autospamv1::randomize_text(&spam_text);
+                            let modern_text = AutoSpam::randomize_text(&spam_text);
 
                             println!("Text spamming: {}", modern_text);
                             if bot.is_inworld() {

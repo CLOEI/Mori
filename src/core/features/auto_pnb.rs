@@ -5,7 +5,7 @@ use std::thread;
 use std::time::Duration;
 
 #[derive(Default)]
-pub struct AutofarmC {
+pub struct AutoPNB {
     pub selected_bot: String,
     pub is_farming: bool,
     pub is_paused: Arc<AtomicBool>,
@@ -15,7 +15,7 @@ pub struct AutofarmC {
     pub temp_item_id: String,
 }
 
-impl AutofarmC {
+impl AutoPNB {
     pub fn start_autofarm(&mut self, manager: Arc<RwLock<BotManager>>) {
         if self.selected_positions.is_empty() || self.is_farming {
             return;
@@ -34,7 +34,7 @@ impl AutofarmC {
             if let Some(bot) = manager.read().unwrap().get_bot(&bot_name).cloned() {
                 for (offset_x, offset_y) in positions.iter().cycle() {
                     if is_paused.load(Ordering::SeqCst) {
-                        println!("Autofarm paused.");
+                        println!("PNB paused.");
                         return;
                     }
 

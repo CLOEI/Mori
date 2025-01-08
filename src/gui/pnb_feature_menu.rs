@@ -1,11 +1,11 @@
 use crate::manager::bot_manager::BotManager;
 use crate::utils::logging::{info, warn};
-use crate::core::features::auto_farm::AutofarmC;
+use crate::core::features::auto_pnb::AutoPNB;
 use eframe::egui::{self, Ui};
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::Ordering;
 
-impl AutofarmC {
+impl AutoPNB {
     pub fn render(&mut self, ui: &mut Ui, manager: Arc<RwLock<BotManager>>) {
         self.selected_bot = crate::utils::config::get_selected_bot();
 
@@ -17,25 +17,25 @@ impl AutofarmC {
         }
 
         ui.vertical(|ui| {
-            ui.heading("Autofarm - module version: 1.0.0");
+            ui.heading("PNB");
 
             ui.horizontal(|ui| {
                 if self.is_farming {
-                    if ui.button("Pause Autofarm").clicked() {
+                    if ui.button("Pause").clicked() {
                         self.pause_autofarm();
                     }
                 } else {
-                    if ui.button("Start Autofarm").clicked() {
+                    if ui.button("Start").clicked() {
                         self.start_autofarm(manager.clone());
                     }
                 }
 
                 ui.label(if self.is_farming {
-                    "Autofarm is running..."
+                    "PNB is running..."
                 } else if self.is_paused.load(Ordering::SeqCst) {
-                    "Autofarm is paused."
+                    "PNB is paused."
                 } else {
-                    "Autofarm is idle."
+                    "PNB is idle."
                 });
             });
 
