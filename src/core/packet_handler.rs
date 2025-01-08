@@ -101,6 +101,9 @@ pub fn handle(bot: Arc<Bot>, packet_type: EPacketType, data: &[u8]) {
             Ok(tank_packet) => {
                 bot.log_info(format!("Received: {:?}", tank_packet._type).as_str());
                 match tank_packet._type {
+                    ETankPacketType::NetGamePacketDisconnect => {
+                        bot.disconnect_now();
+                    }
                     ETankPacketType::NetGamePacketState => {
                         let mut players = bot.players.lock().unwrap();
                         for player in players.iter_mut() {

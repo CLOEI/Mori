@@ -41,7 +41,7 @@ fn init_config() {
             findpath_delay: 30,
             auto_collect: true,
             selected_bot: "".to_string(),
-            game_version: "5".to_string(),
+            game_version: "5.02".to_string(),
             use_alternate_server: false,
             captcha: Default::default(),
         };

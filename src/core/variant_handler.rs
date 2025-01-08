@@ -233,9 +233,11 @@ pub fn handle(bot: Arc<Bot>, _: &TankPacket, data: &[u8]) {
             let data = textparse::parse_and_store_as_map(&message);
             if data.contains_key("type") {
                 if data.get("type").unwrap() == "local" {
-                    let mut state = bot.state.lock().unwrap();
-                    state.net_id = data.get("netID").unwrap().parse().unwrap();
-                    state.is_allowed_to_warp = true;
+                    {
+                        let mut state = bot.state.lock().unwrap();
+                        state.net_id = data.get("netID").unwrap().parse().unwrap();
+                        state.is_allowed_to_warp = true;
+                    }
                     bot.send_packet(
                         EPacketType::NetMessageGenericText,
                         "action|getDRAnimations\n".to_string(),
