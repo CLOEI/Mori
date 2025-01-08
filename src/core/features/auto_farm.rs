@@ -5,7 +5,7 @@ use std::thread;
 use std::time::Duration;
 
 #[derive(Default)]
-pub struct Autofarm_c {
+pub struct AutofarmC {
     pub selected_bot: String,
     pub is_farming: bool,
     pub is_paused: Arc<AtomicBool>,
@@ -15,12 +15,14 @@ pub struct Autofarm_c {
     pub temp_item_id: String,
 }
 
-impl Autofarm_c {
+impl AutofarmC {
     pub fn start_autofarm(&mut self, manager: Arc<RwLock<BotManager>>) {
         if self.selected_positions.is_empty() || self.is_farming {
             return;
         }
-
+        if self.item_id == 0 {
+            return;
+        }
         self.is_farming = true;
         self.is_paused.store(false, Ordering::SeqCst);
         let positions = self.selected_positions.clone();
@@ -30,22 +32,54 @@ impl Autofarm_c {
 
         thread::spawn(move || {
             if let Some(bot) = manager.read().unwrap().get_bot(&bot_name).cloned() {
-                for (x, y) in positions.iter().cycle() {
+                for (offset_x, offset_y) in positions.iter().cycle() {
                     if is_paused.load(Ordering::SeqCst) {
-                        break;
+                        println!("Autofarm paused.");
+                        return;
                     }
 
-                    bot.place(*x, *y, item_id);
-                    thread::sleep(Duration::from_millis(180));
+                    let tiles = {
+                        let world = bot.world.try_read().unwrap();
+                        world.tiles.clone()
+                    };
 
-                    bot.punch(*x, *y);
-                    thread::sleep(Duration::from_millis(180));
+                    let local = {
+                        let position = bot.position.lock().unwrap();
+                        position.clone()
+                    };
+
+                    let target_x = (local.x / 32.0) as i32 + offset_x;
+                    let target_y = (local.y / 32.0) as i32 + offset_y;
+
+                    for tile in tiles {
+                        if tile.x as i32 == target_x && tile.y as i32 == target_y {
+                            if tile.foreground_item_id as u32 != item_id {
+                                println!(
+                                    "Placing item at ({}, {}). Target item_id: {}, Current: {}",
+                                    target_x, target_y, item_id, tile.foreground_item_id
+                                );
+                                thread::sleep(Duration::from_millis(100));
+                                bot.place(*offset_x, *offset_y, item_id);
+                                thread::sleep(Duration::from_millis(100));
+                            } else if tile.foreground_item_id as u32 == item_id || tile.foreground_item_id != 0 {
+                                println!(
+                                    "Punching tile at ({}, {}). Current item_id: {}",
+                                    target_x, target_y, tile.foreground_item_id
+                                );
+                                thread::sleep(Duration::from_millis(170));
+                                bot.punch(*offset_x, *offset_y);
+                            }
+                        }
+                    }
                 }
+            } else {
+                println!("Bot '{}' not found.", bot_name);
             }
         });
     }
 
     pub fn pause_autofarm(&mut self) {
+        println!("Pausing autofarm...");
         self.is_paused.store(true, Ordering::SeqCst);
         self.is_farming = false;
     }

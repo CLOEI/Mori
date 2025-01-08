@@ -50,7 +50,8 @@ Any contribution would help alot.
 - [ ] Auto dirt farm
 - [ ] Auto tutorial
 - [x] Auto clear world
-- [ ] Spam
+- [x] Auto Punch and Break
+- [x] Spam
 - [x] Socks5 support
 
 ## Note
