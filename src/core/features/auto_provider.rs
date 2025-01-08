@@ -25,10 +25,11 @@ pub fn start(bot: &Arc<Bot>, id: u16) {
                 };
                 let info = bot.info.lock().unwrap().status.clone();
                 if info == EStatus::Disconnected || world_name == "EXIT" {
+                    bot.log_warn("Currently disconnected, waiting for reconnection...");
+                    thread::sleep(std::time::Duration::from_secs(5));
                     continue;
                 }
-                bot.log_warn("Currently disconnected, waiting for reconnection...");
-                thread::sleep(std::time::Duration::from_secs(5));
+                break;
             }
         }
         bot.log_info("Finish harvesting provider.")
