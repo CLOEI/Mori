@@ -21,6 +21,7 @@ use std::{
     fs::{self, File},
     io::Write,
 };
+use eframe::{HardwareAcceleration, Renderer};
 use types::config::{Config};
 
 mod core;
@@ -55,6 +56,8 @@ fn main() {
 
     let options = eframe::NativeOptions {
         centered: true,
+        hardware_acceleration: HardwareAcceleration::Preferred,
+        renderer: Renderer::Wgpu,
         viewport: ViewportBuilder::default()
             .with_title("Mori")
             .with_icon(
