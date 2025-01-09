@@ -385,13 +385,15 @@ impl Bot {
     }
 
     pub fn sleep(&self) {
-        let mut temp = self.temporary_data.write().unwrap();
-        temp.timeout += config::get_timeout();
-        while temp.timeout > 0 {
-            temp.timeout -= 1;
-            drop(temp);
+        loop {
+            {
+                let mut temp = self.temporary_data.write().unwrap();
+                if temp.timeout == 0 {
+                    break;
+                }
+                temp.timeout -= 1;
+            }
             thread::sleep(Duration::from_secs(1));
-            temp = self.temporary_data.write().unwrap();
         }
     }
 

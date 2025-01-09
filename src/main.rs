@@ -56,8 +56,6 @@ fn main() {
 
     let options = eframe::NativeOptions {
         centered: true,
-        hardware_acceleration: HardwareAcceleration::Preferred,
-        renderer: Renderer::Wgpu,
         viewport: ViewportBuilder::default()
             .with_title("Mori")
             .with_icon(

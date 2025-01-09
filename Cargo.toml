@@ -21,7 +21,7 @@ serde = { version = "1.0.208", features = ["derive"] }
 gtworld-r = { git = "https://github.com/CLOEI/gtworld-r.git" }
 serde_repr = "0.1.19"
 gtitem-r = { git = "https://github.com/CLOEI/gtitem-r.git" }
-eframe = { version = "0.30.0", features = ["wgpu"]}
+eframe = { version = "0.30.0" }
 egui_extras = { version = "0.30.0", features = ["svg", "syntect"] }
 egui = "0.30.0"
 socks = "0.3.4"
