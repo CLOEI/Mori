@@ -65,6 +65,7 @@ pub struct Bot {
     pub logs: Arc<Mutex<Vec<String>>>,
     pub sender: Sender<String>,
     pub lua: Mutex<Lua>,
+    pub agent: ureq::Agent,
 }
 
 impl Bot {
@@ -93,6 +94,7 @@ impl Bot {
         let mut proxy_address: Option<SocketAddr> = None;
         let mut proxy_username = String::new();
         let mut proxy_password = String::new();
+        let mut agent = ureq::AgentBuilder::new();
 
         if config::get_bot_use_proxy(payload[0].clone()) {
             let mut proxy_manager = proxy_manager.write().unwrap();
@@ -112,6 +114,14 @@ impl Bot {
                     );
                     proxy_username = proxy_data.proxy.username.clone();
                     proxy_password = proxy_data.proxy.password.clone();
+                    logging::info(
+                        &format!(
+                            "Using proxy: {}:{}:{}:{}",
+                            proxy_data.proxy.ip, proxy_data.proxy.port, proxy_username, proxy_password
+                        ),
+                        &sender
+                    );
+                    agent = agent.proxy(ureq::Proxy::new(format!("socks5://{}:{}@{}:{}", proxy_username, proxy_password, proxy_data.proxy.ip, proxy_data.proxy.port)).unwrap());
                 }
             }
         }
@@ -173,6 +183,7 @@ impl Bot {
             logs,
             sender,
             lua,
+            agent: agent.build().clone(),
         })
     }
 
@@ -541,12 +552,12 @@ impl Bot {
         };
         self.set_status(EStatus::FetchingServer);
         loop {
-            let req = ureq::post(server)
+            let req = self.agent.post(server)
                 .set(
                     "User-Agent",
                     "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
                 )
-                .send_string("");
+                .send_string("version=5.07&platform=0&protocol=214");
 
             let res = match req {
                 Ok(res) => res,
