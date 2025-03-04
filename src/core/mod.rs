@@ -351,7 +351,7 @@ impl Bot {
         };
 
         loop {
-            let response = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
+            let response = self.agent.post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
                 .set("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
                 .send_form(&[
                     ("refreshToken", token.as_str()),
