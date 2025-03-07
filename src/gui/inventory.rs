@@ -78,6 +78,12 @@ impl Inventory {
                                                         bot_clone.wear(id as u32);
                                                     });
                                                 }
+                                                if ui.button("Drop All").clicked() {
+                                                    let bot_clone = bot.clone();
+                                                    spawn(move || {
+                                                        bot_clone.drop_item(id as u32, inventory_item.amount as u32);
+                                                    });
+                                                }
                                                 if ui.button("Drop").clicked() {
                                                     let bot_clone = bot.clone();
                                                     spawn(move || {
