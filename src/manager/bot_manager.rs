@@ -31,10 +31,10 @@ impl BotManager {
         let proxy_manager_clone = Arc::clone(&self.proxy_manager);
 
         let new_bot = Bot::new(bot.clone(), items_database_clone, proxy_manager_clone);
-        let newbot_clone = Arc::clone(&new_bot);
+        // let newbot_clone = Arc::clone(&new_bot);
 
         let handle = spawn(move || {
-            newbot_clone.logon(bot.data.clone());
+            // newbot_clone.logon(bot.data.clone());
         });
         self.bots.push((new_bot, handle));
     }
