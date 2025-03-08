@@ -171,10 +171,20 @@ impl BotMenu {
                                                 ui.end_row();
                                                 ui.horizontal_centered(|ui| {
                                                     if ui.button("Connect").clicked() {
-                                                        // TODO
+                                                        if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                                            let bot_clone = bot.clone();
+                                                            thread::spawn(move || {
+                                                                bot_clone.konek();
+                                                            });
+                                                        }
                                                     }
                                                     if ui.button("Disconnect").clicked() {
-                                                        // TODO
+                                                        if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                                            let bot_clone = bot.clone();
+                                                            thread::spawn(move || {
+                                                                bot_clone.diskonek();
+                                                            });
+                                                        }
                                                     }
                                                     if ui.button("Reconnect").clicked() {
                                                         if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
