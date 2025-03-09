@@ -174,7 +174,7 @@ impl BotMenu {
                                                         if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
                                                             let bot_clone = bot.clone();
                                                             thread::spawn(move || {
-                                                                bot_clone.konek();
+                                                                bot_clone.connect_bot();
                                                             });
                                                         }
                                                     }
@@ -182,7 +182,7 @@ impl BotMenu {
                                                         if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
                                                             let bot_clone = bot.clone();
                                                             thread::spawn(move || {
-                                                                bot_clone.diskonek();
+                                                                bot_clone.disconnect_bot();
                                                             });
                                                         }
                                                     }
@@ -190,7 +190,7 @@ impl BotMenu {
                                                         if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
                                                             let bot_clone = bot.clone();
                                                             thread::spawn(move || {
-                                                                bot_clone.relog();
+                                                                bot_clone.reconnect_bot();
                                                             });
                                                         }
                                                     }

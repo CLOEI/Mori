@@ -43,7 +43,6 @@ use crate::{
         random::{self},
     },
 };
-use crate::utils::config::parse_config;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0";
@@ -283,7 +282,7 @@ impl Bot {
         true
     }
 
-    pub fn konek(self: Arc<Self>) {
+    pub fn connect_bot(self: Arc<Self>) {
         let mut state = self.state.lock().expect("Failed to lock state");
         if state.is_running == false {
             self.log_info("Connecting bot");
@@ -296,7 +295,7 @@ impl Bot {
         }
     }
 
-    pub fn diskonek(self: Arc<Self>) {
+    pub fn disconnect_bot(self: Arc<Self>) {
         let mut state = self.state.lock().expect("Failed to lock state");
         if state.is_running == true {
             self.log_info("Disconnecting bot");
@@ -310,7 +309,7 @@ impl Bot {
         }
     }
 
-    pub fn relog(self: Arc<Self>) {
+    pub fn reconnect_bot(self: Arc<Self>) {
         self.log_info("Reconnecting bot");
         {
             let mut state = self.state.lock().expect("Failed to lock state");
