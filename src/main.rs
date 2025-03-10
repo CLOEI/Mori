@@ -14,14 +14,14 @@ use egui::{
 use gui::{
     add_bot_dialog::AddBotDialog, bot_menu::BotMenu, item_database::ItemDatabase, navbar::Navbar,
 };
-use paris::{error, info, warn};
+// use paris::{error, info, warn};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::{
     fs::{self, File},
     io::Write,
 };
-use eframe::{HardwareAcceleration, Renderer};
+// use eframe::{HardwareAcceleration, Renderer};
 use types::config::{Config};
 
 mod core;
@@ -201,7 +201,8 @@ impl eframe::App for App {
                     ui.heading("Mori");
                     ui.separator();
                     self.navbar
-                        .render(ui, &mut self.add_bot_dialog, &self.bot_manager);
+                        .render(ui);
+                        // .render(ui, &mut self.add_bot_dialog, &self.bot_manager);
                 },
             );
 
@@ -251,6 +252,7 @@ impl eframe::App for App {
                 match self.navbar.current_menu.as_str() {
                     "bots" => self.bot_menu.render(
                         &mut content_ui,
+                        &mut self.add_bot_dialog,
                         &self.bot_manager,
                         &self.texture_manager,
                     ),

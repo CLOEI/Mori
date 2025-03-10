@@ -8,13 +8,14 @@ use crate::gui::scripting::Scripting;
 use crate::gui::world_map::WorldMap;
 use crate::texture_manager::TextureManager;
 use crate::core::features::auto_spam::AutoSpam;
-use crate::gui::spam_feature_menu;
+// use crate::gui::spam_feature_menu;
 use crate::gui::players::PlayersScan;
 use crate::{manager::bot_manager::BotManager, types::config::BotConfig, utils};
 use eframe::egui::{self, Ui};
 use egui::scroll_area::ScrollBarVisibility;
 use egui::{Color32, UiBuilder};
 use crate::core::features;
+use crate::gui::add_bot_dialog::AddBotDialog;
 
 #[derive(Default)]
 pub struct BotMenu {
@@ -34,7 +35,7 @@ pub struct BotMenu {
 }
 
 impl BotMenu {
-    pub fn render(&mut self, ui: &mut Ui, manager: &Arc<RwLock<BotManager>>, texture_manager: &Arc<RwLock<TextureManager>>) {
+    pub fn render(&mut self, ui: &mut Ui, add_bot_dialog: &mut AddBotDialog, manager: &Arc<RwLock<BotManager>>, texture_manager: &Arc<RwLock<TextureManager>>) {
         self.bots = utils::config::get_bots();
         self.selected_bot = utils::config::get_selected_bot();
         ui.add_space(4.0);
@@ -53,22 +54,42 @@ impl BotMenu {
                 ui.allocate_ui(
                     egui::vec2(ui.available_width() * 0.18, ui.available_height()),
                     |ui| {
-                        egui::ScrollArea::vertical().id_salt("bot_list").show(ui, |ui| {
-                            ui.vertical(|ui| {
-                                let bots_clone = self.bots.clone();
-                                if bots_clone.is_empty() {
-                                    ui.centered_and_justified(|ui| {
-                                        ui.add_sized([ui.available_width(), 0.0], egui::Label::new("No bots added"));
-                                    });
-                                } else {
-                                    for bot in self.bots.clone() {
-                                        let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
-                                        if ui.add_sized([ui.available_width(), 0.0], egui::Button::new(payload[0].clone()).truncate()).clicked() {
-                                            self.selected_bot = payload[0].clone();
-                                            utils::config::set_selected_bot(self.selected_bot.clone());
+                        ui.vertical(|ui| {
+                            ui.horizontal(|ui| {
+                                if ui.add(
+                                    egui::Button::new(
+                                        egui_phosphor::variants::fill::PLUS.to_owned() + " Add bot"
+                                    )
+                                ).clicked(){
+                                    add_bot_dialog.open = true;
+                                }
+                                if ui.add(
+                                    egui::Button::new(
+                                        egui_phosphor::variants::fill::MINUS.to_owned() + "  Remove bot"
+                                    )
+                                ).clicked(){
+                                    let selected_bot = utils::config::get_selected_bot();
+                                    manager.write().unwrap().remove_bot(&selected_bot);
+                                }
+                            });
+                            ui.separator();
+                            egui::ScrollArea::vertical().id_salt("bot_list").show(ui, |ui| {
+                                ui.vertical(|ui| {
+                                    let bots_clone = self.bots.clone();
+                                    if bots_clone.is_empty() {
+                                        ui.centered_and_justified(|ui| {
+                                            ui.add_sized([ui.available_width(), 0.0], egui::Label::new("No bots added"));
+                                        });
+                                    } else {
+                                        for bot in self.bots.clone() {
+                                            let payload = utils::textparse::parse_and_store_as_vec(&bot.payload);
+                                            if ui.add_sized([ui.available_width(), 0.0], egui::Button::new(payload[0].clone()).truncate()).clicked() {
+                                                self.selected_bot = payload[0].clone();
+                                                utils::config::set_selected_bot(self.selected_bot.clone());
+                                            }
                                         }
                                     }
-                                }
+                                });
                             });
                         });
                     },
@@ -148,6 +169,33 @@ impl BotMenu {
                                                 ui.label("Status");
                                                 ui.add(egui::Label::new(status.to_string()).truncate());
                                                 ui.end_row();
+                                                ui.horizontal_centered(|ui| {
+                                                    if ui.button("Connect").clicked() {
+                                                        if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                                            let bot_clone = bot.clone();
+                                                            thread::spawn(move || {
+                                                                bot_clone.connect_bot();
+                                                            });
+                                                        }
+                                                    }
+                                                    if ui.button("Disconnect").clicked() {
+                                                        if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                                            let bot_clone = bot.clone();
+                                                            thread::spawn(move || {
+                                                                bot_clone.disconnect_bot();
+                                                            });
+                                                        }
+                                                    }
+                                                    if ui.button("Reconnect").clicked() {
+                                                        if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                                            let bot_clone = bot.clone();
+                                                            thread::spawn(move || {
+                                                                bot_clone.reconnect_bot();
+                                                            });
+                                                        }
+                                                    }
+                                                });
+                                                ui.end_row();
                                                 ui.label("Ping");
                                                 ui.label(ping);
                                                 ui.end_row();
@@ -180,14 +228,14 @@ impl BotMenu {
                                                 });
                                             }
                                         }
-                                        if ui.button("Relog").clicked() {
-                                            if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
-                                                let bot_clone = bot.clone();
-                                                thread::spawn(move || {
-                                                    bot_clone.relog();
-                                                });
-                                            }
-                                        }
+                                        // if ui.button("Relog").clicked() {
+                                        //     if let Some(bot) = manager.read().unwrap().get_bot(&self.selected_bot) {
+                                        //         let bot_clone = bot.clone();
+                                        //         thread::spawn(move || {
+                                        //             bot_clone.relog();
+                                        //         });
+                                        //     }
+                                        // }
                                         if ui.button("Leave").clicked() {
                                             let bot_clone = bot.clone();
                                             thread::spawn(move || {

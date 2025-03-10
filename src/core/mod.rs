@@ -282,8 +282,35 @@ impl Bot {
         true
     }
 
-    pub fn relog(self: Arc<Self>) {
-        self.log_info("Relogging core");
+    pub fn connect_bot(self: Arc<Self>) {
+        let mut state = self.state.lock().expect("Failed to lock state");
+        if state.is_running == false {
+            self.log_info("Connecting bot");
+            self.set_status(EStatus::Connecting);
+            state.is_running = true;
+            drop(state);
+            self.process_events();
+        } else {
+            self.log_info("Bot is already connected");
+        }
+    }
+
+    pub fn disconnect_bot(self: Arc<Self>) {
+        let mut state = self.state.lock().expect("Failed to lock state");
+        if state.is_running == true {
+            self.log_info("Disconnecting bot");
+            state.is_running = false;
+            state.is_redirecting = false;
+            self.set_status(EStatus::Disconnected);
+            self.disconnect_now();
+            self.log_info("Bot disconnected");
+        } else {
+            self.log_info("Bot is already disconnected");
+        }
+    }
+
+    pub fn reconnect_bot(self: Arc<Self>) {
+        self.log_info("Reconnecting bot");
         {
             let mut state = self.state.lock().expect("Failed to lock state");
             state.is_running = false;
