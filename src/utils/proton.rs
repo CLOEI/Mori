@@ -65,7 +65,8 @@ pub fn hash_file(file_name: &str) -> io::Result<u32> {
 
     let mut hash: u32 = 0x55555555;
     for byte in buffer {
-        hash = (hash >> 27) + (hash << 5) + (byte as u32);
+        // Use wrapping_add to avoid overflow during addition
+        hash = (hash >> 27).wrapping_add(hash << 5).wrapping_add(byte as u32);
     }
 
     Ok(hash)
