@@ -117,11 +117,23 @@ impl Bot {
                     logging::info(
                         &format!(
                             "Using proxy: {}:{}:{}:{}",
-                            proxy_data.proxy.ip, proxy_data.proxy.port, proxy_username, proxy_password
+                            proxy_data.proxy.ip,
+                            proxy_data.proxy.port,
+                            proxy_username,
+                            proxy_password
                         ),
-                        &sender
+                        &sender,
                     );
-                    agent = agent.proxy(ureq::Proxy::new(format!("socks5://{}:{}@{}:{}", proxy_username, proxy_password, proxy_data.proxy.ip, proxy_data.proxy.port)).unwrap());
+                    agent = agent.proxy(
+                        ureq::Proxy::new(format!(
+                            "socks5://{}:{}@{}:{}",
+                            proxy_username,
+                            proxy_password,
+                            proxy_data.proxy.ip,
+                            proxy_data.proxy.port
+                        ))
+                        .unwrap(),
+                    );
                 }
             }
         }
@@ -452,7 +464,6 @@ impl Bot {
             )
         };
 
-
         let token_result = match method {
             ELoginMethod::GOOGLE => match login::get_google_token(
                 oauth_links.get(1).unwrap_or(&"".to_string()),
@@ -579,12 +590,15 @@ impl Bot {
         };
         self.set_status(EStatus::FetchingServer);
         loop {
-            let req = self.agent.post(server)
+            let req = self
+                .agent
+                .post(server)
                 .set(
                     "User-Agent",
                     "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
                 )
-                .send_string("version=5.11&platform=0&protocol=216");
+                .set("Content-Type", "application/x-www-form-urlencoded")
+                .send_string("version=5.23&platform=0&protocol=216");
 
             let res = match req {
                 Ok(res) => res,
