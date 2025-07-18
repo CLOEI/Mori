@@ -22,6 +22,7 @@ pub enum EStatus {
     TwoFAFailed,
     ParsingServer,
     FetchingServer,
+    FetchingVersion,
     CheckingToken,
     GettingToken,
     GettingOAuth,
@@ -31,7 +32,7 @@ pub enum EStatus {
     Reconnecting,
     Connecting,
     Connected,
-    Banned
+    Banned,
 }
 
 impl Default for EStatus {
@@ -47,6 +48,7 @@ impl EStatus {
             EStatus::TwoFAFailed => "2FA Failed".to_string(),
             EStatus::ParsingServer => "Parsing server".to_string(),
             EStatus::FetchingServer => "Fetching server".to_string(),
+            EStatus::FetchingVersion => "Fetching version".to_string(),
             EStatus::CheckingToken => "Checking token".to_string(),
             EStatus::GettingToken => "Getting token".to_string(),
             EStatus::GettingOAuth => "Getting OAuth".to_string(),

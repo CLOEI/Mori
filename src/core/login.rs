@@ -1,4 +1,5 @@
 use crate::core::Bot;
+use crate::types::bot_info::EStatus;
 use crate::utils;
 use crate::utils::error;
 use base64::engine::general_purpose;
@@ -13,7 +14,6 @@ use std::{env, io, process::Command, time::Duration};
 use ureq::Agent;
 use urlencoding::encode;
 use wait_timeout::ChildExt;
-use crate::types::bot_info::EStatus;
 
 static USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -354,4 +354,27 @@ pub fn extract_token_from_html(body: &str) -> Option<String> {
     regex
         .captures(body)
         .and_then(|cap| cap.get(1).map(|match_| match_.as_str().to_string()))
+}
+
+pub fn scrap_game_version() -> Result<String, ureq::Error> {
+    let agent = ureq::AgentBuilder::new().redirects(0).build();
+    let body = agent
+        .get("https://apps.apple.com/tr/app/growtopia/id590495115")
+        .set("User-Agent", USER_AGENT)
+        .call()?
+        .into_string()?;
+
+    let re = Regex::new(
+        r#"<p[^>]*class="[^"]*whats-new__latest__version[^"]*"[^>]*>\s*Version\s+([0-9.]+)\s*</p>"#,
+    )
+    .unwrap();
+
+    if let Some(cap) = re.captures(&body) {
+        Ok(cap[1].to_string())
+    } else {
+        Err(ureq::Error::Status(
+            500,
+            ureq::Response::new(500, "error", "fetching_game_version_error")?,
+        ))
+    }
 }

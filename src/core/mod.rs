@@ -22,6 +22,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::{thread, time::Duration, vec};
 use urlencoding::encode;
 
+use crate::core::login::scrap_game_version;
 use crate::core::proxy::{SocketType, Socks5UdpSocket};
 use crate::manager::proxy_manager::ProxyManager;
 use crate::types::bot_info::{EStatus, TemporaryData, FTUE};
@@ -582,6 +583,22 @@ impl Bot {
     }
 
     pub fn to_http(&self) {
+        self.log_info("Fetching game version");
+        self.set_status(EStatus::FetchingVersion);
+        let game_version = match scrap_game_version() {
+            Ok(ver) => {
+                self.log_info(&format!("Current Game Version: {}", ver));
+                ver
+            }
+            Err(_) => {
+                self.log_error("Failed fetching version, using fallback version: 5.23");
+                "5.23".to_string()
+            }
+        };
+        {
+            let mut locked_info = self.info.lock().unwrap();
+            locked_info.login_info.game_version = game_version.clone();
+        }
         self.log_info("Fetching server data");
         let server = if config::get_use_alternate_server() {
             "https://www.growtopia2.com/growtopia/server_data.php"
@@ -598,7 +615,7 @@ impl Bot {
                     "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
                 )
                 .set("Content-Type", "application/x-www-form-urlencoded")
-                .send_string("version=5.23&platform=0&protocol=216");
+                .send_string(&format!("version={}&platform=0&protocol=216", game_version));
 
             let res = match req {
                 Ok(res) => res,
