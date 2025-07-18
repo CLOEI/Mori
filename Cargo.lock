@@ -1695,7 +1695,7 @@ dependencies = [
 [[package]]
 name = "gtitem-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtitem-r.git#c4439094c4922a0229ebc35b9b1442b0c6fd6134"
+source = "git+https://github.com/CLOEI/gtitem-r.git#82f9a9641f92072ece124f33fd8c40fd65c8eab5"
 dependencies = [
  "byteorder",
 ]
