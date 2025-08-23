@@ -3,10 +3,9 @@ name: Build and Release
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
-  release:
-    types: [ published ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -76,15 +75,38 @@ jobs:
         name: ${{ matrix.asset_name }}
         path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
 
-    - name: Upload release assets
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          artifacts/mori-linux-x86_64/Mori
+          artifacts/mori-windows-x86_64.exe/Mori.exe
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        body: |
+          ## Release ${{ github.ref_name }}
+          
+          Cross-platform Growtopia companion built from commit ${{ github.sha }}.
+          
+          ### Downloads
+          - **Linux x86_64**: `Mori` 
+          - **Windows x86_64**: `Mori.exe`
+          
+          For installation and usage instructions, see the [README](https://github.com/CLOEI/Mori/blob/main/README.md).
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
-        asset_name: ${{ matrix.asset_name }}
-        asset_content_type: application/octet-stream
 
 
