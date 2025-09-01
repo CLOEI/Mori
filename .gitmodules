@@ -1,0 +1,3 @@
+[submodule "godot/assets"]
+	path = godot/assets
+	url = https://github.com/CLOEI/gt-data.git
