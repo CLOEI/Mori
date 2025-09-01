@@ -108,4 +108,3 @@ offset_bottom = -18.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_font_sizes/font_size = 8
-text = "John Doe"

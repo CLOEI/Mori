@@ -6,3 +6,177 @@
 
 [node name="TileMapLayer" type="TileMapLayer" parent="."]
 tile_set = ExtResource("1_ig7tw")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="AddBotButton" type="Button" parent="CanvasLayer"]
+offset_right = 8.0
+offset_bottom = 8.0
+text = "+ Add Bot"
+
+[node name="BotList" type="Panel" parent="CanvasLayer"]
+offset_top = 35.0
+offset_right = 136.0
+offset_bottom = 178.0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CanvasLayer/BotList"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 30.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Bots" type="VBoxContainer" parent="CanvasLayer/BotList/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer/BotList"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 25.0
+grow_horizontal = 2
+color = Color(0.266575, 0.266575, 0.266575, 1)
+
+[node name="Label" type="Label" parent="CanvasLayer/BotList"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -20.0
+offset_right = 20.0
+offset_bottom = 23.0
+grow_horizontal = 2
+text = "List"
+
+[node name="Console" type="Panel" parent="CanvasLayer"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -203.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="ConsoleDragHandle" type="ColorRect" parent="CanvasLayer/Console"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = -26.0
+grow_horizontal = 2
+color = Color(0.266667, 0.266667, 0.266667, 1)
+
+[node name="Label" type="Label" parent="CanvasLayer/Console/ConsoleDragHandle"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -31.0
+offset_right = 31.0
+offset_bottom = 23.0
+grow_horizontal = 2
+text = "Console"
+
+[node name="InventoryButton" type="Button" parent="CanvasLayer"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -8.0
+offset_bottom = 8.0
+grow_horizontal = 0
+text = "Inventory"
+
+[node name="CodeButton" type="Button" parent="CanvasLayer"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -48.0
+offset_top = 33.0
+offset_bottom = 64.0
+grow_horizontal = 0
+text = "Code"
+
+[node name="AddBotDialog" type="ColorRect" parent="CanvasLayer"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -241.0
+offset_top = -62.0
+offset_right = 241.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.266667, 0.266667, 0.266667, 1)
+
+[node name="Button" type="Button" parent="CanvasLayer/AddBotDialog"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -18.0
+offset_bottom = 31.0
+grow_horizontal = 0
+text = "X"
+
+[node name="Label" type="Label" parent="CanvasLayer/AddBotDialog"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -35.5
+offset_right = 35.5
+offset_bottom = 23.0
+grow_horizontal = 2
+text = "ADD BOT"
+
+[node name="Button2" type="Button" parent="CanvasLayer/AddBotDialog"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -239.0
+offset_top = -51.0
+grow_horizontal = 0
+grow_vertical = 0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+text = "Login"
+
+[node name="GridContainer" type="GridContainer" parent="CanvasLayer/AddBotDialog"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 38.0
+offset_bottom = 122.0
+grow_horizontal = 2
+rotation = -0.000370686
+columns = 2
+
+[node name="UsernameLabel" type="Label" parent="CanvasLayer/AddBotDialog/GridContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Username"
+
+[node name="UsernameInput" type="TextEdit" parent="CanvasLayer/AddBotDialog/GridContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="PasswordLabel" type="Label" parent="CanvasLayer/AddBotDialog/GridContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 6
+text = "Password"
+
+[node name="PasswordInput" type="TextEdit" parent="CanvasLayer/AddBotDialog/GridContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3

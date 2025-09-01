@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="Mori"
+run/main_scene="uid://cqkwbad80fd1v"
 config/features=PackedStringArray("4.4", "Mobile")
 
 [rendering]
