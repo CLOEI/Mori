@@ -1,6 +1,7 @@
-use std::{mem, ptr};
+use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::Cursor;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum NetGamePacket {
     State,
@@ -52,8 +53,7 @@ pub enum NetGamePacket {
     OnStepTileMod,
 }
 
-#[derive(Default)]
-#[repr(packed, C)]
+#[derive(Default, Debug)]
 pub struct NetGamePacketData {
     pub _type: NetGamePacket,
     pub object_type: u8,
@@ -75,16 +75,71 @@ pub struct NetGamePacketData {
 }
 
 impl NetGamePacketData {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut wtr = vec![];
+        wtr.push(self._type.clone() as u8);
+        wtr.push(self.object_type);
+        wtr.push(self.jump_count);
+        wtr.push(self.animation_type);
+        wtr.extend(&self.net_id.to_le_bytes());
+        wtr.extend(&self.target_net_id.to_le_bytes());
+        wtr.extend(&self.flags.to_le_bytes());
+        wtr.extend(&self.float_variable.to_le_bytes());
+        wtr.extend(&self.value.to_le_bytes());
+        wtr.extend(&self.vector_x.to_le_bytes());
+        wtr.extend(&self.vector_y.to_le_bytes());
+        wtr.extend(&self.vector_x2.to_le_bytes());
+        wtr.extend(&self.vector_y2.to_le_bytes());
+        wtr.extend(&self.particle_rotation.to_le_bytes());
+        wtr.extend(&self.int_x.to_le_bytes());
+        wtr.extend(&self.int_y.to_le_bytes());
+        wtr.extend(&self.extended_data_length.to_le_bytes());
+        wtr
+    }
+    
     pub fn from_bytes(data: &[u8]) -> Option<Self> {
-        if data.len() < mem::size_of::<Self>() {
+        let mut rdr = Cursor::new(data);
+        if data.len() < std::mem::size_of::<NetGamePacketData>() {
             return None;
         }
 
-        // TODO: do not use unsafe
-        unsafe {
-            let pointer = data.as_ptr() as *const Self;
-            Some(ptr::read_unaligned(pointer))
-        }
+        let _type = rdr.read_u8().ok().map(NetGamePacket::from)?;
+        let object_type = rdr.read_u8().ok()?;
+        let jump_count = rdr.read_u8().ok()?;
+        let animation_type = rdr.read_u8().ok()?;
+        let net_id = rdr.read_u32::<LittleEndian>().ok()?;
+        let target_net_id = rdr.read_u32::<LittleEndian>().ok()?;
+        let flags = rdr.read_u32::<LittleEndian>().ok()?;
+        let float_variable = rdr.read_f32::<LittleEndian>().ok()?;
+        let value = rdr.read_u32::<LittleEndian>().ok()?;
+        let vector_x = rdr.read_f32::<LittleEndian>().ok()?;
+        let vector_y = rdr.read_f32::<LittleEndian>().ok()?;
+        let vector_x2 = rdr.read_f32::<LittleEndian>().ok()?;
+        let vector_y2 = rdr.read_f32::<LittleEndian>().ok()?;
+        let particle_rotation = rdr.read_f32::<LittleEndian>().ok()?;
+        let int_x = rdr.read_i32::<LittleEndian>().ok()?;
+        let int_y = rdr.read_i32::<LittleEndian>().ok()?;
+        let extended_data_length = rdr.read_u32::<LittleEndian>().ok()?;
+
+        Some(NetGamePacketData {
+            _type,
+            object_type,
+            jump_count,
+            animation_type,
+            net_id,
+            target_net_id,
+            flags,
+            float_variable,
+            value,
+            vector_x,
+            vector_y,
+            vector_x2,
+            vector_y2,
+            particle_rotation,
+            int_x,
+            int_y,
+            extended_data_length,
+        })
     }
 }
 

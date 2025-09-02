@@ -1,8 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::FromStr;
 use std::sync::{Mutex, RwLock};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use rusty_enet::Packet;
 use crate::types::bot::{Info, State};
 use crate::types::login_info::LoginInfo;
@@ -19,10 +18,14 @@ pub struct Bot {
     pub host: Mutex<rusty_enet::Host<UdpSocket>>,
     pub peer_id: Mutex<Option<rusty_enet::PeerID>>,
     pub info: Info,
-    pub state: State,
+    pub state: Mutex<State>,
     pub position: RwLock<(f32, f32)>,
     pub logs: RwLock<Vec<String>>,
     pub duration: Mutex<Instant>,
+    pub net_id: Mutex<u32>,
+    pub is_running: Mutex<bool>,
+    pub is_redirecting: Mutex<bool>,
+    pub is_inworld: Mutex<bool>,
 }
 
 impl Bot {
@@ -51,13 +54,13 @@ impl Bot {
                 dashboard_links: Mutex::new(None),
             },
             position: RwLock::new((0.0, 0.0)),
-            state: State {
-                is_running: Mutex::new(true),
-                is_redirecting: Mutex::new(false),
-                hack_type: Mutex::new(0),
-            },
+            state: Mutex::new(State::default()),
             logs: RwLock::new(Vec::new()),
             duration: Mutex::new(Instant::now()),
+            net_id: Mutex::new(0),
+            is_running: Mutex::new(true),
+            is_redirecting: Mutex::new(false),
+            is_inworld: Mutex::new(false),
         }
     }
 
@@ -72,7 +75,7 @@ impl Bot {
     }
 
     pub fn connect_to_server(&self) {
-        if !*self.state.is_redirecting.lock().unwrap() {
+        if !*self.is_redirecting.lock().unwrap() {
             {
                 let mut login_info = self.info.login_info.lock().unwrap();
                 let info_data = login_info.as_mut().expect("Login info not set");
@@ -203,7 +206,7 @@ impl Bot {
 
     fn process_event(&self) {
         let is_running = {
-            let running = self.state.is_running.lock().unwrap();
+            let running = self.is_running.lock().unwrap();
             *running
         };
 

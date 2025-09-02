@@ -4,10 +4,13 @@ use crate::server::DashboardLinks;
 use crate::types::login_info::LoginInfo;
 use crate::types::server_data::ServerData;
 
+#[derive(Debug, Default)]
 pub struct State {
-    pub is_running: Mutex<bool>,
-    pub is_redirecting: Mutex<bool>,
-    pub hack_type: Mutex<u32>
+    pub hack_type: u32,
+    pub build_length: u8,
+    pub punch_length: u8,
+    pub velocity: f32,
+    pub gravity: f32,
 }
 
 pub struct Info {

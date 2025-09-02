@@ -11,8 +11,8 @@ pub fn handle(bot: &Bot, data: &[u8]) {
     match packet_type {
         NetMessage::ServerHello => {
             let is_redirecting = {
-                let state = bot.state.is_redirecting.lock().unwrap();
-                *state
+                let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
+                *is_redirecting_lock
             };
 
             let login_info_lock = &bot.info.login_info.lock().unwrap();
@@ -58,8 +58,8 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 );
 
                 {
-                    let mut redirecting = bot.state.is_redirecting.lock().unwrap();
-                    *redirecting = false;
+                    let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
+                    *is_redirecting_lock = false;
                 }
 
             } else {
@@ -75,6 +75,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
         NetMessage::GameMessage => {
             let message = String::from_utf8_lossy(&data[4..]).to_string();
             println!("GameMessage: {}", message);
+
+            if message.contains("logon_fail") {
+                bot.disconnect()
+            }
         },
         NetMessage::GamePacket => {
             let parsed = NetGamePacketData::from_bytes(&data[4..]).expect("Failed to parse NetGamePacketData");
@@ -83,10 +87,23 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 NetGamePacket::CallFunction => {
                     variant_handler::handle(bot, &data[60..]);
                 }
+                NetGamePacket::SendMapData => {
+                    let mut is_inworld_lock = bot.is_inworld.lock().unwrap();
+                    *is_inworld_lock = true;
+                }
                 NetGamePacket::SetCharacterState => {
-                    let value = parsed.value;
-                    let mut hack_type_lock = bot.state.hack_type.lock().unwrap();
-                    *hack_type_lock = value;
+                    let hack_type = parsed.value;
+                    let build_length = parsed.jump_count - 126;
+                    let punch_length = parsed.animation_type - 126;
+                    let gravity = parsed.vector_x2;
+                    let velocity = parsed.vector_y2;
+
+                    let mut state_lock = bot.state.lock().unwrap();
+                    state_lock.hack_type = hack_type;
+                    state_lock.build_length = build_length;
+                    state_lock.punch_length = punch_length;
+                    state_lock.velocity = velocity;
+                    state_lock.gravity = gravity;
                 }
                 NetGamePacket::PingRequest => {
                     let elapsed = {
@@ -96,20 +113,33 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     };
 
                     let value = parsed.value;
-                    let hack_type = {
-                        let hack_type_lock = bot.state.hack_type.lock().unwrap();
-                        *hack_type_lock
+                    let (hack_type, build_length, punch_length, gravity, velocity) = {
+                        let state_lock = bot.state.lock().unwrap();
+                        (state_lock.hack_type, state_lock.build_length, state_lock.punch_length, state_lock.gravity, state_lock.velocity)
                     };
 
-                    let data = NetGamePacketData {
+                    let mut data = NetGamePacketData {
                         _type: NetGamePacket::PingReply,
                         target_net_id: utils::proton::hash(value.to_string().as_bytes(), HashMode::NullTerminated) as u32,
                         value: elapsed,
-                        vector_x: 2f32 * 32f32,
-                        vector_y: 2f32 * 32f32,
-                        animation_type: hack_type as u8,
+                        vector_x: (build_length as f32) * 32f32,
+                        vector_y: (punch_length as f32) * 32f32,
                         ..Default::default()
                     };
+
+                    let (in_world, net_id) = {
+                        let state = bot.is_inworld.lock().unwrap();
+                        let net_id = bot.net_id.lock().unwrap();
+                        ( *state, *net_id )
+                    };
+
+                    if in_world {
+                        data.net_id = net_id;
+                        data.vector_x2 = gravity;
+                        data.vector_y2 = velocity;
+                    }
+
+                    bot.send_packet(NetMessage::GamePacket, &data.to_bytes(), None, true);
                 }
                 _ => {}
             }
