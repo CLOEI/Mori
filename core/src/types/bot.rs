@@ -11,7 +11,6 @@ pub struct State {
 pub struct Info {
     pub payload: Vec<String>,
     pub login_method: ELoginMethod,
-    pub token: Mutex<Option<String>>,
     pub login_info: Mutex<Option<LoginInfo>>,
     pub server_data: Mutex<Option<ServerData>>,
     pub dashboard_links: Mutex<Option<DashboardLinks>>,

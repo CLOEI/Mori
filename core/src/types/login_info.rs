@@ -21,7 +21,7 @@ pub struct LoginInfo {
     pub hash: String,
     pub category: String,
     pub token: String,
-    pub total_playtime: String,
+    pub total_play_time: String,
     pub door_id: String,
     pub klv: String,
     pub meta: String,
@@ -32,6 +32,7 @@ pub struct LoginInfo {
     pub user: String,
     pub wk: String,
     pub aat: String,
+    pub ltoken: String,
 }
 
 impl LoginInfo {
@@ -56,7 +57,7 @@ impl LoginInfo {
             hash: "0".to_string(),
             category: "_-5100".to_string(),
             token: String::new(),
-            total_playtime: "0".to_string(),
+            total_play_time: "0".to_string(),
             door_id: String::new(),
             klv: String::new(),
             meta: String::new(),
@@ -67,6 +68,7 @@ impl LoginInfo {
             user: String::new(),
             wk: utils::random::hex(32, true),
             aat: "0".to_string(),
+            ltoken: "" .to_string(),
         };
 
         login_info.klv = utils::proton::generate_klv(&login_info.protocol, &login_info.game_version, &login_info.rid);
@@ -90,7 +92,7 @@ impl LoginInfo {
             self.player_age,
             self.gdpr,
             self.category,
-            self.total_playtime,
+            self.total_play_time,
             self.klv,
             self.hash2,
             self.meta,

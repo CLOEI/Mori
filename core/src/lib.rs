@@ -1,13 +1,18 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::FromStr;
 use std::sync::{Mutex, RwLock};
+use std::thread;
+use std::time::Duration;
 use crate::types::bot::{Info, State};
 use crate::types::login_info::LoginInfo;
+use crate::types::net_message::NetMessage;
 
 mod server;
 mod types;
 mod utils;
 mod login;
+mod packet_handler;
+mod variant_handler;
 
 pub struct Bot {
     pub host: Mutex<rusty_enet::Host<UdpSocket>>,
@@ -39,14 +44,13 @@ impl Bot {
             info: Info {
                 payload,
                 login_method: types::bot::ELoginMethod::default(),
-                token: Mutex::new(None),
                 login_info: Mutex::new(None),
                 server_data: Mutex::new(None),
                 dashboard_links: Mutex::new(None),
             },
             position: RwLock::new((0.0, 0.0)),
             state: State {
-                is_running: Mutex::new(false),
+                is_running: Mutex::new(true),
                 is_redirecting: Mutex::new(false),
             },
             logs: RwLock::new(Vec::new()),
@@ -64,9 +68,7 @@ impl Bot {
     }
 
     pub fn connect_to_server(&self) {
-        if *self.state.is_redirecting.lock().unwrap() {
-            todo!("Handle redirection logic");
-        } else {
+        if !*self.state.is_redirecting.lock().unwrap() {
             {
                 let mut login_info = self.info.login_info.lock().unwrap();
                 let info_data = login_info.as_mut().expect("Login info not set");
@@ -118,38 +120,77 @@ impl Bot {
             }
         };
 
-        let mut token_lock = self.info.token.lock().unwrap();
-        *token_lock = Some(token);
+        let mut login_info_lock = self.info.login_info.lock().unwrap();
+        let login_info = login_info_lock.as_mut().expect("Login info not set");
+        login_info.ltoken = token.clone();
     }
 
-    fn process_event(&self) {
-        self.connect_to_server();
+    pub fn send_packet(&self, packet_type: NetMessage, message: String) {
+        let mut packet_data = Vec::new();
+        packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
+        packet_data.extend_from_slice(message.as_bytes());
+        let pkt = rusty_enet::Packet::reliable(packet_data.as_slice());
 
-        loop {
-            let event = {
-                let mut host = self.host.lock().unwrap();
-                let event = host.service();
-                event.ok().flatten().map(|e| e.no_ref())
-            };
-
-            if let Some(event) = event {
-                match event {
-                    rusty_enet::EventNoRef::Connect { peer, .. } => {
-                        println!("Connected to server");
+        if let Ok(peer_id) = self.peer_id.lock() {
+            if let Some(peer_id) = *peer_id {
+                if let Ok(mut host) = self.host.lock() {
+                    let peer = host.peer_mut(peer_id);
+                    if let Err(err) = peer.send(0, &pkt) {
+                        println!("Failed to send packet: {}", err);
                     }
-                    _ => {}
                 }
             }
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_bot_logon() {
-        let bot = Bot::new(vec!["".to_string(), "".to_string()]);
-        bot.logon(None);
+    fn disconnect(&self) {
+        let peer_id = self.peer_id.lock().unwrap().clone();
+        if let Some(peer_id) = peer_id {
+            if let Ok(mut host) = self.host.lock() {
+                let peer = host.peer_mut(peer_id);
+                peer.disconnect(0);
+            }
+        }
+    }
+
+    fn process_event(&self) {
+        let is_running = {
+            let running = self.state.is_running.lock().unwrap();
+            *running
+        };
+
+        while is_running {
+            self.connect_to_server();
+
+            loop {
+                let event = {
+                    let mut host = self.host.lock().unwrap();
+                    let event = host.service();
+                    event.ok().flatten().map(|e| e.no_ref())
+                };
+
+                if let Some(event) = event {
+                    match event {
+                        rusty_enet::EventNoRef::Connect { peer, .. } => {
+                            println!("Connected to server");
+                            let mut peer_id_lock = self.peer_id.lock().unwrap();
+                            *peer_id_lock = Some(peer);
+                        }
+                        rusty_enet::EventNoRef::Receive { peer, channel_id, packet } => {
+                            let data = packet.data();
+                            if data.len() < 4 {
+                                continue;
+                            }
+                            packet_handler::handle(self, data);
+                        }
+                        rusty_enet::EventNoRef::Disconnect { peer, data } => {
+                            println!("Disconnected from server");
+                            break;
+                        }
+                    }
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+        }
     }
 }
