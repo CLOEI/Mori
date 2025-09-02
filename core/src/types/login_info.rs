@@ -1,4 +1,5 @@
 use crate::utils;
+use crate::utils::proton::HashMode;
 
 #[derive(Debug, Default)]
 pub struct LoginInfo {
@@ -72,8 +73,8 @@ impl LoginInfo {
         };
 
         login_info.klv = utils::proton::generate_klv(&login_info.protocol, &login_info.game_version, &login_info.rid);
-        login_info.hash = utils::proton::hash_string(&format!("{}RT", login_info.mac)).to_string();
-        login_info.hash2 = utils::proton::hash_string(&format!("{}RT", utils::random::hex(16, true))).to_string();
+        login_info.hash = utils::proton::hash(&format!("{}RT", login_info.mac).as_bytes(), HashMode::NullTerminated).to_string();
+        login_info.hash2 = utils::proton::hash(&format!("{}RT", utils::random::hex(16, true)).as_bytes(), HashMode::NullTerminated).to_string();
         
         login_info
     }

@@ -44,32 +44,6 @@ pub fn hash_md5(input: &str) -> String {
     let hasher = md5::compute(input);
     hex::encode(hasher.as_ref() as &[u8])}
 
-pub fn hash_string(input: &str) -> u32 {
-    if input.is_empty() {
-        return 0;
-    }
-
-    let mut acc: u32 = 0x55555555;
-    for byte in input.as_bytes() {
-        acc = (acc >> 27) + (acc << 5) + (*byte as u32);
-    }
-    acc
-}
-
-pub fn hash_file(file_name: &str) -> io::Result<u32> {
-    let mut file = File::open(file_name)?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)?;
-
-    let mut hash: u32 = 0x55555555;
-    for byte in buffer {
-        // Use wrapping_add to avoid overflow during addition
-        hash = (hash >> 27).wrapping_add(hash << 5).wrapping_add(byte as u32);
-    }
-
-    Ok(hash)
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum HashMode {
     FixedLength(i32),
