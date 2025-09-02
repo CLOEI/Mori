@@ -120,7 +120,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
 
                     let mut data = NetGamePacketData {
                         _type: NetGamePacket::PingReply,
-                        target_net_id: utils::proton::hash(value.to_string().as_bytes(), HashMode::NullTerminated) as u32,
+                        target_net_id: utils::proton::hash(value.to_string().as_bytes(), HashMode::NullTerminated) as i32,
                         value: elapsed,
                         vector_x: (build_length as f32) * 32f32,
                         vector_y: (punch_length as f32) * 32f32,

@@ -60,7 +60,7 @@ pub struct NetGamePacketData {
     pub jump_count: u8,
     pub animation_type: u8,
     pub net_id: u32,
-    pub target_net_id: u32,
+    pub target_net_id: i32,
     pub flags: u32,
     pub float_variable: f32,
     pub value: u32,
@@ -96,7 +96,7 @@ impl NetGamePacketData {
         wtr.extend(&self.extended_data_length.to_le_bytes());
         wtr
     }
-    
+
     pub fn from_bytes(data: &[u8]) -> Option<Self> {
         let mut rdr = Cursor::new(data);
         if data.len() < std::mem::size_of::<NetGamePacketData>() {
@@ -108,7 +108,7 @@ impl NetGamePacketData {
         let jump_count = rdr.read_u8().ok()?;
         let animation_type = rdr.read_u8().ok()?;
         let net_id = rdr.read_u32::<LittleEndian>().ok()?;
-        let target_net_id = rdr.read_u32::<LittleEndian>().ok()?;
+        let target_net_id = rdr.read_i32::<LittleEndian>().ok()?;
         let flags = rdr.read_u32::<LittleEndian>().ok()?;
         let float_variable = rdr.read_f32::<LittleEndian>().ok()?;
         let value = rdr.read_u32::<LittleEndian>().ok()?;
