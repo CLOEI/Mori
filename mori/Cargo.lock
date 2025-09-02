@@ -422,6 +422,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "byteorder",
+ "gtitem-r",
+ "gtworld-r",
  "hex",
  "md5",
  "rand 0.9.2",
@@ -432,6 +434,23 @@ dependencies = [
  "sha2",
  "ureq",
  "urlencoding",
+]
+
+[[package]]
+name = "gtitem-r"
+version = "0.1.0"
+source = "git+https://github.com/CLOEI/gtitem-r.git#82f9a9641f92072ece124f33fd8c40fd65c8eab5"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
+name = "gtworld-r"
+version = "0.1.0"
+source = "git+https://github.com/CLOEI/gtworld-r.git#f2628cf72094f68cffb432a6d07dbe30f4204abc"
+dependencies = [
+ "byteorder",
+ "gtitem-r",
 ]
 
 [[package]]

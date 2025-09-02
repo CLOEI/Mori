@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+rusty_enet = { git = "https://github.com/CLOEI/rusty_enet.git" }
+gtitem-r = { git = "https://github.com/CLOEI/gtitem-r.git" }
+gtworld-r = { git = "https://github.com/CLOEI/gtworld-r.git" }
 ureq = { version = "3.1.0", features = ["cookies"]}
 rand = "0.9.2"
 urlencoding = "2.1.3"
@@ -12,7 +15,6 @@ hex = "0.4.3"
 md5 = "0.8.0"
 anyhow = "1.0.99"
 scraper = "0.24.0"
-rusty_enet = { git = "https://github.com/CLOEI/rusty_enet.git" }
 serde_json = "1.0.143"
 regex = "1.11.2"
 byteorder = "1.5.0"

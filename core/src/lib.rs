@@ -2,7 +2,8 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::FromStr;
 use std::sync::{Mutex, RwLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use rusty_enet::Packet;
 use crate::types::bot::{Info, State};
 use crate::types::login_info::LoginInfo;
 use crate::types::net_message::NetMessage;
@@ -21,6 +22,7 @@ pub struct Bot {
     pub state: State,
     pub position: RwLock<(f32, f32)>,
     pub logs: RwLock<Vec<String>>,
+    pub duration: Mutex<Instant>,
 }
 
 impl Bot {
@@ -52,8 +54,10 @@ impl Bot {
             state: State {
                 is_running: Mutex::new(true),
                 is_redirecting: Mutex::new(false),
+                hack_type: Mutex::new(0),
             },
             logs: RwLock::new(Vec::new()),
+            duration: Mutex::new(Instant::now()),
         }
     }
 
@@ -125,24 +129,68 @@ impl Bot {
         login_info.ltoken = token.clone();
     }
 
-    pub fn send_packet(&self, packet_type: NetMessage, message: String) {
-        let mut packet_data = Vec::new();
-        packet_data.extend_from_slice(&(packet_type as u32).to_le_bytes());
-        packet_data.extend_from_slice(message.as_bytes());
-        let pkt = rusty_enet::Packet::reliable(packet_data.as_slice());
+    pub fn send_packet(
+        &self,
+        packet_type: NetMessage,
+        packet_data: &[u8],
+        extended_data: Option<&[u8]>,
+        reliable: bool,
+    ) {
+        const MAX_PACKET_SIZE: usize = 1_000_000;
 
-        if let Ok(peer_id) = self.peer_id.lock() {
-            if let Some(peer_id) = *peer_id {
-                if let Ok(mut host) = self.host.lock() {
-                    let peer = host.peer_mut(peer_id);
-                    if let Err(err) = peer.send(0, &pkt) {
-                        println!("Failed to send packet: {}", err);
-                    }
+        if packet_data.len() > MAX_PACKET_SIZE {
+            println!("Error: Attempted to send huge packet of size {}", packet_data.len());
+            return;
+        }
+
+        let mut final_payload = Vec::new();
+        let mut is_special_case = false;
+
+        if let NetMessage::GamePacket = packet_type {
+            if packet_data.len() >= 16 {
+                let flags_bytes: [u8; 4] = packet_data[12..16].try_into().expect("Slice with incorrect length");
+                let flags = u32::from_le_bytes(flags_bytes);
+
+                if (flags & 8) != 0 {
+                    is_special_case = true;
                 }
             }
         }
-    }
 
+        final_payload.extend_from_slice(&(packet_type as u32).to_le_bytes());
+        final_payload.extend_from_slice(packet_data);
+
+        if is_special_case {
+            if let Some(ext_data) = extended_data {
+                if packet_data.len() >= 56 {
+                    let len_bytes: [u8; 4] = packet_data[52..56].try_into().expect("Slice with incorrect length");
+                    let extended_len = u32::from_le_bytes(len_bytes) as usize;
+
+                    final_payload.extend_from_slice(&ext_data[..extended_len]);
+                }
+            }
+        }
+
+        let enet_packet = if reliable {
+            Packet::reliable(final_payload)
+        } else {
+            Packet::unreliable(final_payload)
+        };
+
+        let peer_id_guard = self.peer_id.lock().expect("Failed to lock peer_id");
+        let Some(peer_id) = *peer_id_guard else {
+            println!("Cannot send packet: No active peer connection.");
+            return;
+        };
+
+        let mut host_guard = self.host.lock().expect("Failed to lock host");
+        let peer = host_guard.peer_mut(peer_id);
+
+        if let Err(err) = peer.send(0, &enet_packet) {
+            println!("Failed to send packet: {}", err);
+        }
+    }
+    
     fn disconnect(&self) {
         let peer_id = self.peer_id.lock().unwrap().clone();
         if let Some(peer_id) = peer_id {
@@ -189,7 +237,6 @@ impl Bot {
                         }
                     }
                 }
-                thread::sleep(Duration::from_millis(100));
             }
         }
     }

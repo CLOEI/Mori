@@ -69,3 +69,36 @@ pub fn hash_file(file_name: &str) -> io::Result<u32> {
 
     Ok(hash)
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum HashMode {
+    FixedLength(i32),
+    NullTerminated,
+}
+
+pub fn hash(data: &[u8], mode: HashMode) -> i64 {
+    let mut hash: i64 = 0x55555555;
+
+    match mode {
+        HashMode::FixedLength(length) => {
+            if length > 0 {
+                let len = (length as usize).min(data.len());
+                for i in 0..len {
+                    let byte_val = data[i] as i64;
+                    hash = byte_val + ((hash as u32) >> 27) as i64 + (hash << 5);
+                }
+            }
+        }
+        HashMode::NullTerminated => {
+            for &byte in data {
+                if byte == 0 {
+                    break;
+                }
+                let byte_val = byte as i64;
+                hash = byte_val + ((hash as u32) >> 27) as i64 + (hash << 5);
+            }
+        }
+    }
+
+    hash
+}

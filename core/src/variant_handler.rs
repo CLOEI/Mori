@@ -6,6 +6,8 @@ pub fn handle(bot: &Bot, data: &[u8]) {
     let variant = VariantList::deserialize(&data).expect("Failed to deserialize variant list");
     let function_call: String = variant.get(0).unwrap().as_string();
 
+    println!("Function call: {}", function_call);
+
     match function_call.as_str() {
         "OnSendToServer" => {
             let port = variant.get(1).unwrap().as_int32();
@@ -36,7 +38,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             bot.disconnect()
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
-            bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string());
+            bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
             let mut is_redirecting_lock = bot.state.is_redirecting.lock().unwrap();
             *is_redirecting_lock = false;
         }

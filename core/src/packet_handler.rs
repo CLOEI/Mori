@@ -1,7 +1,8 @@
 use byteorder::{ByteOrder, LittleEndian};
-use crate::{variant_handler, Bot};
+use crate::{utils, variant_handler, Bot};
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
+use crate::utils::proton::HashMode;
 
 pub fn handle(bot: &Bot, data: &[u8]) {
     let packet_id = LittleEndian::read_u32(&data[0..4]);
@@ -69,7 +70,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     login_info.platform_id
                 );
             }
-            bot.send_packet(NetMessage::GenericText, data);
+            bot.send_packet(NetMessage::GenericText, data.as_bytes(), None, true);
         },
         NetMessage::GameMessage => {
             let message = String::from_utf8_lossy(&data[4..]).to_string();
@@ -81,6 +82,34 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             match parsed._type {
                 NetGamePacket::CallFunction => {
                     variant_handler::handle(bot, &data[60..]);
+                }
+                NetGamePacket::SetCharacterState => {
+                    let value = parsed.value;
+                    let mut hack_type_lock = bot.state.hack_type.lock().unwrap();
+                    *hack_type_lock = value;
+                }
+                NetGamePacket::PingRequest => {
+                    let elapsed = {
+                        let duration_lock = bot.duration.lock().unwrap();
+                        let duration = duration_lock.elapsed();
+                        duration.as_millis() as u32
+                    };
+
+                    let value = parsed.value;
+                    let hack_type = {
+                        let hack_type_lock = bot.state.hack_type.lock().unwrap();
+                        *hack_type_lock
+                    };
+
+                    let data = NetGamePacketData {
+                        _type: NetGamePacket::PingReply,
+                        target_net_id: utils::proton::hash(value.to_string().as_bytes(), HashMode::NullTerminated) as u32,
+                        value: elapsed,
+                        vector_x: 2f32 * 32f32,
+                        vector_y: 2f32 * 32f32,
+                        animation_type: hack_type as u8,
+                        ..Default::default()
+                    };
                 }
                 _ => {}
             }

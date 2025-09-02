@@ -1,4 +1,5 @@
 use std::sync::Mutex;
+use std::time::Duration;
 use crate::server::DashboardLinks;
 use crate::types::login_info::LoginInfo;
 use crate::types::server_data::ServerData;
@@ -6,6 +7,7 @@ use crate::types::server_data::ServerData;
 pub struct State {
     pub is_running: Mutex<bool>,
     pub is_redirecting: Mutex<bool>,
+    pub hack_type: Mutex<u32>
 }
 
 pub struct Info {
