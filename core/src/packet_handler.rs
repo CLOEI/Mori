@@ -134,6 +134,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     };
 
                     if in_world {
+                        if (hack_type > 0) {
+                            data.animation_type = hack_type as u8;
+                        }
+
                         data.net_id = net_id;
                         data.vector_x2 = gravity;
                         data.vector_y2 = velocity;
