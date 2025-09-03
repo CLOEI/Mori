@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::sync::{Mutex, RwLock};
 use std::time::Instant;
 use rusty_enet::Packet;
+use crate::server::DashboardLinks;
 use crate::types::bot::{Info, State};
 use crate::types::login_info::LoginInfo;
 use crate::types::net_message::NetMessage;
@@ -13,6 +14,8 @@ mod utils;
 mod login;
 mod packet_handler;
 mod variant_handler;
+
+type TokenFetcher = Box<dyn Fn(String) -> String + Send + Sync>;
 
 pub struct Bot {
     pub host: Mutex<rusty_enet::Host<UdpSocket>>,
@@ -26,10 +29,11 @@ pub struct Bot {
     pub is_running: Mutex<bool>,
     pub is_redirecting: Mutex<bool>,
     pub is_inworld: Mutex<bool>,
+    pub token_fetcher: Option<TokenFetcher>,
 }
 
 impl Bot {
-    pub fn new(payload: Vec<String>) -> Self {
+    pub fn new(payload: Vec<String>, token_fetcher: Option<TokenFetcher>) -> Self {
         let socket = UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
         let host = rusty_enet::Host::<UdpSocket>::new(
             socket,
@@ -48,7 +52,7 @@ impl Bot {
             peer_id: Mutex::new(None),
             info: Info {
                 payload,
-                login_method: types::bot::ELoginMethod::default(),
+                login_method: types::bot::ELoginMethod::GOOGLE,
                 login_info: Mutex::new(None),
                 server_data: Mutex::new(None),
                 dashboard_links: Mutex::new(None),
@@ -61,6 +65,7 @@ impl Bot {
             is_running: Mutex::new(true),
             is_redirecting: Mutex::new(false),
             is_inworld: Mutex::new(false),
+            token_fetcher,
         }
     }
 
@@ -128,6 +133,23 @@ impl Bot {
 
         let dashboard_links = self.info.dashboard_links.lock().unwrap();
         let urls = dashboard_links.as_ref();
+
+        if let Some(token_fetcher) = &self.token_fetcher {
+            let login_method = &self.info.login_method;
+            let url = match login_method {
+                types::bot::ELoginMethod::APPLE => urls.and_then(|links| links.apple.clone()),
+                types::bot::ELoginMethod::GOOGLE => urls.and_then(|links| links.google.clone()),
+                types::bot::ELoginMethod::LEGACY => urls.and_then(|links| links.growtopia.clone()),
+                _ => None,
+            };
+
+            let token = token_fetcher(url.unwrap());
+            let mut login_info_lock = self.info.login_info.lock().unwrap();
+            let login_info = login_info_lock.as_mut().expect("Login info not set");
+            login_info.ltoken = token.clone();
+            return;
+        }
+
         let token = match self.info.login_method {
             types::bot::ELoginMethod::LEGACY => {
                 let payload = self.info.payload.clone();

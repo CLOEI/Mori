@@ -6,6 +6,7 @@ use scraper::{Html, Selector};
 use serde_json::Value;
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct DashboardLinks {
     pub apple: Option<String>,
     pub google: Option<String>,
@@ -16,7 +17,7 @@ pub fn check_token(token: &str, login_info: &str) -> Result<String> {
     if token.is_empty() {
         return Err(anyhow::anyhow!("Token is empty"));
     }
-    
+
     let req = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
         .header("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
         .header("Content-Type", "application/x-www-form-urlencoded")

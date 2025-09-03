@@ -122,8 +122,8 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         _type: NetGamePacket::PingReply,
                         target_net_id: utils::proton::hash(value.to_string().as_bytes(), HashMode::NullTerminated) as i32,
                         value: elapsed,
-                        vector_x: (build_length as f32) * 32f32,
-                        vector_y: (punch_length as f32) * 32f32,
+                        vector_x:  (if build_length == 0 { 2.0 } else { build_length as f32 }) * 32.0,
+                        vector_y: (if punch_length == 0 { 2.0 } else { punch_length as f32 }) * 32.0,
                         ..Default::default()
                     };
 
@@ -134,16 +134,12 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     };
 
                     if in_world {
-                        if (hack_type > 0) {
-                            data.animation_type = hack_type as u8;
-                        }
-
-                        data.net_id = net_id;
-                        data.vector_x2 = gravity;
-                        data.vector_y2 = velocity;
+                        data.net_id = hack_type;
+                        data.vector_x2 = velocity;
+                        data.vector_y2 = gravity;
                     }
 
-                    println!("PingReply: {:?}", data);
+                    println!("PingReply: {:?}, len: {}", data, data.to_bytes().len());
                     bot.send_packet(NetMessage::GamePacket, &data.to_bytes(), None, true);
                 }
                 _ => {}
