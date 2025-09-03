@@ -31,7 +31,7 @@ pub fn check_token(token: &str, login_info: &str) -> Result<String> {
     match req {
         Ok(response) => {
             if response["status"] == "success" {
-                let new_token = response["token"].clone().to_string();
+                let new_token = response["token"].as_str().unwrap_or_default().to_string();
                 Ok(new_token)
             } else {
                 Err(anyhow::anyhow!("Token validation failed: {}", response))
