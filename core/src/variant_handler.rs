@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use log::log;
 use crate::Bot;
 use crate::types::net_message::NetMessage;
+use crate::types::player::Player;
 use crate::utils::variant::VariantList;
 
 pub fn handle(bot: &Bot, data: &[u8]) {
@@ -43,6 +45,38 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
             *is_redirecting_lock = false;
         }
+        "OnSetPos" => {
+            let pos = variant.get(1).unwrap().as_vec2();
+            let mut position_lock = bot.position.write().unwrap();
+            *position_lock = pos;
+        }
+        "OnTalkBubble" => {
+            let message = variant.get(2).unwrap().as_string();
+            println!("[TALK] {}", message);
+        }
+        "OnConsoleMessage" => {
+            let message = variant.get(1).unwrap().as_string();
+            println!("[CONSOLE] {}", message);
+        }
+        "OnSetBux" => {
+            let bux = variant.get(1).unwrap().as_int32();
+            let mut gems_lock = bot.gems.lock().unwrap();
+            *gems_lock = bux;
+        }
+        "SetHasGrowID" => {
+            let growid = variant.get(2).unwrap().as_string();
+            let mut login_info_lock = bot.info.login_info.lock().unwrap();
+            let login_info = login_info_lock.as_mut().unwrap();
+            login_info.tank_id_name = growid;
+        }
+        "OnRemove" => {
+            let message = variant.get(1).unwrap().as_string();
+            let data = parse_and_store_as_map(&message);
+            let net_id: u32 = data["netID"].parse().unwrap();
+
+            let mut players = bot.world.players.lock().unwrap();
+            players.retain(|p| p.net_id != net_id);
+        }
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
             let data = parse_and_store_as_map(&message);
@@ -50,6 +84,33 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             if data.contains_key("type") {
                 let mut net_id_lock = bot.net_id.lock().unwrap();
                 *net_id_lock = data.get("netID").unwrap().parse().expect("Failed to parse netid");
+            } else {
+                let player = Player {
+                    _type: data["type"].clone(),
+                    avatar: data["avatar"].clone(),
+                    net_id: data["netID"].parse().expect("Failed to parse netid"),
+                    online_id: data["onlineID"].parse().expect("Failed to parse onlineid"),
+                    e_id: data["eid"].parse().expect("Failed to parse eid"),
+                    ip: data["ip"].clone(),
+                    col_rect: data["colrect"].clone(),
+                    title_icon: data["titleIcon"].clone(),
+                    m_state: data["mstate"].parse().expect("Failed to parse mstate"),
+                    user_id: data["userID"].parse().expect("Failed to parse userid"),
+                    invisible: data["invisible"].parse().expect("Failed to parse invisible"),
+                    name: data["name"].clone(),
+                    country: data["country"].clone(),
+                    position: {
+                        if data.contains_key("posXY") {
+                            let pos_xy = data.get("posXY").unwrap().split('|').map(|s| s.trim().parse().expect("Fail to parse player coordinates")).collect::<Vec<f32>>();
+                            (pos_xy[0], pos_xy[1])
+                        } else {
+                            (0.0, 0.0)
+                        }
+                    }
+                };
+
+                let mut players = bot.world.players.lock().unwrap();
+                players.push(player);
             }
         }
         _ => {}

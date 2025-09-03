@@ -90,6 +90,9 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 NetGamePacket::SendMapData => {
                     let mut is_inworld_lock = bot.is_inworld.lock().unwrap();
                     *is_inworld_lock = true;
+
+                    let world_data = &data[60..];
+                    std::fs::write("world.dat", world_data).expect("Unable to write world data");
                 }
                 NetGamePacket::SetCharacterState => {
                     let hack_type = parsed.value;
@@ -138,8 +141,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         data.vector_x2 = velocity;
                         data.vector_y2 = gravity;
                     }
-
-                    println!("PingReply: {:?}, len: {}", data, data.to_bytes().len());
+                    
                     bot.send_packet(NetMessage::GamePacket, &data.to_bytes(), None, true);
                 }
                 _ => {}

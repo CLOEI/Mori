@@ -931,6 +931,7 @@ dependencies = [
  "gtitem-r",
  "gtworld-r",
  "hex",
+ "log",
  "md5",
  "rand 0.9.2",
  "regex",

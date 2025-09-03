@@ -3,8 +3,7 @@ use std::str::FromStr;
 use std::sync::{Mutex, RwLock};
 use std::time::Instant;
 use rusty_enet::Packet;
-use crate::server::DashboardLinks;
-use crate::types::bot::{Info, State};
+use crate::types::bot::{Info, State, World};
 use crate::types::login_info::LoginInfo;
 use crate::types::net_message::NetMessage;
 
@@ -29,6 +28,8 @@ pub struct Bot {
     pub is_running: Mutex<bool>,
     pub is_redirecting: Mutex<bool>,
     pub is_inworld: Mutex<bool>,
+    pub world: World,
+    pub gems: Mutex<i32>,
     pub token_fetcher: Option<TokenFetcher>,
 }
 
@@ -65,6 +66,8 @@ impl Bot {
             is_running: Mutex::new(true),
             is_redirecting: Mutex::new(false),
             is_inworld: Mutex::new(false),
+            world: World::default(),
+            gems: Mutex::new(0),
             token_fetcher,
         }
     }

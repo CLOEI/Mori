@@ -2,6 +2,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use crate::server::DashboardLinks;
 use crate::types::login_info::LoginInfo;
+use crate::types::player::Player;
 use crate::types::server_data::ServerData;
 
 #[derive(Debug, Default)]
@@ -19,6 +20,12 @@ pub struct Info {
     pub login_info: Mutex<Option<LoginInfo>>,
     pub server_data: Mutex<Option<ServerData>>,
     pub dashboard_links: Mutex<Option<DashboardLinks>>,
+}
+
+#[derive(Debug, Default)]
+pub struct World {
+    pub data: Mutex<Option<gtworld_r::World>>,
+    pub players: Mutex<Vec<Player>>
 }
 
 #[derive(Debug, PartialEq, Clone)]
