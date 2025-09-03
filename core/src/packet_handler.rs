@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Read;
+use std::sync::Arc;
 use byteorder::{ByteOrder, LittleEndian};
 use flate2::read::ZlibDecoder;
 use crate::{utils, variant_handler, Bot};
@@ -7,14 +8,14 @@ use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
 use crate::utils::proton::HashMode;
 
-pub fn handle(bot: &Bot, data: &[u8]) {
+pub fn handle(bot: &mut Bot, data: &[u8]) {
     let packet_id = LittleEndian::read_u32(&data[0..4]);
     let packet_type = NetMessage::from(packet_id);
 
     match packet_type {
         NetMessage::ServerHello => {
             let is_redirecting = {
-                let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
+                let is_redirecting_lock = bot.is_redirecting.lock().unwrap();
                 *is_redirecting_lock
             };
 
@@ -96,6 +97,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
 
                     let world_data = &data[60..];
                     fs::write("world.dat", world_data).expect("Unable to write world data");
+                    let item_database_clone = Arc::clone(&bot.item_database);
+                    let world = gtworld_r::World::new(item_database_clone);
+                    let mut world_lock = bot.world.data.lock().unwrap();
+                    *world_lock = Some(world);
                 }
                 NetGamePacket::SendInventoryState => {
                     bot.inventory.lock().unwrap().parse(&data[60..])
@@ -160,6 +165,9 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
                     let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
                     *is_redirecting_lock = false;
+
+                    let item_database = gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
+                    bot.item_database = Arc::new(item_database);
                 }
                 _ => {}
             }

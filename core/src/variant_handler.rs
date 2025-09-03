@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::sync::Arc;
 use log::log;
 use crate::{utils, Bot};
 use crate::types::net_message::NetMessage;
@@ -7,7 +8,7 @@ use crate::types::player::Player;
 use crate::utils::proton::HashMode;
 use crate::utils::variant::VariantList;
 
-pub fn handle(bot: &Bot, data: &[u8]) {
+pub fn handle(bot: &mut Bot, data: &[u8]) {
     let variant = VariantList::deserialize(&data).expect("Failed to deserialize variant list");
     let function_call: String = variant.get(0).unwrap().as_string();
 
@@ -53,6 +54,8 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
                         let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
                         *is_redirecting_lock = false;
+                        let item_database = gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
+                        bot.item_database = Arc::new(item_database);
                         return;
                     }
                 }

@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::thread;
 use gt_core::Bot;
 use serde_json::Value;
 use tao::{
@@ -91,7 +92,6 @@ fn main() {
         token
     };
 
-    let item_database = Arc::new(None);
-    let bot = Bot::new(vec!["".to_string(), "".to_string()], Some(Box::new(token_fetch)), item_database);
+    let mut bot = Bot::new(vec!["".to_string(), "".to_string()], Some(Box::new(token_fetch)));
     bot.logon(None);
 }

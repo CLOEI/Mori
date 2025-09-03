@@ -31,7 +31,7 @@ pub struct Bot {
     pub is_running: Mutex<bool>,
     pub is_redirecting: Mutex<bool>,
     pub is_inworld: Mutex<bool>,
-    pub item_database: Arc<Option<ItemDatabase>>,
+    item_database: Arc<ItemDatabase>,
     pub world: World,
     pub inventory: Mutex<Inventory>,
     pub gems: Mutex<i32>,
@@ -39,7 +39,7 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub fn new(payload: Vec<String>, token_fetcher: Option<TokenFetcher>, item_database: Arc<Option<ItemDatabase>>) -> Self {
+    pub fn new(payload: Vec<String>, token_fetcher: Option<TokenFetcher>) -> Self {
         let socket = UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
         let host = rusty_enet::Host::<UdpSocket>::new(
             socket,
@@ -72,14 +72,14 @@ impl Bot {
             is_redirecting: Mutex::new(false),
             is_inworld: Mutex::new(false),
             world: World::default(),
-            item_database,
+            item_database: Arc::new(ItemDatabase::new()),
             inventory: Mutex::new(Inventory::new()),
             gems: Mutex::new(0),
             token_fetcher,
         }
     }
 
-    pub fn logon(&self, data: Option<&str>) {
+    pub fn logon(&mut self, data: Option<&str>) {
         if data.is_some() {
             todo!("Implement logon with pre-existing credentials");
         } else {
@@ -250,7 +250,7 @@ impl Bot {
         }
     }
 
-    fn process_event(&self) {
+    fn process_event(&mut self) {
         let is_running = {
             let running = self.is_running.lock().unwrap();
             *running
