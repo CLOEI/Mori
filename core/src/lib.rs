@@ -1,7 +1,8 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::FromStr;
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
+use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
 use crate::inventory::Inventory;
 use crate::types::bot::{Info, State, World};
@@ -30,6 +31,7 @@ pub struct Bot {
     pub is_running: Mutex<bool>,
     pub is_redirecting: Mutex<bool>,
     pub is_inworld: Mutex<bool>,
+    pub item_database: Arc<Option<ItemDatabase>>,
     pub world: World,
     pub inventory: Mutex<Inventory>,
     pub gems: Mutex<i32>,
@@ -37,7 +39,7 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub fn new(payload: Vec<String>, token_fetcher: Option<TokenFetcher>) -> Self {
+    pub fn new(payload: Vec<String>, token_fetcher: Option<TokenFetcher>, item_database: Arc<Option<ItemDatabase>>) -> Self {
         let socket = UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
         let host = rusty_enet::Host::<UdpSocket>::new(
             socket,
@@ -70,6 +72,7 @@ impl Bot {
             is_redirecting: Mutex::new(false),
             is_inworld: Mutex::new(false),
             world: World::default(),
+            item_database,
             inventory: Mutex::new(Inventory::new()),
             gems: Mutex::new(0),
             token_fetcher,

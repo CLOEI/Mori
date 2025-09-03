@@ -1,4 +1,7 @@
+use std::fs;
+use std::io::Read;
 use byteorder::{ByteOrder, LittleEndian};
+use flate2::read::ZlibDecoder;
 use crate::{utils, variant_handler, Bot};
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
@@ -92,7 +95,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     *is_inworld_lock = true;
 
                     let world_data = &data[60..];
-                    std::fs::write("world.dat", world_data).expect("Unable to write world data");
+                    fs::write("world.dat", world_data).expect("Unable to write world data");
                 }
                 NetGamePacket::SendInventoryState => {
                     bot.inventory.lock().unwrap().parse(&data[60..])
@@ -146,6 +149,17 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     }
 
                     bot.send_packet(NetMessage::GamePacket, &data.to_bytes(), None, true);
+                }
+                NetGamePacket::SendItemDatabaseData => {
+                    let data = &data[60..];
+                    let mut decoder = ZlibDecoder::new(data);
+                    let mut data = Vec::new();
+                    decoder.read_to_end(&mut data).unwrap();
+                    fs::write("items.dat", &data).unwrap();
+
+                    bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
+                    let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
+                    *is_redirecting_lock = false;
                 }
                 _ => {}
             }

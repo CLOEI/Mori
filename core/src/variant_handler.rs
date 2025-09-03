@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::fs;
 use log::log;
-use crate::Bot;
+use crate::{utils, Bot};
 use crate::types::net_message::NetMessage;
 use crate::types::player::Player;
+use crate::utils::proton::HashMode;
 use crate::utils::variant::VariantList;
 
 pub fn handle(bot: &Bot, data: &[u8]) {
@@ -41,9 +43,25 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             bot.disconnect()
         }
         "OnSuperMainStartAcceptLogonHrdxs47254722215a" => {
-            bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
-            let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
-            *is_redirecting_lock = false;
+            let server_hash = variant.get(1).unwrap().as_uint32();
+
+            match fs::read("items.dat") {
+                Ok(data) => {
+                    let hash = utils::proton::hash(data.as_slice(), HashMode::FixedLength(data.len() as i32)) as u32;
+
+                    if hash == server_hash {
+                        bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
+                        let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
+                        *is_redirecting_lock = false;
+                        return;
+                    }
+                }
+                Err(_) => {
+                    println!("Fetching server items.dat...");
+                }
+            }
+
+            bot.send_packet(NetMessage::GenericText, "action|refresh_item_data\n".to_string().as_bytes(), None, true);
         }
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
