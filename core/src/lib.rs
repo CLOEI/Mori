@@ -112,6 +112,20 @@ impl Bot {
     }
 
     pub fn get_token(&self) {
+        let (ltoken, login_data) = {
+            let login_info_lock = self.info.login_info.lock().unwrap();
+            let login_info = login_info_lock.as_ref().expect("Login info not set");
+            (login_info.ltoken.clone(), login_info.to_string())
+        };
+
+        if let Ok(ltoken) = server::check_token(&ltoken, &login_data) {
+            println!("Refreshed token: {}", ltoken);
+            let mut login_info_lock = self.info.login_info.lock().unwrap();
+            let login_info = login_info_lock.as_mut().expect("Login info not set");
+            login_info.ltoken = ltoken;
+            return;
+        }
+
         let dashboard_links = self.info.dashboard_links.lock().unwrap();
         let urls = dashboard_links.as_ref();
         let token = match self.info.login_method {

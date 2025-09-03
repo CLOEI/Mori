@@ -3,12 +3,43 @@ use crate::types::server_data::ServerData;
 use urlencoding::encode;
 use anyhow::Result;
 use scraper::{Html, Selector};
+use serde_json::Value;
 
 #[derive(Debug)]
 pub struct DashboardLinks {
     pub apple: Option<String>,
     pub google: Option<String>,
     pub growtopia: Option<String>,
+}
+
+pub fn check_token(token: &str, login_info: &str) -> Result<String> {
+    if token.is_empty() {
+        return Err(anyhow::anyhow!("Token is empty"));
+    }
+    
+    let req = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
+        .header("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .send_form([
+            ("refreshToken", token),
+            ("clientData", login_info),
+        ])?
+    .body_mut()
+    .read_json::<Value>();
+
+    match req {
+        Ok(response) => {
+            if response["status"] == "success" {
+                let new_token = response["token"].clone().to_string();
+                Ok(new_token)
+            } else {
+                Err(anyhow::anyhow!("Token validation failed: {}", response))
+            }
+        }
+        Err(e) => {
+            Err(anyhow::anyhow!("Failed to validate token: {}", e))
+        }
+    }
 }
 
 pub fn get_server_data(alternate: bool, login_info: &LoginInfo) -> Result<ServerData> {

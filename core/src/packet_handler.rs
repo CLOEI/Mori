@@ -143,6 +143,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         data.vector_y2 = velocity;
                     }
 
+                    println!("PingReply: {:?}", data);
                     bot.send_packet(NetMessage::GamePacket, &data.to_bytes(), None, true);
                 }
                 _ => {}
