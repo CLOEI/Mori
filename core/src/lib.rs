@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::sync::{Mutex, RwLock};
 use std::time::Instant;
 use rusty_enet::Packet;
+use crate::inventory::Inventory;
 use crate::types::bot::{Info, State, World};
 use crate::types::login_info::LoginInfo;
 use crate::types::net_message::NetMessage;
@@ -13,6 +14,7 @@ mod utils;
 mod login;
 mod packet_handler;
 mod variant_handler;
+mod inventory;
 
 type TokenFetcher = Box<dyn Fn(String) -> String + Send + Sync>;
 
@@ -29,6 +31,7 @@ pub struct Bot {
     pub is_redirecting: Mutex<bool>,
     pub is_inworld: Mutex<bool>,
     pub world: World,
+    pub inventory: Mutex<Inventory>,
     pub gems: Mutex<i32>,
     pub token_fetcher: Option<TokenFetcher>,
 }
@@ -67,6 +70,7 @@ impl Bot {
             is_redirecting: Mutex::new(false),
             is_inworld: Mutex::new(false),
             world: World::default(),
+            inventory: Mutex::new(Inventory::new()),
             gems: Mutex::new(0),
             token_fetcher,
         }

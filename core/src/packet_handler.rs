@@ -94,6 +94,9 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     let world_data = &data[60..];
                     std::fs::write("world.dat", world_data).expect("Unable to write world data");
                 }
+                NetGamePacket::SendInventoryState => {
+                    bot.inventory.lock().unwrap().parse(&data[60..])
+                }
                 NetGamePacket::SetCharacterState => {
                     let hack_type = parsed.value;
                     let build_length = parsed.jump_count - 126;
@@ -141,7 +144,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         data.vector_x2 = velocity;
                         data.vector_y2 = gravity;
                     }
-                    
+
                     bot.send_packet(NetMessage::GamePacket, &data.to_bytes(), None, true);
                 }
                 _ => {}
