@@ -1,7 +1,0 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cpnso8semsnmi"]
-
-[ext_resource type="Shader" uid="uid://xe0widsefsy" path="res://skin.gdshader" id="1_csn12"]
-
-[resource]
-shader = ExtResource("1_csn12")
-shader_parameter/skin_color = Color(1, 0.619472, 0.456652, 1)

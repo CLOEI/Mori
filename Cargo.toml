@@ -1,0 +1,16 @@
+[package]
+name = "Mori"
+version = "0.1.0"
+edition = "2024"
+authors = ["Cendy"]
+
+[dependencies]
+bevy = "0.16.1"
+bevy_egui = "0.36.0"
+gt-core = { path = "./core" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

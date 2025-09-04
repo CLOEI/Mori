@@ -24,6 +24,8 @@ mod variant_handler;
 mod lua;
 mod astar;
 
+pub use gtitem_r;
+
 type TokenFetcher = Box<dyn Fn(String) -> String + Send + Sync>;
 
 pub struct Bot {

@@ -2,3 +2,8 @@ target
 # Godot 4+ specific ignores
 .godot/
 android/
+
+
+# Added by cargo
+
+/target
