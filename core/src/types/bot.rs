@@ -81,6 +81,13 @@ impl Default for ELoginMethod {
     }
 }
 
+#[derive(Default)]
+pub struct TemporaryData {
+    pub drop: Mutex<(u32, u32)>,
+    pub trash: Mutex<(u32, u32)>,
+    pub dialog_callback: Mutex<Option<fn(&Bot)>>,
+}
+
 #[derive(Clone)]
 pub struct BotArc(pub Arc<Bot>);
 
@@ -159,6 +166,14 @@ impl UserData for BotArc {
         });
         methods.add_method("setPlaceDelay", |_, this, delay: u32| {
             this.0.set_place_delay(delay);
+            Ok(())
+        });
+        methods.add_method("drop", |_, this, (item_id, amount): (u32, u32)| {
+            this.0.drop_item(item_id, amount);
+            Ok(())
+        });
+        methods.add_method("trash", |_, this, (item_id, amount): (u32, u32)| {
+            this.0.trash_item(item_id, amount);
             Ok(())
         });
 

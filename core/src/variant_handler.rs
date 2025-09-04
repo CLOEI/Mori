@@ -164,6 +164,26 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 players.push(player);
             }
         }
+        "OnDialogRequest" => {
+            let message = variant.get(1).unwrap().as_string();
+            let cb = {
+                let dialog_callback = bot.temporary_data.dialog_callback.lock().unwrap();
+                dialog_callback.clone()
+            };
+
+            if let Some(cb) = cb {
+                cb(bot);
+            }
+
+            if message.contains("Gazette") {
+                bot.send_packet(
+                    NetMessage::GenericText,
+                    "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string().as_bytes(),
+                    None,
+                    true,
+                );
+            }
+        }
         _ => {}
     }
 }

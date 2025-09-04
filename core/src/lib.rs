@@ -1,6 +1,6 @@
 use crate::astar::AStar;
 use crate::inventory::Inventory;
-use crate::types::bot::{Automation, DelayConfig, Info, Scripting, State, World};
+use crate::types::bot::{Automation, DelayConfig, Info, Scripting, State, TemporaryData, World};
 use crate::types::flags::PacketFlag;
 use crate::types::login_info::LoginInfo;
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
@@ -46,6 +46,7 @@ pub struct Bot {
     pub delay_config: Mutex<DelayConfig>,
     pub automation: Mutex<Automation>,
     pub astar: Mutex<AStar>,
+    pub temporary_data: TemporaryData,
 }
 
 impl Bot {
@@ -95,6 +96,7 @@ impl Bot {
             delay_config: Mutex::new(DelayConfig::default()),
             automation: Mutex::new(Automation::default()),
             astar: Mutex::new(AStar::new()),
+            temporary_data: TemporaryData::default(),
         })
     }
 
@@ -510,5 +512,61 @@ impl Bot {
                 thread::sleep(Duration::from_millis(delay as u64));
             }
         }
+    }
+
+    pub fn drop_item(&self, item_id: u32, amount: u32) {
+        self.send_packet(
+            NetMessage::GenericText,
+            format!("action|drop\n|itemID|{}\n", item_id).as_bytes(),
+            None,
+            true,
+        );
+        let mut drop = self.temporary_data.drop.lock().unwrap();
+        let mut dialog_callback = self.temporary_data.dialog_callback.lock().unwrap();
+        *drop = (item_id, amount);
+
+        *dialog_callback = Some(|bot| {
+            let mut drop = bot.temporary_data.drop.lock().unwrap();
+            let mut dialog_callback = bot.temporary_data.dialog_callback.lock().unwrap();
+            bot.send_packet(
+                NetMessage::GenericText,
+                format!(
+                    "action|dialog_return\ndialog_name|drop_item\nitemID|{}|\ncount|{}\n",
+                    drop.0, drop.1
+                ).as_bytes(),
+                None,
+                true,
+            );
+            *drop = (0, 0);
+            *dialog_callback = None;
+        });
+    }
+
+    pub fn trash_item(&self, item_id: u32, amount: u32) {
+        self.send_packet(
+            NetMessage::GenericText,
+            format!("action|trash\n|itemID|{}\n", item_id).as_bytes(),
+            None,
+            true,
+        );
+        let mut trash = self.temporary_data.trash.lock().unwrap();
+        let mut dialog_callback = self.temporary_data.dialog_callback.lock().unwrap();
+        *trash = (item_id, amount);
+
+        *dialog_callback = Some(|bot| {
+            let mut trash = bot.temporary_data.trash.lock().unwrap();
+            let mut dialog_callback = bot.temporary_data.dialog_callback.lock().unwrap();
+            bot.send_packet(
+                NetMessage::GenericText,
+                format!(
+                    "action|dialog_return\ndialog_name|trash_item\nitemID|{}|\ncount|{}\n",
+                    trash.0, trash.1
+                ).as_bytes(),
+                None,
+                true,
+            );
+            *trash = (0, 0);
+            *dialog_callback = None;
+        });
     }
 }
