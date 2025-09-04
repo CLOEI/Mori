@@ -5,7 +5,7 @@ use crate::{Bot, utils, variant_handler};
 use byteorder::{ByteOrder, LittleEndian};
 use flate2::read::ZlibDecoder;
 use std::fs;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::ops::Deref;
 
 pub fn handle(bot: &Bot, data: &[u8]) {
@@ -86,6 +86,13 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 .expect("Failed to parse NetGamePacketData");
             println!("GamePacket: {:?}", parsed._type);
             match parsed._type {
+                NetGamePacket::State => {
+                    let mut players = bot.world.players.lock().unwrap();
+                    if let Some(player) = players.get_mut(&parsed.net_id) {
+                        player.position.0 = parsed.vector_x;
+                        player.position.1 = parsed.vector_y;
+                    }
+                }
                 NetGamePacket::CallFunction => {
                     variant_handler::handle(bot, &data[60..]);
                 }
@@ -95,7 +102,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     let item_database_lock = bot.item_database.read().unwrap();
                     let item_database = item_database_lock.deref();
                     let mut world_lock = bot.world.data.lock().unwrap();
-                    let _ = world_lock.parse(&data[60..], item_database);
+                    let _ = world_lock.parse(&data[60..], &item_database);
                     
                     if !world_lock.tiles.is_empty() {
                         let mut collision_data = Vec::with_capacity(world_lock.tiles.len());
@@ -168,11 +175,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         ..Default::default()
                     };
 
-                    let (in_world, net_id) = {
+                    let in_world = {
                         let world_lock = bot.world.data.lock().unwrap();
                         let in_world = world_lock.name != "EXIT";
-                        let net_id = bot.net_id.lock().unwrap();
-                        (in_world, *net_id)
+                        in_world
                     };
 
                     if in_world {
@@ -199,13 +205,260 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
                     *is_redirecting_lock = false;
 
-                    let item_database =
-                        gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
-                    // bot.item_database = Arc::new(item_database);
+                    let item_database = gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
+                    *bot.item_database.write().unwrap() = item_database;
+                }
+                NetGamePacket::TileChangeRequest => {
+                    handle_tile_change_request(bot, &parsed);
+                }
+                NetGamePacket::ItemChangeObject => {
+                    handle_item_change_object(bot, &parsed);
+                }
+                NetGamePacket::SendTileTreeState => {
+                    handle_send_tile_tree_state(bot, &parsed);
+                }
+                NetGamePacket::ModifyItemInventory => {
+                    handle_modify_item_inventory(bot, &parsed);
+                }
+                NetGamePacket::SendTileUpdateData => {
+                    handle_send_tile_update_data(bot, &parsed, &data);
                 }
                 _ => {}
             }
         }
         _ => {}
+    }
+}
+
+fn handle_tile_change_request(bot: &Bot, tank_packet: &NetGamePacketData) {
+    if tank_packet.value == 18 {
+        update_tile_for_punch(bot, tank_packet);
+        update_single_tile_astar(bot, tank_packet.int_x as u32, tank_packet.int_y as u32, 0);
+        return;
+    }
+
+    let should_update_inventory = {
+        let net_id = bot.net_id.lock().unwrap();
+        *net_id == tank_packet.net_id
+    };
+
+    if should_update_inventory {
+        update_inventory_for_tile_change(bot, tank_packet);
+    }
+
+    update_tile_for_place(bot, tank_packet);
+    
+    let collision_type = get_collision_type_for_item(bot, tank_packet.value);
+    update_single_tile_astar(bot, tank_packet.int_x as u32, tank_packet.int_y as u32, collision_type);
+}
+
+fn handle_item_change_object(bot: &Bot, tank_packet: &NetGamePacketData) {
+    let mut world = bot.world.data.lock().unwrap();
+    
+    match tank_packet.net_id {
+        u32::MAX => {
+            let item = gtworld_r::DroppedItem {
+                id: tank_packet.value as u16,
+                x: tank_packet.vector_x.ceil(),
+                y: tank_packet.vector_y.ceil(),
+                count: tank_packet.float_variable as u8,
+                flags: tank_packet.object_type,
+                uid: world.dropped.last_dropped_item_uid + 1,
+            };
+
+            world.dropped.items.push(item);
+            world.dropped.last_dropped_item_uid += 1;
+            world.dropped.items_count += 1;
+        }
+        net_id if net_id == u32::MAX - 3 => {
+            if let Some(obj) = world.dropped.items.iter_mut().find(|obj| {
+                obj.id == tank_packet.value as u16
+                    && obj.x == tank_packet.vector_x.ceil()
+                    && obj.y == tank_packet.vector_y.ceil()
+            }) {
+                obj.count = tank_packet.jump_count;
+            }
+        }
+        net_id if net_id > 0 => {
+            if let Some((index, collected_item)) = world
+                .dropped
+                .items
+                .iter()
+                .enumerate()
+                .find(|(_, obj)| obj.uid == tank_packet.value)
+                .map(|(i, obj)| (i, obj.clone()))
+            {
+                let our_net_id = *bot.net_id.lock().unwrap();
+                if tank_packet.net_id == our_net_id {
+                    update_player_inventory_from_dropped_item(bot, &collected_item);
+                }
+
+                world.dropped.items.remove(index);
+                world.dropped.items_count -= 1;
+            }
+        }
+        _ => {}
+    }
+    
+    drop(world);
+}
+
+
+fn handle_send_tile_tree_state(bot: &Bot, tank_packet: &NetGamePacketData) {
+    let mut world = bot.world.data.lock().unwrap();
+    if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+        tile.foreground_item_id = 0;
+        tile.tile_type = gtworld_r::TileType::Basic;
+    }
+    drop(world);
+    
+    update_single_tile_astar(bot, tank_packet.int_x as u32, tank_packet.int_y as u32, 0);
+}
+
+fn update_inventory_for_tile_change(bot: &Bot, tank_packet: &NetGamePacketData) {
+    let item_id = tank_packet.value as u16;
+    let mut inventory = bot.inventory.lock().unwrap();
+    
+    if let Some(item) = inventory.items.get_mut(&item_id) {
+        item.amount = item.amount.saturating_sub(1);
+        if item.amount == 0 {
+            inventory.items.remove(&item_id);
+        }
+    }
+}
+
+fn update_tile_for_punch(bot: &Bot, tank_packet: &NetGamePacketData) {
+    let mut world = bot.world.data.lock().unwrap();
+    if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+        if tile.foreground_item_id != 0 {
+            tile.foreground_item_id = 0;
+        } else {
+            tile.background_item_id = 0;
+        }
+    }
+}
+
+fn update_tile_for_place(bot: &Bot, tank_packet: &NetGamePacketData) {
+    let mut world = bot.world.data.lock().unwrap();
+    if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+        let item_database = bot.item_database.read().unwrap();
+        if let Some(item) = item_database.items.get(&tank_packet.value) {
+            if matches!(item.action_type, 22 | 28 | 18) {
+                tile.background_item_id = tank_packet.value as u16;
+            } else {
+                tile.foreground_item_id = tank_packet.value as u16;
+                
+                if item.id % 2 != 0 {
+                    tile.tile_type = gtworld_r::TileType::Seed {
+                        ready_to_harvest: false,
+                        time_passed: 0,
+                        item_on_tree: 0,
+                        elapsed: std::time::Instant::now().elapsed(),
+                    };
+                }
+            }
+        }
+    }
+}
+
+fn update_player_inventory_from_dropped_item(bot: &Bot, dropped_item: &gtworld_r::DroppedItem) {
+    if dropped_item.id == 112 {
+        bot.gems.fetch_add(dropped_item.count as i32, std::sync::atomic::Ordering::SeqCst);
+    } else {
+        let mut inventory = bot.inventory.lock().unwrap();
+        if let Some(item) = inventory.items.get_mut(&dropped_item.id) {
+            let new_amount = (item.amount + dropped_item.count).min(200);
+            item.amount = new_amount;
+        } else {
+            let item = crate::inventory::InventoryItem {
+                id: dropped_item.id,
+                amount: dropped_item.count,
+                flag: 0,
+            };
+            inventory.items.insert(dropped_item.id, item);
+        }
+    }
+}
+
+fn get_collision_type_for_item(bot: &Bot, item_id: u32) -> u8 {
+    let item_database = bot.item_database.read().unwrap();
+    if let Some(item) = item_database.get_item(&item_id) {
+        item.collision_type
+    } else {
+        0
+    }
+}
+
+fn update_single_tile_astar(bot: &Bot, x: u32, y: u32, new_collision_type: u8) {
+    let mut astar = bot.astar.lock().unwrap();
+    astar.update_single_tile(x, y, new_collision_type);
+}
+
+fn handle_modify_item_inventory(bot: &Bot, tank_packet: &NetGamePacketData) {
+    let item_id = tank_packet.value as u16;
+    let amount_to_remove = tank_packet.jump_count;
+    
+    let mut inventory = bot.inventory.lock().unwrap();
+    if let Some(item) = inventory.items.get_mut(&item_id) {
+        item.amount = item.amount.saturating_sub(amount_to_remove);
+        if item.amount == 0 {
+            inventory.items.remove(&item_id);
+        }
+    }
+}
+
+fn handle_send_tile_update_data(bot: &Bot, tank_packet: &NetGamePacketData, data: &[u8]) {
+    let tile_x = tank_packet.int_x as u32;
+    let tile_y = tank_packet.int_y as u32;
+    
+    let world_bounds = {
+        let world = bot.world.data.lock().unwrap();
+        (world.width, world.height)
+    };
+    
+    if tile_x >= world_bounds.0 || tile_y >= world_bounds.1 {
+        return;
+    }
+    
+    let old_collision_type = {
+        let world = bot.world.data.lock().unwrap();
+        if let Some(tile) = world.get_tile(tile_x, tile_y) {
+            let item_database = bot.item_database.read().unwrap();
+            if let Some(item) = item_database.get_item(&(tile.foreground_item_id as u32)) {
+                item.collision_type
+            } else {
+                0
+            }
+        } else {
+            return;
+        }
+    };
+    
+    let tile_data = &data[56..];
+    let mut cursor = Cursor::new(tile_data);
+    
+    let new_collision_type = {
+        let item_database = bot.item_database.read().unwrap();
+        let mut world = bot.world.data.lock().unwrap();
+        if let Some(tile) = world.get_tile(tile_x, tile_y) {
+            let tile_clone = tile.clone();
+            let _ = world.update_tile(tile_clone, &mut cursor, true, &item_database);
+            
+            if let Some(updated_tile) = world.get_tile(tile_x, tile_y) {
+                if let Some(item) = item_database.get_item(&(updated_tile.foreground_item_id as u32)) {
+                    item.collision_type
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+    };
+    
+    if old_collision_type != new_collision_type {
+        update_single_tile_astar(bot, tile_x, tile_y, new_collision_type);
     }
 }

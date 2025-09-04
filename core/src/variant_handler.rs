@@ -113,7 +113,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             let net_id: u32 = data["netID"].parse().unwrap();
 
             let mut players = bot.world.players.lock().unwrap();
-            players.retain(|p| p.net_id != net_id);
+            players.remove(&net_id);
         }
         "OnSpawn" => {
             let message = variant.get(1).unwrap().as_string();
@@ -161,7 +161,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 };
 
                 let mut players = bot.world.players.lock().unwrap();
-                players.push(player);
+                players.insert(player.net_id, player);
             }
         }
         "OnDialogRequest" => {

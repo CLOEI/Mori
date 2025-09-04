@@ -487,7 +487,7 @@ impl Bot {
         };
 
         let paths = {
-            let astar = self.astar.lock().expect("Failed to lock astar");
+            let mut astar = self.astar.lock().expect("Failed to lock astar");
             astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
         };
 

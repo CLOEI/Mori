@@ -5,6 +5,7 @@ use crate::types::player::Player;
 use crate::types::server_data::ServerData;
 use crate::Bot;
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 use mlua::{Lua, UserData, UserDataMethods};
 
 #[derive(Debug, Default)]
@@ -56,14 +57,14 @@ impl Default for Scripting {
 #[derive(Debug)]
 pub struct World {
     pub data: Mutex<gtworld_r::World>,
-    pub players: Mutex<Vec<Player>>,
+    pub players: Mutex<HashMap<u32, Player>>,
 }
 
 impl Default for World {
     fn default() -> Self {
         World {
             data: Mutex::new(gtworld_r::World::new()),
-            players: Mutex::new(Vec::new()),
+            players: Mutex::new(HashMap::<u32, Player>::new()),
         }
     }
 }
