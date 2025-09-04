@@ -31,8 +31,7 @@ pub struct Automation {
 }
 
 pub struct Info {
-    pub payload: Vec<String>,
-    pub login_method: ELoginMethod,
+    pub login_via: LoginVia,
     pub login_info: Mutex<Option<LoginInfo>>,
     pub server_data: Mutex<Option<ServerData>>,
     pub dashboard_links: Mutex<Option<DashboardLinks>>,
@@ -70,15 +69,16 @@ impl Default for World {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ELoginMethod {
-    APPLE,
+pub enum LoginVia {
     GOOGLE,
-    LEGACY,
+    APPLE,
+    LTOKEN([String; 4]),
+    LEGACY([String; 2]),
 }
 
-impl Default for ELoginMethod {
+impl Default for LoginVia {
     fn default() -> Self {
-        ELoginMethod::LEGACY
+        LoginVia::LEGACY([String::new(), String::new()])
     }
 }
 
@@ -176,6 +176,10 @@ impl UserData for BotArc {
         methods.add_method("trash", |_, this, (item_id, amount): (u32, u32)| {
             this.0.trash_item(item_id, amount);
             Ok(())
+        });
+        methods.add_method("collect", |_, this, ()| {
+            let collected = this.0.collect();
+            Ok(collected)
         });
 
     }

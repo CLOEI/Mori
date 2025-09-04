@@ -1,3 +1,4 @@
+use gt_core::types::bot::LoginVia;
 use gt_core::Bot;
 use gtitem_r::structs::ItemDatabase;
 use serde_json::Value;
@@ -103,7 +104,7 @@ fn main() {
     let item_database = Arc::new(RwLock::new(ItemDatabase::new()));
 
     let bot = Bot::new(
-        vec!["".to_string(), "".to_string()],
+        LoginVia::GOOGLE,
         Some(Box::new(token_fetch)),
         item_database,
     );

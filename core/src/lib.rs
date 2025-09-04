@@ -1,6 +1,6 @@
 use crate::astar::AStar;
 use crate::inventory::Inventory;
-use crate::types::bot::{Automation, DelayConfig, Info, Scripting, State, TemporaryData, World};
+use crate::types::bot::{Automation, DelayConfig, Info, LoginVia, Scripting, State, TemporaryData, World};
 use crate::types::flags::PacketFlag;
 use crate::types::login_info::LoginInfo;
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
@@ -18,7 +18,7 @@ mod inventory;
 mod login;
 mod packet_handler;
 mod server;
-mod types;
+pub mod types;
 mod utils;
 mod variant_handler;
 mod lua;
@@ -51,7 +51,7 @@ pub struct Bot {
 
 impl Bot {
     pub fn new(
-        payload: Vec<String>,
+        login_via: types::bot::LoginVia,
         token_fetcher: Option<TokenFetcher>,
         item_database: Arc<RwLock<ItemDatabase>>,
     ) -> Arc<Self> {
@@ -74,8 +74,7 @@ impl Bot {
             host: Mutex::new(host),
             peer_id: Mutex::new(None),
             info: Info {
-                payload,
-                login_method: types::bot::ELoginMethod::GOOGLE,
+                login_via,
                 login_info: Mutex::new(None),
                 server_data: Mutex::new(None),
                 dashboard_links: Mutex::new(None),
@@ -169,38 +168,45 @@ impl Bot {
         let urls = dashboard_links.as_ref();
 
         if let Some(token_fetcher) = &self.token_fetcher {
-            let login_method = &self.info.login_method;
-            let url = match login_method {
-                types::bot::ELoginMethod::APPLE => urls.and_then(|links| links.apple.clone()),
-                types::bot::ELoginMethod::GOOGLE => urls.and_then(|links| links.google.clone()),
-                types::bot::ELoginMethod::LEGACY => urls.and_then(|links| links.growtopia.clone()),
-                _ => None,
+            let login_via = &self.info.login_via;
+            let url = match login_via {
+                LoginVia::APPLE => urls.and_then(|links| links.apple.clone()),
+                LoginVia::GOOGLE => urls.and_then(|links| links.google.clone()),
+                LoginVia::LEGACY(_) => urls.and_then(|links| links.growtopia.clone()),
+                LoginVia::LTOKEN(_) => None,
             };
 
-            let token = token_fetcher(url.unwrap());
-            let mut login_info_lock = self.info.login_info.lock().unwrap();
-            let login_info = login_info_lock.as_mut().expect("Login info not set");
-            login_info.ltoken = token.clone();
-            return;
+            if let Some(url) = url {
+                let token = token_fetcher(url);
+                let mut login_info_lock = self.info.login_info.lock().unwrap();
+                let login_info = login_info_lock.as_mut().expect("Login info not set");
+                login_info.ltoken = token.clone();
+                return;
+            }
         }
 
-        let token = match self.info.login_method {
-            types::bot::ELoginMethod::LEGACY => {
-                let payload = self.info.payload.clone();
-                let username = payload.get(0).expect("Username not found");
-                let password = payload.get(1).expect("Password not found");
+        let token = match &self.info.login_via {
+            LoginVia::LEGACY(credentials) => {
+                let username = &credentials[0];
+                let password = &credentials[1];
                 let growtopia_url = urls.as_ref().and_then(|links| links.growtopia.clone());
                 login::get_legacy_token(&growtopia_url.unwrap(), username, password)
                     .expect("Failed to get legacy token")
             }
-            _ => {
-                todo!("Implement token retrieval for different login methods");
-            }
+            _ => todo!("Login method not implemented"),
+
         };
 
         let mut login_info_lock = self.info.login_info.lock().unwrap();
         let login_info = login_info_lock.as_mut().expect("Login info not set");
         login_info.ltoken = token.clone();
+    }
+
+    pub fn execute_lua(&self, lua_code: String) {
+        let lua = &self.scripting.lua;
+        if let Err(err) = lua.load(&lua_code).exec() {
+            println!("Failed to execute Lua code: {}", err);
+        }
     }
 
     pub fn send_packet(
@@ -568,5 +574,104 @@ impl Bot {
             *trash = (0, 0);
             *dialog_callback = None;
         });
+    }
+
+    pub fn collect(&self) -> usize {
+        let is_in_world = {
+            match self.world.data.try_lock() {
+                Ok(world) => world.name != "EXIT",
+                Err(_) => return 0,
+            }
+        };
+
+        if !is_in_world {
+            return 0;
+        }
+
+        let bot_position = {
+            match self.position.try_read() {
+                Ok(pos) => (pos.0, pos.1),
+                Err(_) => return 0,
+            }
+        };
+
+        let bot_tile_x = bot_position.0 / 32.0;
+        let bot_tile_y = bot_position.1 / 32.0;
+
+        let inventory_state = {
+            match self.inventory.try_lock() {
+                Ok(inv) => {
+                    let mut item_amounts = std::collections::HashMap::with_capacity(inv.items.len());
+                    for (&item_id, item) in &inv.items {
+                        item_amounts.insert(item_id, item.amount);
+                    }
+                    (inv.size, inv.items.len() as u32, item_amounts)
+                },
+                Err(_) => return 0, 
+            }
+        };
+
+        let (inventory_size, current_item_count, item_amounts) = inventory_state;
+
+        let collectible_items = {
+            match self.world.data.try_lock() {
+                Ok(world) => {
+                    let mut nearby_items = Vec::with_capacity(std::cmp::min(world.dropped.items.len(), 50));
+                    
+                    for item in &world.dropped.items {
+                        let dx = bot_tile_x - item.x;
+                        let dy = bot_tile_y - item.y;
+                        let distance_squared = dx * dx + dy * dy;
+                        
+                        if distance_squared <= 25.0 {
+                            nearby_items.push((item.clone(), distance_squared));
+                        }
+                    }
+                    
+                    nearby_items.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                    nearby_items.into_iter().map(|(item, _)| item).collect::<Vec<_>>()
+                },
+                Err(_) => return 0,
+            }
+        };
+
+        if collectible_items.is_empty() {
+            return 0;
+        }
+
+        let mut collected_count = 0;
+        let mut packets_to_send = Vec::with_capacity(collectible_items.len());
+
+        for item in collectible_items {
+            let can_collect = if let Some(&current_amount) = item_amounts.get(&item.id) {
+                current_amount < 200
+            } else {
+                current_item_count < inventory_size
+            };
+
+            if can_collect {
+                let packet = NetGamePacketData {
+                    _type: NetGamePacket::ItemActivateObjectRequest,
+                    vector_x: item.x,
+                    vector_y: item.y,
+                    value: item.uid,
+                    ..Default::default()
+                };
+
+                packets_to_send.push(packet);
+                collected_count += 1;
+            }
+        }
+
+        for packet in packets_to_send {
+            self.send_packet(
+                NetMessage::GamePacket,
+                &packet.to_bytes(),
+                None,
+                true,
+            );
+        }
+
+        collected_count
     }
 }
