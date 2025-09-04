@@ -1,3 +1,4 @@
+use crate::astar::AStar;
 use crate::inventory::Inventory;
 use crate::types::bot::{Automation, DelayConfig, Info, Scripting, State, World};
 use crate::types::flags::PacketFlag;
@@ -10,7 +11,8 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::FromStr;
 use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 
 mod inventory;
 mod login;
@@ -20,6 +22,7 @@ mod types;
 mod utils;
 mod variant_handler;
 mod lua;
+mod astar;
 
 type TokenFetcher = Box<dyn Fn(String) -> String + Send + Sync>;
 
@@ -41,7 +44,8 @@ pub struct Bot {
     pub token_fetcher: Option<TokenFetcher>,
     pub scripting: Scripting,
     pub delay_config: Mutex<DelayConfig>,
-    pub automation: Mutex<Automation>
+    pub automation: Mutex<Automation>,
+    pub astar: Mutex<AStar>,
 }
 
 impl Bot {
@@ -90,6 +94,7 @@ impl Bot {
             scripting: Scripting::default(),
             delay_config: Mutex::new(DelayConfig::default()),
             automation: Mutex::new(Automation::default()),
+            astar: Mutex::new(AStar::new()),
         })
     }
 
@@ -471,5 +476,39 @@ impl Bot {
             None,
             true,
         );
+    }
+
+    pub fn find_path(&self, x: u32, y: u32) {
+        let position = {
+            let position = self.position.read().expect("Failed to lock position");
+            position.clone()
+        };
+
+        let paths = {
+            let astar = self.astar.lock().expect("Failed to lock astar");
+            astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
+        };
+
+        let findpath_delay = {
+            let findpath_delay = self
+                .delay_config
+                .lock()
+                .unwrap()
+                .findpath_delay;
+            findpath_delay
+        };
+
+        let delay = findpath_delay;
+        if let Some(paths) = paths {
+            for node in paths {
+                {
+                    let mut position = self.position.write().expect("Failed to lock position");
+                    position.0 = node.x as f32 * 32.0;
+                    position.1 = node.y as f32 * 32.0;
+                }
+                self.walk(node.x as i32, node.y as i32, true);
+                thread::sleep(Duration::from_millis(delay as u64));
+            }
+        }
     }
 }

@@ -118,6 +118,10 @@ impl UserData for BotArc {
             this.0.punch(offset_x, offset_y);
             Ok(())
         });
+        methods.add_method("findPath", |_, this, (x, y): (u32, u32)| {
+            this.0.find_path(x, y);
+            Ok(())
+        });
         methods.add_method(
             "place",
             |_, this, (offset_x, offset_y, item_id): (i32, i32, u32)| {

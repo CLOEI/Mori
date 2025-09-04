@@ -95,7 +95,22 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     let item_database_lock = bot.item_database.read().unwrap();
                     let item_database = item_database_lock.deref();
                     let mut world_lock = bot.world.data.lock().unwrap();
-                    let _ =world_lock.parse(&data[60..], item_database);
+                    let _ = world_lock.parse(&data[60..], item_database);
+                    
+                    if !world_lock.tiles.is_empty() {
+                        let mut collision_data = Vec::with_capacity(world_lock.tiles.len());
+                        for tile in &world_lock.tiles {
+                            let collision_type = if let Some(item) = item_database.get_item(&(tile.foreground_item_id as u32)) {
+                                item.collision_type
+                            } else {
+                                0
+                            };
+                            collision_data.push(collision_type);
+                        }
+                        
+                        let mut astar_lock = bot.astar.lock().unwrap();
+                        astar_lock.update_from_collision_data(world_lock.width, world_lock.height, &collision_data);
+                    }
                 }
                 NetGamePacket::SendInventoryState => {
                     bot.inventory.lock().unwrap().parse(&data[60..])
