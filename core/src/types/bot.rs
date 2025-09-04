@@ -16,6 +16,19 @@ pub struct State {
     pub gravity: f32,
 }
 
+#[derive(Debug, Default)]
+pub struct DelayConfig {
+    pub findpath_delay: u32,
+    pub punch_delay: u32,
+    pub place_delay: u32,
+}
+
+#[derive(Debug, Default)]
+pub struct Automation {
+    pub auto_collect: bool,
+    pub auto_reconnect: bool,
+}
+
 pub struct Info {
     pub payload: Vec<String>,
     pub login_method: ELoginMethod,
@@ -82,6 +95,13 @@ impl UserData for Position {
 
 impl UserData for BotArc {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method(
+            "sendPacket",
+            |_, this, (packet_type, message): (u32, String)| {
+                this.0.send_packet(packet_type.into(), message.as_bytes(), None, true);
+                Ok(())
+            },
+        );
         methods.add_method("say", |_, this, message: String| {
             this.0.say(message);
             Ok(())
@@ -109,20 +129,32 @@ impl UserData for BotArc {
             this.0.wrench(offset_x, offset_y);
             Ok(())
         });
-        methods.add_method("warp", |_, this, world_name: String| {
-            this.0.warp(world_name);
-            Ok(())
-        });
         methods.add_method("wear", |_, this, item_id: u32| {
             this.0.wear(item_id);
             Ok(())
         });
-        methods.add_method("gems", |_, this, ()| {
-            let gems = this.0.gems.load(Ordering::SeqCst);
-            Ok(gems)
-        });
         methods.add_method("walk", |_, this, (offset_x, offset_y): (i32, i32)| {
             this.0.walk(offset_x, offset_y, false);
+            Ok(())
+        });
+        methods.add_method("autoCollect", |_, this, enabled: bool| {
+            this.0.set_auto_collect(enabled);
+            Ok(())
+        });
+        methods.add_method("autoReconnect", |_, this, enabled: bool| {
+            this.0.set_auto_reconnect(enabled);
+            Ok(())
+        });
+        methods.add_method("setFindPathDelay", |_, this, delay: u32| {
+            this.0.set_findpath_delay(delay);
+            Ok(())
+        });
+        methods.add_method("setPunchDelay", |_, this, delay: u32| {
+            this.0.set_punch_delay(delay);
+            Ok(())
+        });
+        methods.add_method("setPlaceDelay", |_, this, delay: u32| {
+            this.0.set_place_delay(delay);
             Ok(())
         });
 
@@ -132,6 +164,10 @@ impl UserData for BotArc {
         fields.add_field_method_get("pos", |_, this| {
             let pos = this.0.position.read().unwrap();
             Ok(Position(pos.0, pos.1))
+        });
+        fields.add_field_method_get("gems", |_, this| {
+            let gems = this.0.gems.load(Ordering::SeqCst);
+            Ok(gems)
         });
     }
 }

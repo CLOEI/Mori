@@ -1,5 +1,5 @@
 use crate::inventory::Inventory;
-use crate::types::bot::{Info, Scripting, State, World};
+use crate::types::bot::{Automation, DelayConfig, Info, Scripting, State, World};
 use crate::types::flags::PacketFlag;
 use crate::types::login_info::LoginInfo;
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
@@ -34,13 +34,14 @@ pub struct Bot {
     pub net_id: Mutex<u32>,
     pub is_running: Mutex<bool>,
     pub is_redirecting: Mutex<bool>,
-    pub is_inworld: Mutex<bool>,
     pub item_database: Arc<RwLock<ItemDatabase>>,
     pub world: World,
     pub inventory: Mutex<Inventory>,
     pub gems: AtomicI32,
     pub token_fetcher: Option<TokenFetcher>,
-    pub scripting: Scripting
+    pub scripting: Scripting,
+    pub delay_config: Mutex<DelayConfig>,
+    pub automation: Mutex<Automation>
 }
 
 impl Bot {
@@ -81,13 +82,14 @@ impl Bot {
             net_id: Mutex::new(0),
             is_running: Mutex::new(true),
             is_redirecting: Mutex::new(false),
-            is_inworld: Mutex::new(false),
             world: World::default(),
             item_database,
             inventory: Mutex::new(Inventory::new()),
             gems: AtomicI32::new(0),
             token_fetcher,
             scripting: Scripting::default(),
+            delay_config: Mutex::new(DelayConfig::default()),
+            automation: Mutex::new(Automation::default()),
         })
     }
 
@@ -273,6 +275,31 @@ impl Bot {
         }
     }
 
+    pub fn set_auto_collect(&self, enabled: bool) {
+        let mut automation = self.automation.lock().unwrap();
+        automation.auto_collect = enabled;
+    }
+
+    pub fn set_auto_reconnect(&self, enabled: bool) {
+        let mut automation = self.automation.lock().unwrap();
+        automation.auto_reconnect = enabled;
+    }
+
+    pub fn set_findpath_delay(&self, delay: u32) {
+        let mut delay_config = self.delay_config.lock().unwrap();
+        delay_config.findpath_delay = delay;
+    }
+
+    pub fn set_punch_delay(&self, delay: u32) {
+        let mut delay_config = self.delay_config.lock().unwrap();
+        delay_config.punch_delay = delay;
+    }
+
+    pub fn set_place_delay(&self, delay: u32) {
+        let mut delay_config = self.delay_config.lock().unwrap();
+        delay_config.place_delay = delay;
+    }
+
     fn process_event(&self) {
         let is_running = {
             let running = self.is_running.lock().unwrap();
@@ -445,5 +472,4 @@ impl Bot {
             true,
         );
     }
-
 }

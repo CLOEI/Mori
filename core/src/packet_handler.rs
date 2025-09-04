@@ -90,9 +90,6 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     variant_handler::handle(bot, &data[60..]);
                 }
                 NetGamePacket::SendMapData => {
-                    let mut is_inworld_lock = bot.is_inworld.lock().unwrap();
-                    *is_inworld_lock = true;
-
                     let world_data = &data[60..];
                     fs::write("world.dat", world_data).expect("Unable to write world data");
                     let item_database_lock = bot.item_database.read().unwrap();
@@ -157,9 +154,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     };
 
                     let (in_world, net_id) = {
-                        let state = bot.is_inworld.lock().unwrap();
+                        let world_lock = bot.world.data.lock().unwrap();
+                        let in_world = world_lock.name != "EXIT";
                         let net_id = bot.net_id.lock().unwrap();
-                        (*state, *net_id)
+                        (in_world, *net_id)
                     };
 
                     if in_world {
