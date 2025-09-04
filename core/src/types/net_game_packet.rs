@@ -1,6 +1,8 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Cursor;
 
+use crate::types::flags::PacketFlag;
+
 #[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum NetGamePacket {
@@ -61,7 +63,7 @@ pub struct NetGamePacketData {
     pub animation_type: u8,
     pub net_id: u32,
     pub target_net_id: i32,
-    pub flags: u32,
+    pub flags: PacketFlag,
     pub float_variable: f32,
     pub value: u32,
     pub vector_x: f32,
@@ -83,7 +85,7 @@ impl NetGamePacketData {
         wtr.push(self.animation_type);
         wtr.extend(&self.net_id.to_le_bytes());
         wtr.extend(&self.target_net_id.to_le_bytes());
-        wtr.extend(&self.flags.to_le_bytes());
+        wtr.extend(&self.flags.bits().to_le_bytes());
         wtr.extend(&self.float_variable.to_le_bytes());
         wtr.extend(&self.value.to_le_bytes());
         wtr.extend(&self.vector_x.to_le_bytes());
@@ -109,7 +111,7 @@ impl NetGamePacketData {
         let animation_type = rdr.read_u8().ok()?;
         let net_id = rdr.read_u32::<LittleEndian>().ok()?;
         let target_net_id = rdr.read_i32::<LittleEndian>().ok()?;
-        let flags = rdr.read_u32::<LittleEndian>().ok()?;
+        let flags = PacketFlag::from_bits_truncate(rdr.read_u32::<LittleEndian>().ok()?);
         let float_variable = rdr.read_f32::<LittleEndian>().ok()?;
         let value = rdr.read_u32::<LittleEndian>().ok()?;
         let vector_x = rdr.read_f32::<LittleEndian>().ok()?;

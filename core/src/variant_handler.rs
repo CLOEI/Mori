@@ -3,10 +3,9 @@ use crate::types::player::Player;
 use crate::utils::proton::HashMode;
 use crate::utils::variant::VariantList;
 use crate::{Bot, utils};
-use log::log;
 use std::collections::HashMap;
 use std::fs;
-use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 pub fn handle(bot: &Bot, data: &[u8]) {
     let variant = VariantList::deserialize(&data).expect("Failed to deserialize variant list");
@@ -98,9 +97,9 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             println!("[CONSOLE] {}", message);
         }
         "OnSetBux" => {
-            let bux = variant.get(1).unwrap().as_int32();
-            let mut gems_lock = bot.gems.lock().unwrap();
-            *gems_lock = bux;
+            let gems = variant.get(1).unwrap().as_int32();
+            let current = bot.gems.load(Ordering::SeqCst);
+            bot.gems.store(current + gems, Ordering::SeqCst);
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();

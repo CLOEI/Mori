@@ -1,11 +1,14 @@
 use crate::inventory::Inventory;
-use crate::types::bot::{Info, State, World};
+use crate::types::bot::{Info, Scripting, State, World};
+use crate::types::flags::PacketFlag;
 use crate::types::login_info::LoginInfo;
+use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
 use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::str::FromStr;
+use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
@@ -16,6 +19,7 @@ mod server;
 mod types;
 mod utils;
 mod variant_handler;
+mod lua;
 
 type TokenFetcher = Box<dyn Fn(String) -> String + Send + Sync>;
 
@@ -34,8 +38,9 @@ pub struct Bot {
     pub item_database: Arc<RwLock<ItemDatabase>>,
     pub world: World,
     pub inventory: Mutex<Inventory>,
-    pub gems: Mutex<i32>,
+    pub gems: AtomicI32,
     pub token_fetcher: Option<TokenFetcher>,
+    pub scripting: Scripting
 }
 
 impl Bot {
@@ -43,7 +48,7 @@ impl Bot {
         payload: Vec<String>,
         token_fetcher: Option<TokenFetcher>,
         item_database: Arc<RwLock<ItemDatabase>>,
-    ) -> Self {
+    ) -> Arc<Self> {
         let socket =
             UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
         let host = rusty_enet::Host::<UdpSocket>::new(
@@ -59,7 +64,7 @@ impl Bot {
         )
         .expect("Failed to create host");
 
-        Self {
+        Arc::new(Self {
             host: Mutex::new(host),
             peer_id: Mutex::new(None),
             info: Info {
@@ -80,12 +85,14 @@ impl Bot {
             world: World::default(),
             item_database,
             inventory: Mutex::new(Inventory::new()),
-            gems: Mutex::new(0),
+            gems: AtomicI32::new(0),
             token_fetcher,
-        }
+            scripting: Scripting::default(),
+        })
     }
 
-    pub fn logon(&self, data: Option<&str>) {
+    pub fn logon(self: Arc<Self>, data: Option<&str>) {
+        lua::initialize(&self);
         if data.is_some() {
             todo!("Implement logon with pre-existing credentials");
         } else {
@@ -309,4 +316,134 @@ impl Bot {
             }
         }
     }
+}
+
+// packet methods
+impl Bot {
+    pub fn say(&self, message: String) {
+        self.send_packet(
+            NetMessage::GenericText,
+            format!("action|input\n|text|{}\n", message).as_bytes(),
+            None,
+            true,
+        );
+    }
+
+    pub fn warp(&self, world_name: String) {
+        self.send_packet(
+            NetMessage::GameMessage,
+            format!("action|join_request\nname|{}\ninvitedWorld|0\n", world_name).as_bytes(),
+            None,
+            true,
+        );
+    }
+
+    pub fn place(&self, offset_x: i32, offset_y: i32, item_id: u32) {
+        let mut pkt = NetGamePacketData::default();
+        pkt._type = NetGamePacket::TileChangeRequest;
+        let (base_x, base_y) = {
+            let position = self.position.read().unwrap();
+            pkt.vector_x = position.0;
+            pkt.vector_y = position.1;
+            pkt.int_x = (position.0 / 32.0).floor() as i32 + offset_x;
+            pkt.int_y = (position.1 / 32.0).floor() as i32 + offset_y;
+            pkt.value = item_id;
+
+            (
+                (position.0 / 32.0).floor() as i32,
+                (position.1 / 32.0).floor() as i32,
+            )
+        };
+
+        if pkt.int_x <= base_x + 4
+            && pkt.int_x >= base_x - 4
+            && pkt.int_y <= base_y + 4
+            && pkt.int_y >= base_y - 4
+        {
+            self.send_packet(
+                NetMessage::GamePacket,
+                pkt.to_bytes().as_slice(),
+                None,
+                true,
+            );
+            pkt.flags = PacketFlag::PLACE | PacketFlag::STANDING;
+            if base_x > pkt.int_x {
+                pkt.flags |= PacketFlag::FACING_LEFT;
+            }
+            pkt._type = NetGamePacket::State;
+            self.send_packet(
+                NetMessage::GamePacket,
+                pkt.to_bytes().as_slice(),
+                None,
+                true,
+            );
+        }
+    }
+
+    pub fn punch(&self, offset_x: i32, offset_y: i32) {
+        self.place(offset_x, offset_y, 18);
+    }
+
+    pub fn wrench(&self, offset_x: i32, offset_y: i32) {
+        self.place(offset_x, offset_y, 32);
+    }
+
+    pub fn wear(&self, item_id: u32) {
+        let packet = NetGamePacketData {
+            _type: NetGamePacket::ItemActivateRequest,
+            value: item_id,
+            ..Default::default()
+        };
+
+        self.send_packet(
+            NetMessage::GamePacket,
+            packet.to_bytes().as_slice(),
+            None,
+            true,
+        );
+    }
+
+    pub fn walk(&self, x: i32, y: i32, ap: bool) {
+        if !ap {
+            let mut position = self.position.write().expect("Failed to lock position");
+            *position = (position.0 + (x * 32) as f32, position.1 + (y * 32) as f32);
+        }
+
+        let position = {
+            let position = self
+                .position
+                .read()
+                .expect("Failed to lock position")
+                .clone();
+
+            position
+        };
+
+        let mut pkt = NetGamePacketData::default();
+        {
+            pkt._type = NetGamePacket::State;
+            pkt.vector_x = position.0;
+            pkt.vector_y = position.1;
+            pkt.int_x = -1;
+            pkt.int_y = -1;
+            pkt.flags = PacketFlag::WALK | PacketFlag::STANDING;
+            
+
+            let face_left = if position.0 < x as f32 * 32.0 {
+                false
+            } else {
+                true
+            };
+
+            pkt.flags.set(PacketFlag::FACING_LEFT, face_left);
+        }
+
+        self.send_packet(
+            NetMessage::GamePacket,
+            pkt.to_bytes().as_slice(),
+            None,
+            true,
+        );
+    }
+
 }

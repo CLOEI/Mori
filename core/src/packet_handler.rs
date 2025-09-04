@@ -7,7 +7,6 @@ use flate2::read::ZlibDecoder;
 use std::fs;
 use std::io::Read;
 use std::ops::Deref;
-use std::sync::Arc;
 
 pub fn handle(bot: &Bot, data: &[u8]) {
     let packet_id = LittleEndian::read_u32(&data[0..4]);
@@ -99,7 +98,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     let item_database_lock = bot.item_database.read().unwrap();
                     let item_database = item_database_lock.deref();
                     let mut world_lock = bot.world.data.lock().unwrap();
-                    world_lock.parse(&data[60..], item_database);
+                    let _ =world_lock.parse(&data[60..], item_database);
                 }
                 NetGamePacket::SendInventoryState => {
                     bot.inventory.lock().unwrap().parse(&data[60..])

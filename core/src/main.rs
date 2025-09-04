@@ -102,11 +102,11 @@ fn main() {
 
     let item_database = Arc::new(RwLock::new(ItemDatabase::new()));
 
-    let bot = Arc::new(Bot::new(
+    let bot = Bot::new(
         vec!["".to_string(), "".to_string()],
         Some(Box::new(token_fetch)),
         item_database,
-    ));
+    );
     let bot_clone = Arc::clone(&bot);
     let t = thread::spawn(move || {
         bot_clone.logon(None);
