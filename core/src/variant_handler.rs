@@ -1,14 +1,14 @@
-use std::collections::HashMap;
-use std::fs;
-use std::sync::Arc;
-use log::log;
-use crate::{utils, Bot};
 use crate::types::net_message::NetMessage;
 use crate::types::player::Player;
 use crate::utils::proton::HashMode;
 use crate::utils::variant::VariantList;
+use crate::{Bot, utils};
+use log::log;
+use std::collections::HashMap;
+use std::fs;
+use std::sync::Arc;
 
-pub fn handle(bot: &mut Bot, data: &[u8]) {
+pub fn handle(bot: &Bot, data: &[u8]) {
     let variant = VariantList::deserialize(&data).expect("Failed to deserialize variant list");
     let function_call: String = variant.get(0).unwrap().as_string();
 
@@ -20,7 +20,10 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
             let token = variant.get(2).unwrap().as_int32();
             let user_id = variant.get(3).unwrap().as_int32();
             let server_data = variant.get(4).unwrap().as_string();
-            let parsed_server_data: Vec<String> = server_data.split('|').map(|s| s.trim_end().to_string()).collect();
+            let parsed_server_data: Vec<String> = server_data
+                .split('|')
+                .map(|s| s.trim_end().to_string())
+                .collect();
             let aat = variant.get(5).unwrap().as_int32();
 
             let mut server_data_lock = bot.info.server_data.lock().unwrap();
@@ -48,14 +51,24 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
 
             match fs::read("items.dat") {
                 Ok(data) => {
-                    let hash = utils::proton::hash(data.as_slice(), HashMode::FixedLength(data.len() as i32)) as u32;
+                    let hash = utils::proton::hash(
+                        data.as_slice(),
+                        HashMode::FixedLength(data.len() as i32),
+                    ) as u32;
 
                     if hash == server_hash {
-                        bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
+                        bot.send_packet(
+                            NetMessage::GenericText,
+                            "action|enter_game\n".to_string().as_bytes(),
+                            None,
+                            true,
+                        );
                         let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
                         *is_redirecting_lock = false;
-                        let item_database = gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
-                        bot.item_database = Arc::new(item_database);
+                        let item_database = gtitem_r::load_from_file("items.dat")
+                            .expect("Failed to load items.dat");
+                        let mut item_database_lock = bot.item_database.write().unwrap();
+                        *item_database_lock = item_database;
                         return;
                     }
                 }
@@ -64,7 +77,12 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
                 }
             }
 
-            bot.send_packet(NetMessage::GenericText, "action|refresh_item_data\n".to_string().as_bytes(), None, true);
+            bot.send_packet(
+                NetMessage::GenericText,
+                "action|refresh_item_data\n".to_string().as_bytes(),
+                None,
+                true,
+            );
         }
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
@@ -104,7 +122,11 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
 
             if data.contains_key("type") {
                 let mut net_id_lock = bot.net_id.lock().unwrap();
-                *net_id_lock = data.get("netID").unwrap().parse().expect("Failed to parse netid");
+                *net_id_lock = data
+                    .get("netID")
+                    .unwrap()
+                    .parse()
+                    .expect("Failed to parse netid");
             } else {
                 let player = Player {
                     _type: data["type"].clone(),
@@ -117,17 +139,26 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
                     title_icon: data["titleIcon"].clone(),
                     m_state: data["mstate"].parse().expect("Failed to parse mstate"),
                     user_id: data["userID"].parse().expect("Failed to parse userid"),
-                    invisible: data["invisible"].parse().expect("Failed to parse invisible"),
+                    invisible: data["invisible"]
+                        .parse()
+                        .expect("Failed to parse invisible"),
                     name: data["name"].clone(),
                     country: data["country"].clone(),
                     position: {
                         if data.contains_key("posXY") {
-                            let pos_xy = data.get("posXY").unwrap().split('|').map(|s| s.trim().parse().expect("Fail to parse player coordinates")).collect::<Vec<f32>>();
+                            let pos_xy = data
+                                .get("posXY")
+                                .unwrap()
+                                .split('|')
+                                .map(|s| {
+                                    s.trim().parse().expect("Fail to parse player coordinates")
+                                })
+                                .collect::<Vec<f32>>();
                             (pos_xy[0], pos_xy[1])
                         } else {
                             (0.0, 0.0)
                         }
-                    }
+                    },
                 };
 
                 let mut players = bot.world.players.lock().unwrap();

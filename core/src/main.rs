@@ -1,14 +1,16 @@
-use std::sync::{Arc, Mutex};
-use std::thread;
 use gt_core::Bot;
+use gtitem_r::structs::ItemDatabase;
 use serde_json::Value;
-use tao::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow},
-    window::WindowBuilder,
-};
+use std::sync::{Arc, Mutex, RwLock};
+use std::thread;
 use tao::event_loop::EventLoopBuilder;
 use tao::platform::run_return::EventLoopExtRunReturn;
+use tao::platform::windows::EventLoopBuilderExtWindows;
+use tao::{
+    event::{Event, WindowEvent},
+    event_loop::ControlFlow,
+    window::WindowBuilder,
+};
 use wry::WebViewBuilder;
 
 #[derive(Debug, Clone, Copy)]
@@ -20,7 +22,9 @@ enum UserEvent {
 
 fn main() {
     let token_fetch = |url: String| {
-        let mut event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
+        let mut event_loop = EventLoopBuilder::<UserEvent>::with_user_event()
+            .with_any_thread(true)
+            .build();
         let proxy = event_loop.create_proxy();
         let token_mutex = Arc::new(Mutex::new("".to_string()));
 
@@ -66,7 +70,9 @@ fn main() {
             .build(&window)
             .unwrap();
 
-        println!("WebView thread: WebView is running. Please log in and navigate to the validation page...");
+        println!(
+            "WebView thread: WebView is running. Please log in and navigate to the validation page..."
+        );
 
         event_loop.run_return(move |event, _, control_flow| {
             *control_flow = ControlFlow::Wait;
@@ -92,6 +98,20 @@ fn main() {
         token
     };
 
-    let mut bot = Bot::new(vec!["".to_string(), "".to_string()], Some(Box::new(token_fetch)));
-    bot.logon(None);
+    let mut bots: Vec<Arc<Bot>> = vec![];
+
+    let item_database = Arc::new(RwLock::new(ItemDatabase::new()));
+
+    let bot = Arc::new(Bot::new(
+        vec!["".to_string(), "".to_string()],
+        Some(Box::new(token_fetch)),
+        item_database,
+    ));
+    let bot_clone = Arc::clone(&bot);
+    let t = thread::spawn(move || {
+        bot_clone.logon(None);
+    });
+    bots.push(bot);
+
+    t.join().unwrap();
 }

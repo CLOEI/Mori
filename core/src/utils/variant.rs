@@ -1,6 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::prelude::*;
 use std::io::Cursor;
+use std::io::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum VariantType {

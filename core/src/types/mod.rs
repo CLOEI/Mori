@@ -1,6 +1,6 @@
-pub mod login_info;
-pub mod server_data;
 pub mod bot;
-pub mod net_message;
+pub mod login_info;
 pub mod net_game_packet;
+pub mod net_message;
 pub mod player;
+pub mod server_data;

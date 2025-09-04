@@ -1,21 +1,21 @@
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
-use std::str::FromStr;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::Instant;
-use gtitem_r::structs::ItemDatabase;
-use rusty_enet::Packet;
 use crate::inventory::Inventory;
 use crate::types::bot::{Info, State, World};
 use crate::types::login_info::LoginInfo;
 use crate::types::net_message::NetMessage;
+use gtitem_r::structs::ItemDatabase;
+use rusty_enet::Packet;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
+use std::str::FromStr;
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::Instant;
 
+mod inventory;
+mod login;
+mod packet_handler;
 mod server;
 mod types;
 mod utils;
-mod login;
-mod packet_handler;
 mod variant_handler;
-mod inventory;
 
 type TokenFetcher = Box<dyn Fn(String) -> String + Send + Sync>;
 
@@ -31,7 +31,7 @@ pub struct Bot {
     pub is_running: Mutex<bool>,
     pub is_redirecting: Mutex<bool>,
     pub is_inworld: Mutex<bool>,
-    item_database: Arc<ItemDatabase>,
+    pub item_database: Arc<RwLock<ItemDatabase>>,
     pub world: World,
     pub inventory: Mutex<Inventory>,
     pub gems: Mutex<i32>,
@@ -39,8 +39,13 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub fn new(payload: Vec<String>, token_fetcher: Option<TokenFetcher>) -> Self {
-        let socket = UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
+    pub fn new(
+        payload: Vec<String>,
+        token_fetcher: Option<TokenFetcher>,
+        item_database: Arc<RwLock<ItemDatabase>>,
+    ) -> Self {
+        let socket =
+            UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
         let host = rusty_enet::Host::<UdpSocket>::new(
             socket,
             rusty_enet::HostSettings {
@@ -51,7 +56,8 @@ impl Bot {
                 using_new_packet: true,
                 ..Default::default()
             },
-        ).expect("Failed to create host");
+        )
+        .expect("Failed to create host");
 
         Self {
             host: Mutex::new(host),
@@ -72,14 +78,14 @@ impl Bot {
             is_redirecting: Mutex::new(false),
             is_inworld: Mutex::new(false),
             world: World::default(),
-            item_database: Arc::new(ItemDatabase::new()),
+            item_database,
             inventory: Mutex::new(Inventory::new()),
             gems: Mutex::new(0),
             token_fetcher,
         }
     }
 
-    pub fn logon(&mut self, data: Option<&str>) {
+    pub fn logon(&self, data: Option<&str>) {
         if data.is_some() {
             todo!("Implement logon with pre-existing credentials");
         } else {
@@ -100,7 +106,8 @@ impl Bot {
                         info_data.meta = data.meta.clone();
                         let mut server = self.info.server_data.lock().unwrap();
                         *server = Some(data.clone());
-                        let dashboard_data = server::get_dashboard(&data.loginurl, info_data).expect("Failed to get dashboard data");
+                        let dashboard_data = server::get_dashboard(&data.loginurl, info_data)
+                            .expect("Failed to get dashboard data");
                         let mut dashboard = self.info.dashboard_links.lock().unwrap();
                         *dashboard = Some(dashboard_data);
                     }
@@ -115,7 +122,8 @@ impl Bot {
         let server_data = self.info.server_data.lock().unwrap();
         let server = server_data.as_ref().expect("Server data not set");
 
-        let socket_address = SocketAddr::from_str(&format!("{}:{}", server.server, server.port)).unwrap();
+        let socket_address =
+            SocketAddr::from_str(&format!("{}:{}", server.server, server.port)).unwrap();
 
         let mut host = self.host.lock().unwrap();
         match host.connect(socket_address, 2, 0) {
@@ -166,8 +174,9 @@ impl Bot {
                 let username = payload.get(0).expect("Username not found");
                 let password = payload.get(1).expect("Password not found");
                 let growtopia_url = urls.as_ref().and_then(|links| links.growtopia.clone());
-                login::get_legacy_token(&growtopia_url.unwrap(), username, password).expect("Failed to get legacy token")
-            },
+                login::get_legacy_token(&growtopia_url.unwrap(), username, password)
+                    .expect("Failed to get legacy token")
+            }
             _ => {
                 todo!("Implement token retrieval for different login methods");
             }
@@ -188,7 +197,10 @@ impl Bot {
         const MAX_PACKET_SIZE: usize = 1_000_000;
 
         if packet_data.len() > MAX_PACKET_SIZE {
-            println!("Error: Attempted to send huge packet of size {}", packet_data.len());
+            println!(
+                "Error: Attempted to send huge packet of size {}",
+                packet_data.len()
+            );
             return;
         }
 
@@ -197,7 +209,9 @@ impl Bot {
 
         if let NetMessage::GamePacket = packet_type {
             if packet_data.len() >= 16 {
-                let flags_bytes: [u8; 4] = packet_data[12..16].try_into().expect("Slice with incorrect length");
+                let flags_bytes: [u8; 4] = packet_data[12..16]
+                    .try_into()
+                    .expect("Slice with incorrect length");
                 let flags = u32::from_le_bytes(flags_bytes);
 
                 if (flags & 8) != 0 {
@@ -212,7 +226,9 @@ impl Bot {
         if is_special_case {
             if let Some(ext_data) = extended_data {
                 if packet_data.len() >= 56 {
-                    let len_bytes: [u8; 4] = packet_data[52..56].try_into().expect("Slice with incorrect length");
+                    let len_bytes: [u8; 4] = packet_data[52..56]
+                        .try_into()
+                        .expect("Slice with incorrect length");
                     let extended_len = u32::from_le_bytes(len_bytes) as usize;
 
                     final_payload.extend_from_slice(&ext_data[..extended_len]);
@@ -239,7 +255,7 @@ impl Bot {
             println!("Failed to send packet: {}", err);
         }
     }
-    
+
     fn disconnect(&self) {
         let peer_id = self.peer_id.lock().unwrap().clone();
         if let Some(peer_id) = peer_id {
@@ -250,7 +266,7 @@ impl Bot {
         }
     }
 
-    fn process_event(&mut self) {
+    fn process_event(&self) {
         let is_running = {
             let running = self.is_running.lock().unwrap();
             *running
@@ -273,7 +289,11 @@ impl Bot {
                             let mut peer_id_lock = self.peer_id.lock().unwrap();
                             *peer_id_lock = Some(peer);
                         }
-                        rusty_enet::EventNoRef::Receive { peer, channel_id, packet } => {
+                        rusty_enet::EventNoRef::Receive {
+                            peer,
+                            channel_id,
+                            packet,
+                        } => {
                             let data = packet.data();
                             if data.len() < 4 {
                                 continue;

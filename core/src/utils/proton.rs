@@ -1,9 +1,9 @@
+use md5;
+use sha2::{Digest, Sha256};
 use std::{
     fs::File,
     io::{self, Read},
 };
-use md5;
-use sha2::{Digest, Sha256};
 
 pub fn generate_klv(protocol: &str, version: &str, rid: &str) -> String {
     let salts = [
@@ -42,7 +42,8 @@ pub fn hash_sha256(input: &str) -> String {
 
 pub fn hash_md5(input: &str) -> String {
     let hasher = md5::compute(input);
-    hex::encode(hasher.as_ref() as &[u8])}
+    hex::encode(hasher.as_ref() as &[u8])
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum HashMode {

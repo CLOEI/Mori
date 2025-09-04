@@ -69,13 +69,25 @@ impl LoginInfo {
             user: String::new(),
             wk: utils::random::hex(32, true),
             aat: "0".to_string(),
-            ltoken: "" .to_string(),
+            ltoken: "".to_string(),
         };
 
-        login_info.klv = utils::proton::generate_klv(&login_info.protocol, &login_info.game_version, &login_info.rid);
-        login_info.hash = utils::proton::hash(&format!("{}RT", login_info.mac).as_bytes(), HashMode::NullTerminated).to_string();
-        login_info.hash2 = utils::proton::hash(&format!("{}RT", utils::random::hex(16, true)).as_bytes(), HashMode::NullTerminated).to_string();
-        
+        login_info.klv = utils::proton::generate_klv(
+            &login_info.protocol,
+            &login_info.game_version,
+            &login_info.rid,
+        );
+        login_info.hash = utils::proton::hash(
+            &format!("{}RT", login_info.mac).as_bytes(),
+            HashMode::NullTerminated,
+        )
+        .to_string();
+        login_info.hash2 = utils::proton::hash(
+            &format!("{}RT", utils::random::hex(16, true)).as_bytes(),
+            HashMode::NullTerminated,
+        )
+        .to_string();
+
         login_info
     }
 

@@ -1,9 +1,9 @@
-use std::sync::Mutex;
-use std::time::Duration;
 use crate::server::DashboardLinks;
 use crate::types::login_info::LoginInfo;
 use crate::types::player::Player;
 use crate::types::server_data::ServerData;
+use std::sync::Mutex;
+use std::time::Duration;
 
 #[derive(Debug, Default)]
 pub struct State {
@@ -22,10 +22,19 @@ pub struct Info {
     pub dashboard_links: Mutex<Option<DashboardLinks>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct World {
-    pub data: Mutex<Option<gtworld_r::World>>,
-    pub players: Mutex<Vec<Player>>
+    pub data: Mutex<gtworld_r::World>,
+    pub players: Mutex<Vec<Player>>,
+}
+
+impl Default for World {
+    fn default() -> Self {
+        World {
+            data: Mutex::new(gtworld_r::World::new()),
+            players: Mutex::new(Vec::new()),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

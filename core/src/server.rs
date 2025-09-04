@@ -1,12 +1,11 @@
 use crate::types::login_info::LoginInfo;
 use crate::types::server_data::ServerData;
-use urlencoding::encode;
 use anyhow::Result;
 use scraper::{Html, Selector};
 use serde_json::Value;
+use urlencoding::encode;
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DashboardLinks {
     pub apple: Option<String>,
     pub google: Option<String>,
@@ -37,9 +36,7 @@ pub fn check_token(token: &str, login_info: &str) -> Result<String> {
                 Err(anyhow::anyhow!("Token validation failed: {}", response))
             }
         }
-        Err(e) => {
-            Err(anyhow::anyhow!("Failed to validate token: {}", e))
-        }
+        Err(e) => Err(anyhow::anyhow!("Failed to validate token: {}", e)),
     }
 }
 
@@ -51,9 +48,15 @@ pub fn get_server_data(alternate: bool, login_info: &LoginInfo) -> Result<Server
     };
 
     let req = ureq::post(url)
-        .header("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
+        .header(
+            "User-Agent",
+            "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
+        )
         .header("Content-Type", "application/x-www-form-urlencoded")
-        .send(&format!("platform=0&protocol={}&version={}", login_info.protocol, login_info.game_version))?
+        .send(&format!(
+            "platform=0&protocol={}&version={}",
+            login_info.protocol, login_info.game_version
+        ))?
         .body_mut()
         .read_to_string();
 
@@ -75,7 +78,8 @@ pub fn get_dashboard(login_url: &str, login_info: &LoginInfo) -> Result<Dashboar
         .map_err(|e| anyhow::anyhow!("Failed to read response: {}", e))?;
 
     let document = Html::parse_document(&req);
-    let link_selector = Selector::parse("a").map_err(|e| anyhow::anyhow!("Failed to parse selector: {}", e))?;
+    let link_selector =
+        Selector::parse("a").map_err(|e| anyhow::anyhow!("Failed to parse selector: {}", e))?;
 
     let mut apple_href = None;
     let mut google_href = None;

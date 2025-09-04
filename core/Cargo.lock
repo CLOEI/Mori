@@ -1016,8 +1016,10 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#0f12be8b803158a9ca18dcd950adc48038ceda98"
+source = "git+https://github.com/CLOEI/gtworld-r.git#8b347a7091a426a314d325118c422ac319026630"
 dependencies = [
+ "anyhow",
+ "bitflags 2.9.4",
  "byteorder",
  "gtitem-r",
 ]
@@ -1331,9 +1333,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.27"
+version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "mac"

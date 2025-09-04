@@ -1,7 +1,7 @@
-use std::time::Duration;
-use regex::Regex;
 use anyhow::Result;
+use regex::Regex;
 use serde_json::Value;
+use std::time::Duration;
 use ureq::Agent;
 
 pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<String> {
@@ -26,7 +26,7 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
         Some(token) => token,
         None => return Err(anyhow::anyhow!("Failed to extract token from HTML")),
     };
-    
+
     let mut req = agent
         .post("https://login.growtopiagame.com/player/growid/login/validate")
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0")
@@ -42,7 +42,10 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
         let json: Value = serde_json::from_str(&body)?;
         Ok(json["token"].as_str().unwrap().to_string())
     } else {
-        Err(anyhow::anyhow!("Login failed with status: {}", req.status()))
+        Err(anyhow::anyhow!(
+            "Login failed with status: {}",
+            req.status()
+        ))
     }
 }
 

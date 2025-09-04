@@ -1,14 +1,15 @@
-use std::fs;
-use std::io::Read;
-use std::sync::Arc;
-use byteorder::{ByteOrder, LittleEndian};
-use flate2::read::ZlibDecoder;
-use crate::{utils, variant_handler, Bot};
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
 use crate::utils::proton::HashMode;
+use crate::{Bot, utils, variant_handler};
+use byteorder::{ByteOrder, LittleEndian};
+use flate2::read::ZlibDecoder;
+use std::fs;
+use std::io::Read;
+use std::ops::Deref;
+use std::sync::Arc;
 
-pub fn handle(bot: &mut Bot, data: &[u8]) {
+pub fn handle(bot: &Bot, data: &[u8]) {
     let packet_id = LittleEndian::read_u32(&data[0..4]);
     let packet_type = NetMessage::from(packet_id);
 
@@ -65,17 +66,14 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
                     let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
                     *is_redirecting_lock = false;
                 }
-
             } else {
                 data = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
-                    login_info.protocol,
-                    login_info.ltoken,
-                    login_info.platform_id
+                    login_info.protocol, login_info.ltoken, login_info.platform_id
                 );
             }
             bot.send_packet(NetMessage::GenericText, data.as_bytes(), None, true);
-        },
+        }
         NetMessage::GameMessage => {
             let message = String::from_utf8_lossy(&data[4..]).to_string();
             println!("GameMessage: {}", message);
@@ -83,9 +81,10 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
             if message.contains("logon_fail") {
                 bot.disconnect()
             }
-        },
+        }
         NetMessage::GamePacket => {
-            let parsed = NetGamePacketData::from_bytes(&data[4..]).expect("Failed to parse NetGamePacketData");
+            let parsed = NetGamePacketData::from_bytes(&data[4..])
+                .expect("Failed to parse NetGamePacketData");
             println!("GamePacket: {:?}", parsed._type);
             match parsed._type {
                 NetGamePacket::CallFunction => {
@@ -97,10 +96,10 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
 
                     let world_data = &data[60..];
                     fs::write("world.dat", world_data).expect("Unable to write world data");
-                    let item_database_clone = Arc::clone(&bot.item_database);
-                    let world = gtworld_r::World::new(item_database_clone);
+                    let item_database_lock = bot.item_database.read().unwrap();
+                    let item_database = item_database_lock.deref();
                     let mut world_lock = bot.world.data.lock().unwrap();
-                    *world_lock = Some(world);
+                    world_lock.parse(&data[60..], item_database);
                 }
                 NetGamePacket::SendInventoryState => {
                     bot.inventory.lock().unwrap().parse(&data[60..])
@@ -129,22 +128,39 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
                     let value = parsed.value;
                     let (hack_type, build_length, punch_length, gravity, velocity) = {
                         let state_lock = bot.state.lock().unwrap();
-                        (state_lock.hack_type, state_lock.build_length, state_lock.punch_length, state_lock.gravity, state_lock.velocity)
+                        (
+                            state_lock.hack_type,
+                            state_lock.build_length,
+                            state_lock.punch_length,
+                            state_lock.gravity,
+                            state_lock.velocity,
+                        )
                     };
 
                     let mut data = NetGamePacketData {
                         _type: NetGamePacket::PingReply,
-                        target_net_id: utils::proton::hash(value.to_string().as_bytes(), HashMode::NullTerminated) as i32,
+                        target_net_id: utils::proton::hash(
+                            value.to_string().as_bytes(),
+                            HashMode::NullTerminated,
+                        ) as i32,
                         value: elapsed,
-                        vector_x:  (if build_length == 0 { 2.0 } else { build_length as f32 }) * 32.0,
-                        vector_y: (if punch_length == 0 { 2.0 } else { punch_length as f32 }) * 32.0,
+                        vector_x: (if build_length == 0 {
+                            2.0
+                        } else {
+                            build_length as f32
+                        }) * 32.0,
+                        vector_y: (if punch_length == 0 {
+                            2.0
+                        } else {
+                            punch_length as f32
+                        }) * 32.0,
                         ..Default::default()
                     };
 
                     let (in_world, net_id) = {
                         let state = bot.is_inworld.lock().unwrap();
                         let net_id = bot.net_id.lock().unwrap();
-                        ( *state, *net_id )
+                        (*state, *net_id)
                     };
 
                     if in_world {
@@ -162,12 +178,18 @@ pub fn handle(bot: &mut Bot, data: &[u8]) {
                     decoder.read_to_end(&mut data).unwrap();
                     fs::write("items.dat", &data).unwrap();
 
-                    bot.send_packet(NetMessage::GenericText, "action|enter_game\n".to_string().as_bytes(), None, true);
+                    bot.send_packet(
+                        NetMessage::GenericText,
+                        "action|enter_game\n".to_string().as_bytes(),
+                        None,
+                        true,
+                    );
                     let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
                     *is_redirecting_lock = false;
 
-                    let item_database = gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
-                    bot.item_database = Arc::new(item_database);
+                    let item_database =
+                        gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
+                    // bot.item_database = Arc::new(item_database);
                 }
                 _ => {}
             }
