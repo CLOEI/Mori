@@ -7,6 +7,9 @@ authors = ["Cendy"]
 [dependencies]
 bevy = "0.16.1"
 bevy_egui = "0.36.0"
+egui_flex = "0.4.0"
+egui_material_icons = "0.4.0"
+egui_virtual_list = "0.8.0"
 gt-core = { path = "./core" }
 
 [profile.dev]

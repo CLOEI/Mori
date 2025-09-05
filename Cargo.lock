@@ -8,6 +8,9 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "egui_flex",
+ "egui_material_icons",
+ "egui_virtual_list",
  "gt-core",
 ]
 
@@ -2395,6 +2398,34 @@ dependencies = [
  "profiling",
  "smallvec",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "egui_flex"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b388984b540ccaf64452c2cb3856026f50b996e5a7c7412d1d011d13a358b51"
+dependencies = [
+ "egui",
+]
+
+[[package]]
+name = "egui_material_icons"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edaf2524c06db70ec9154db2de26b43ea278cd304547c0ee9339d5a46a4d6a04"
+dependencies = [
+ "egui",
+]
+
+[[package]]
+name = "egui_virtual_list"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "532c45e6075a2c44fd40cd094aea69a0aa77c0804e4d91f9e06cdecf7b84b557"
+dependencies = [
+ "egui",
+ "web-time",
 ]
 
 [[package]]
