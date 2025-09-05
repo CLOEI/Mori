@@ -5,9 +5,7 @@ use std::time::Duration;
 use ureq::Agent;
 
 pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<String> {
-    let mut config = Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(5)))
-        .build();
+    let config = Agent::config_builder().build();
     let agent: Agent = config.into();
 
     let body = agent
@@ -29,7 +27,6 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
 
     let mut req = agent
         .post("https://login.growtopiagame.com/player/growid/login/validate")
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .send_form([
             ("_token", &token),

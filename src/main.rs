@@ -1,5 +1,6 @@
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
+use std::thread;
 use bevy::prelude::*;
 use bevy::render::camera::Viewport;
 use bevy::render::view::RenderLayers;
@@ -10,16 +11,32 @@ use egui_flex::{item, Flex};
 use egui_virtual_list::VirtualList;
 use gt_core::gtitem_r;
 use gt_core::gtitem_r::structs::ItemDatabase;
+use gt_core::Bot;
+use gt_core::types::bot::LoginVia;
+
+#[derive(Debug, PartialEq, Clone)]
+enum LoginType {
+    GOOGLE,
+    APPLE,
+    LTOKEN,
+    LEGACY,
+}
 
 #[derive(Resource)]
 struct UiState {
-    selected_bot: &'static str,
+    selected_bot: usize,
     add_bot_window_open: bool,
     item_database_window_open: bool,
     settings_window_open: bool,
-    item_database: Arc<Mutex<ItemDatabase>>,
+    item_database: Arc<RwLock<ItemDatabase>>,
     virtual_list: VirtualList,
     search_text: String,
+    // Add bot form fields
+    login_type: LoginType,
+    ltoken_string: String,
+    legacy_fields: [String; 2],
+    // Bots list
+    bots: Vec<Arc<Bot>>,
 }
 
 impl Default for UiState {
@@ -32,13 +49,17 @@ impl Default for UiState {
         };
 
         Self {
-            selected_bot: "bot-1",
+            selected_bot: 0,
             add_bot_window_open: false,
             item_database_window_open: false,
             settings_window_open: false,
-            item_database: Arc::new(Mutex::new(item_database)),
+            item_database: Arc::new(RwLock::new(item_database)),
             virtual_list: VirtualList::new(),
             search_text: String::new(),
+            login_type: LoginType::LEGACY,
+            ltoken_string: String::new(),
+            legacy_fields: Default::default(),
+            bots: Vec::new(),
         }
     }
 }
@@ -48,7 +69,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(EguiPlugin::default())
         .insert_resource(UiState {
-            selected_bot: "bot-1",
+            selected_bot: 0,
             ..Default::default()
         })
         .add_systems(Startup, setup_camera_system)
@@ -88,12 +109,21 @@ fn setup_ui_system(
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Mori");
+                let bot_count = ui_state.bots.len();
+                let selected_text = if bot_count == 0 {
+                    "No bots".to_string()
+                } else {
+                    format!("Bot {}", ui_state.selected_bot + 1)
+                };
+
                 ComboBox::from_id_salt("bot_selection")
-                    .selected_text(ui_state.selected_bot)
+                    .selected_text(&selected_text)
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut ui_state.selected_bot, "bot-1", "Bot 1");
-                        ui.selectable_value(&mut ui_state.selected_bot, "bot-2", "Bot 2");
-                        ui.selectable_value(&mut ui_state.selected_bot, "bot-3", "Bot 3");
+                        for index in 0..bot_count {
+                            if ui.selectable_value(&mut ui_state.selected_bot, index, format!("Bot {}", index + 1)).clicked() {
+                                // Selection updated
+                            }
+                        }
                     });
                 ui.separator();
                 if ui.button(format!("{} Add bot", egui_material_icons::icons::ICON_ADD)).clicked() {
@@ -156,7 +186,105 @@ fn setup_ui_system(
 
     if ui_state.add_bot_window_open {
         egui::Window::new("Add bot").show(contexts.ctx_mut()?, |ui| {
-            ui.label("List of bots will be here.");
+            ui.vertical(|ui| {
+                ui.label("Login Method:");
+                ui.horizontal(|ui| {
+                    let _ = ui.add_enabled(false, egui::Button::new("Google"));
+                    let _ = ui.add_enabled(false, egui::Button::new("Apple"));
+                    let _ = ui.add_enabled(false, egui::Button::new("LTOKEN"));
+                    ui.selectable_value(&mut ui_state.login_type, LoginType::LEGACY, "Legacy");
+                });
+
+                ui.separator();
+
+                match ui_state.login_type {
+                    LoginType::GOOGLE => {
+                        ui.label(egui::RichText::new("Google login - Coming soon")
+                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                        ui.label("No additional fields required.");
+                    }
+                    LoginType::APPLE => {
+                        ui.label(egui::RichText::new("Apple login - Coming soon")
+                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                        ui.label("No additional fields required.");
+                    }
+                    LoginType::LTOKEN => {
+                        ui.label(egui::RichText::new("LTOKEN login - Coming soon")
+                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                        ui.add_enabled_ui(false, |ui| {
+                            ui.text_edit_singleline(&mut ui_state.ltoken_string);
+                            ui.label(egui::RichText::new("Enter 4 values separated by colons (:)")
+                                .size(12.0)
+                                .color(egui::Color32::from_rgb(150, 150, 150)));
+                        });
+                    }
+                    LoginType::LEGACY => {
+                        ui.label("Legacy login requires 2 fields:");
+                        ui.horizontal(|ui| {
+                            ui.label("GrowID:");
+                            ui.text_edit_singleline(&mut ui_state.legacy_fields[0]);
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Password:");
+                            ui.text_edit_singleline(&mut ui_state.legacy_fields[1]);
+                        });
+                    }
+                }
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui.button("Create Bot").clicked() {
+                        let login_via = match ui_state.login_type {
+                            LoginType::LEGACY => {
+                                LoginVia::LEGACY([
+                                    ui_state.legacy_fields[0].clone(),
+                                    ui_state.legacy_fields[1].clone()
+                                ])
+                            }
+                            LoginType::GOOGLE => LoginVia::GOOGLE,
+                            LoginType::APPLE => LoginVia::APPLE,
+                            LoginType::LTOKEN => {
+                                let parts: Vec<String> = ui_state.ltoken_string
+                                    .split(':')
+                                    .map(|s| s.to_string())
+                                    .collect();
+                                if parts.len() == 4 {
+                                    LoginVia::LTOKEN([
+                                        parts[0].clone(),
+                                        parts[1].clone(),
+                                        parts[2].clone(),
+                                        parts[3].clone()
+                                    ])
+                                } else {
+                                    println!("Invalid LTOKEN format. Expected 4 values separated by colons.");
+                                    return;
+                                }
+                            }
+                        };
+
+                        let item_database = Arc::clone(&ui_state.item_database);
+                        let bot = Bot::new(login_via, None, item_database);
+
+                        let bot_clone = Arc::clone(&bot);
+
+                        thread::spawn(move || {
+                            bot_clone.logon(None);
+                        });
+
+                        ui_state.bots.push(bot);
+
+                        ui_state.add_bot_window_open = false;
+                        ui_state.legacy_fields = Default::default();
+                        ui_state.ltoken_string = String::new();
+                        ui_state.login_type = LoginType::LEGACY;
+
+                        println!("Bot created and added to bots list");
+                    }
+                    if ui.button("Cancel").clicked() {
+                        ui_state.add_bot_window_open = false;
+                    }
+                });
+            });
         });
     }
 
@@ -167,7 +295,7 @@ fn setup_ui_system(
             .collapsible(false)
             .show(contexts.ctx_mut()?, |ui| {
                 let (item_count, items) = {
-                    let item_database = ui_state.item_database.lock().unwrap();
+                    let item_database = ui_state.item_database.read().unwrap();
                     let count = item_database.item_count;
                     let mut item_vec: Vec<_> = item_database.items.values().cloned().collect();
                     item_vec.sort_by_key(|item| item.id);
@@ -186,6 +314,10 @@ fn setup_ui_system(
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 ui.vertical(|ui| {
                                     ui.horizontal(|ui| {
+                                        if ui.button(format!("{} Close", egui_material_icons::icons::ICON_CLOSE)).clicked() {
+                                            ui_state.item_database_window_open = false;
+                                        }
+                                        ui.add_space(8.0);
                                         ui.label(egui::RichText::new("Search:")
                                             .color(egui::Color32::from_rgb(180, 180, 180)));
                                         let response = ui.text_edit_singleline(&mut ui_state.search_text);
