@@ -1,3 +1,5 @@
+mod token;
+
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::thread;
@@ -42,7 +44,6 @@ struct UiState {
 impl Default for UiState {
     fn default() -> Self {
         let item_database = if Path::new("items.dat").exists() {
-            println!("ItemDatabase loaded");
             gtitem_r::load_from_file("items.dat").unwrap_or_else(|_| ItemDatabase::new())
         } else {
             ItemDatabase::new()
@@ -189,9 +190,9 @@ fn setup_ui_system(
             ui.vertical(|ui| {
                 ui.label("Login Method:");
                 ui.horizontal(|ui| {
-                    let _ = ui.add_enabled(false, egui::Button::new("Google"));
-                    let _ = ui.add_enabled(false, egui::Button::new("Apple"));
-                    let _ = ui.add_enabled(false, egui::Button::new("LTOKEN"));
+                    ui.selectable_value(&mut ui_state.login_type, LoginType::GOOGLE, "Google");
+                    ui.selectable_value(&mut ui_state.login_type, LoginType::APPLE, "Apple");
+                    ui.selectable_value(&mut ui_state.login_type, LoginType::LTOKEN, "LTOKEN");
                     ui.selectable_value(&mut ui_state.login_type, LoginType::LEGACY, "Legacy");
                 });
 
@@ -199,24 +200,90 @@ fn setup_ui_system(
 
                 match ui_state.login_type {
                     LoginType::GOOGLE => {
-                        ui.label(egui::RichText::new("Google login - Coming soon")
-                            .color(egui::Color32::from_rgb(150, 150, 150)));
-                        ui.label("No additional fields required.");
+                        ui.label("Google login - Click connect to authenticate");
+                        if ui.button("Connect Google").clicked() {
+                            let item_database = Arc::clone(&ui_state.item_database);
+                            let bot = Bot::new(LoginVia::GOOGLE, Some(Box::new(token::fetch)), item_database);
+
+                            let bot_clone = Arc::clone(&bot);
+
+                            thread::spawn(move || {
+                                bot_clone.logon(None);
+                            });
+
+                            ui_state.bots.push(bot);
+
+                            ui_state.add_bot_window_open = false;
+                            ui_state.legacy_fields = Default::default();
+                            ui_state.ltoken_string = String::new();
+                            ui_state.login_type = LoginType::LEGACY;
+
+                            println!("Google bot created and added to bots list");
+                        }
                     }
                     LoginType::APPLE => {
-                        ui.label(egui::RichText::new("Apple login - Coming soon")
-                            .color(egui::Color32::from_rgb(150, 150, 150)));
-                        ui.label("No additional fields required.");
+                        ui.label("Apple login - Click connect to authenticate");
+                        if ui.button("Connect Apple").clicked() {
+                            let item_database = Arc::clone(&ui_state.item_database);
+                            let bot = Bot::new(LoginVia::APPLE, Some(Box::new(token::fetch)), item_database);
+
+                            let bot_clone = Arc::clone(&bot);
+
+                            thread::spawn(move || {
+                                bot_clone.logon(None);
+                            });
+
+                            ui_state.bots.push(bot);
+
+                            ui_state.add_bot_window_open = false;
+                            ui_state.legacy_fields = Default::default();
+                            ui_state.ltoken_string = String::new();
+                            ui_state.login_type = LoginType::LEGACY;
+
+                            println!("Apple bot created and added to bots list");
+                        }
                     }
                     LoginType::LTOKEN => {
-                        ui.label(egui::RichText::new("LTOKEN login - Coming soon")
+                        ui.label("LTOKEN login - Enter your token:");
+                        ui.text_edit_singleline(&mut ui_state.ltoken_string);
+                        ui.label(egui::RichText::new("Enter 4 values separated by colons (:)")
+                            .size(12.0)
                             .color(egui::Color32::from_rgb(150, 150, 150)));
-                        ui.add_enabled_ui(false, |ui| {
-                            ui.text_edit_singleline(&mut ui_state.ltoken_string);
-                            ui.label(egui::RichText::new("Enter 4 values separated by colons (:)")
-                                .size(12.0)
-                                .color(egui::Color32::from_rgb(150, 150, 150)));
-                        });
+                        
+                        if ui.button("Create LTOKEN Bot").clicked() {
+                            let parts: Vec<String> = ui_state.ltoken_string
+                                .split(':')
+                                .map(|s| s.to_string())
+                                .collect();
+                            if parts.len() == 4 {
+                                let login_via = LoginVia::LTOKEN([
+                                    parts[0].clone(),
+                                    parts[1].clone(),
+                                    parts[2].clone(),
+                                    parts[3].clone()
+                                ]);
+
+                                let item_database = Arc::clone(&ui_state.item_database);
+                                let bot = Bot::new(login_via, None, item_database);
+
+                                let bot_clone = Arc::clone(&bot);
+
+                                thread::spawn(move || {
+                                    bot_clone.logon(None);
+                                });
+
+                                ui_state.bots.push(bot);
+
+                                ui_state.add_bot_window_open = false;
+                                ui_state.legacy_fields = Default::default();
+                                ui_state.ltoken_string = String::new();
+                                ui_state.login_type = LoginType::LEGACY;
+
+                                println!("LTOKEN bot created and added to bots list");
+                            } else {
+                                println!("Invalid LTOKEN format. Expected 4 values separated by colons.");
+                            }
+                        }
                     }
                     LoginType::LEGACY => {
                         ui.label("Legacy login requires 2 fields:");
@@ -228,58 +295,41 @@ fn setup_ui_system(
                             ui.label("Password:");
                             ui.text_edit_singleline(&mut ui_state.legacy_fields[1]);
                         });
+                        
+                        if ui.button("Create Legacy Bot").clicked() {
+                            if !ui_state.legacy_fields[0].is_empty() && !ui_state.legacy_fields[1].is_empty() {
+                                let login_via = LoginVia::LEGACY([
+                                    ui_state.legacy_fields[0].clone(),
+                                    ui_state.legacy_fields[1].clone()
+                                ]);
+
+                                let item_database = Arc::clone(&ui_state.item_database);
+                                // Legacy login doesn't use token fetcher
+                                let bot = Bot::new(login_via, None, item_database);
+
+                                let bot_clone = Arc::clone(&bot);
+
+                                thread::spawn(move || {
+                                    bot_clone.logon(None);
+                                });
+
+                                ui_state.bots.push(bot);
+
+                                ui_state.add_bot_window_open = false;
+                                ui_state.legacy_fields = Default::default();
+                                ui_state.ltoken_string = String::new();
+                                ui_state.login_type = LoginType::LEGACY;
+
+                                println!("Legacy bot created and added to bots list");
+                            } else {
+                                println!("Please fill in both GrowID and Password fields.");
+                            }
+                        }
                     }
                 }
 
                 ui.separator();
                 ui.horizontal(|ui| {
-                    if ui.button("Create Bot").clicked() {
-                        let login_via = match ui_state.login_type {
-                            LoginType::LEGACY => {
-                                LoginVia::LEGACY([
-                                    ui_state.legacy_fields[0].clone(),
-                                    ui_state.legacy_fields[1].clone()
-                                ])
-                            }
-                            LoginType::GOOGLE => LoginVia::GOOGLE,
-                            LoginType::APPLE => LoginVia::APPLE,
-                            LoginType::LTOKEN => {
-                                let parts: Vec<String> = ui_state.ltoken_string
-                                    .split(':')
-                                    .map(|s| s.to_string())
-                                    .collect();
-                                if parts.len() == 4 {
-                                    LoginVia::LTOKEN([
-                                        parts[0].clone(),
-                                        parts[1].clone(),
-                                        parts[2].clone(),
-                                        parts[3].clone()
-                                    ])
-                                } else {
-                                    println!("Invalid LTOKEN format. Expected 4 values separated by colons.");
-                                    return;
-                                }
-                            }
-                        };
-
-                        let item_database = Arc::clone(&ui_state.item_database);
-                        let bot = Bot::new(login_via, None, item_database);
-
-                        let bot_clone = Arc::clone(&bot);
-
-                        thread::spawn(move || {
-                            bot_clone.logon(None);
-                        });
-
-                        ui_state.bots.push(bot);
-
-                        ui_state.add_bot_window_open = false;
-                        ui_state.legacy_fields = Default::default();
-                        ui_state.ltoken_string = String::new();
-                        ui_state.login_type = LoginType::LEGACY;
-
-                        println!("Bot created and added to bots list");
-                    }
                     if ui.button("Cancel").clicked() {
                         ui_state.add_bot_window_open = false;
                     }

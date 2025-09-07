@@ -11,6 +11,8 @@ egui_flex = "0.4.0"
 egui_material_icons = "0.4.0"
 egui_virtual_list = "0.8.0"
 gt-core = { path = "./core" }
+headless_chrome = { version = "1.0.18", features = ["fetch"] }
+serde_json = "1.0.143"
 
 [profile.dev]
 opt-level = 1

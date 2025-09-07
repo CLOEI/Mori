@@ -22,7 +22,7 @@ enum UserEvent {
 // THIS IS JUST A SCRATCH, NOT A FINAL IMPLEMENTATION, DO NOT USE THIS AS IS
 
 fn main() {
-    let token_fetch = |url: String| {
+    let token_fetch = |botname: String, url: String| {
         let mut event_loop = EventLoopBuilder::<UserEvent>::with_user_event()
             .with_any_thread(true)
             .build();

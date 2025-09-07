@@ -26,7 +26,7 @@ mod astar;
 
 pub use gtitem_r;
 
-type TokenFetcher = Box<dyn Fn(String) -> String + Send + Sync>;
+type TokenFetcher = Box<dyn Fn(String, String) -> String + Send + Sync>;
 
 pub struct Bot {
     pub host: Mutex<rusty_enet::Host<UdpSocket>>,
@@ -179,7 +179,7 @@ impl Bot {
             };
 
             if let Some(url) = url {
-                let token = token_fetcher(url);
+                let token = token_fetcher("place_holder".to_string(), url);
                 let mut login_info_lock = self.info.login_info.lock().unwrap();
                 let login_info = login_info_lock.as_mut().expect("Login info not set");
                 login_info.ltoken = token.clone();
