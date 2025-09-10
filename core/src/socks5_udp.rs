@@ -315,7 +315,6 @@ impl rusty_enet::Socket for Socks5UdpSocket {
     fn receive(&mut self, buffer: &mut [u8; MTU_MAX]) -> Result<Option<(Self::Address, PacketReceived)>, Self::Error> {
         match self.udp_socket.recv_from(buffer) {
             Ok((size, _source)) => {
-                println!("Received data");
                 let received_data = &buffer[..size];
                 match self.parse_udp_header(received_data) {
                     Ok((real_addr, payload)) => {

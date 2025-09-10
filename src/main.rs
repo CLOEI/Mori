@@ -308,7 +308,7 @@ fn setup_ui_system(
                             ui.label("Proxy:");
                             ui.text_edit_singleline(&mut ui_state.socks5_string);
                         });
-                        ui.label(egui::RichText::new("Format: host:port:username:password")
+                        ui.label(egui::RichText::new("Format: host:port or host:port:username:password")
                             .size(12.0)
                             .color(egui::Color32::from_rgb(150, 150, 150)));
                         
@@ -319,35 +319,61 @@ fn setup_ui_system(
                                     ui_state.legacy_fields[1].clone()
                                 ]);
 
-                                // Parse SOCKS5 config if provided
                                 let socks5_config = if !ui_state.socks5_string.is_empty() {
                                     let parts: Vec<&str> = ui_state.socks5_string.split(':').collect();
-                                    if parts.len() == 4 {
-                                        let host = parts[0];
-                                        let port = parts[1];
-                                        
-                                        // Try to resolve the domain name to a socket address
-                                        match format!("{}:{}", host, port).to_socket_addrs() {
-                                            Ok(mut addrs) => {
-                                                if let Some(proxy_addr) = addrs.next() {
-                                                    Some(Socks5Config {
-                                                        proxy_addr,
-                                                        username: Some(parts[2].to_string()),
-                                                        password: Some(parts[3].to_string()),
-                                                    })
-                                                } else {
-                                                    println!("Could not resolve SOCKS5 proxy address: {}:{}", host, port);
+                                    match parts.len() {
+                                        2 => {
+                                            // host:port format (no authentication)
+                                            let host = parts[0];
+                                            let port = parts[1];
+                                            
+                                            match format!("{}:{}", host, port).to_socket_addrs() {
+                                                Ok(mut addrs) => {
+                                                    if let Some(proxy_addr) = addrs.next() {
+                                                        Some(Socks5Config {
+                                                            proxy_addr,
+                                                            username: None,
+                                                            password: None,
+                                                        })
+                                                    } else {
+                                                        println!("Could not resolve SOCKS5 proxy address: {}:{}", host, port);
+                                                        None
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    println!("Failed to resolve SOCKS5 proxy address {}:{}: {}", host, port, e);
                                                     None
                                                 }
                                             }
-                                            Err(e) => {
-                                                println!("Failed to resolve SOCKS5 proxy address {}:{}: {}", host, port, e);
-                                                None
+                                        }
+                                        4 => {
+                                            // host:port:username:password format (with authentication)
+                                            let host = parts[0];
+                                            let port = parts[1];
+                                            
+                                            match format!("{}:{}", host, port).to_socket_addrs() {
+                                                Ok(mut addrs) => {
+                                                    if let Some(proxy_addr) = addrs.next() {
+                                                        Some(Socks5Config {
+                                                            proxy_addr,
+                                                            username: Some(parts[2].to_string()),
+                                                            password: Some(parts[3].to_string()),
+                                                        })
+                                                    } else {
+                                                        println!("Could not resolve SOCKS5 proxy address: {}:{}", host, port);
+                                                        None
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    println!("Failed to resolve SOCKS5 proxy address {}:{}: {}", host, port, e);
+                                                    None
+                                                }
                                             }
                                         }
-                                    } else {
-                                        println!("Invalid SOCKS5 format. Expected: host:port:username:password");
-                                        None
+                                        _ => {
+                                            println!("Invalid SOCKS5 format. Expected: host:port or host:port:username:password");
+                                            None
+                                        }
                                     }
                                 } else {
                                     None
