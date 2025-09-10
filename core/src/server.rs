@@ -4,6 +4,7 @@ use anyhow::Result;
 use scraper::{Html, Selector};
 use serde_json::Value;
 use urlencoding::encode;
+use ureq::config::Config;
 
 #[derive(Debug, Clone)]
 pub struct DashboardLinks {
@@ -13,11 +14,27 @@ pub struct DashboardLinks {
 }
 
 pub fn check_token(token: &str, login_info: &str) -> Result<String> {
+    check_token_with_proxy(token, login_info, None)
+}
+
+pub fn check_token_with_proxy(token: &str, login_info: &str, proxy: Option<&str>) -> Result<String> {
     if token.is_empty() {
         return Err(anyhow::anyhow!("Token is empty"));
     }
 
-    let req = ureq::post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
+    let agent = if let Some(proxy_url) = proxy {
+        let proxy = ureq::Proxy::new(proxy_url)?;
+        ureq::Agent::new_with_config(
+            Config::builder()
+                .proxy(Some(proxy))
+                .build()
+        )
+    } else {
+        ureq::Agent::new_with_defaults()
+    };
+
+    let req = agent
+        .post("https://login.growtopiagame.com/player/growid/checktoken?valKey=40db4045f2d8c572efe8c4a060605726")
         .header("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .send_form([
@@ -41,13 +58,29 @@ pub fn check_token(token: &str, login_info: &str) -> Result<String> {
 }
 
 pub fn get_server_data(alternate: bool, login_info: &LoginInfo) -> Result<ServerData> {
+    get_server_data_with_proxy(alternate, login_info, None)
+}
+
+pub fn get_server_data_with_proxy(alternate: bool, login_info: &LoginInfo, proxy: Option<&str>) -> Result<ServerData> {
     let url = if alternate {
         "https://www.growtopia1.com/growtopia/server_data.php"
     } else {
         "https://www.growtopia2.com/growtopia/server_data.php"
     };
 
-    let req = ureq::post(url)
+    let agent = if let Some(proxy_url) = proxy {
+        let proxy = ureq::Proxy::new(proxy_url)?;
+        ureq::Agent::new_with_config(
+            Config::builder()
+                .proxy(Some(proxy))
+                .build()
+        )
+    } else {
+        ureq::Agent::new_with_defaults()
+    };
+
+    let body = agent
+        .post(url)
         .header(
             "User-Agent",
             "UbiServices_SDK_2022.Release.9_PC64_ansi_static",
@@ -58,17 +91,31 @@ pub fn get_server_data(alternate: bool, login_info: &LoginInfo) -> Result<Server
             login_info.protocol, login_info.game_version
         ))?
         .body_mut()
-        .read_to_string();
+        .read_to_string()?;
 
-    match req {
-        Ok(body) => ServerData::parse_from_response(&body),
-        Err(e) => Err(anyhow::anyhow!("Failed to get server data: {}", e)),
-    }
+    ServerData::parse_from_response(&body)
 }
 
 pub fn get_dashboard(login_url: &str, login_info: &LoginInfo) -> Result<DashboardLinks> {
+    get_dashboard_with_proxy(login_url, login_info, None)
+}
+
+pub fn get_dashboard_with_proxy(login_url: &str, login_info: &LoginInfo, proxy: Option<&str>) -> Result<DashboardLinks> {
     let data = encode(&login_info.to_string()).to_string();
-    let req = ureq::post(format!("https://{}/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726", login_url))
+    
+    let agent = if let Some(proxy_url) = proxy {
+        let proxy = ureq::Proxy::new(proxy_url)?;
+        ureq::Agent::new_with_config(
+            Config::builder()
+                .proxy(Some(proxy))
+                .build()
+        )
+    } else {
+        ureq::Agent::new_with_defaults()
+    };
+
+    let req = agent
+        .post(format!("https://{}/player/login/dashboard?valKey=40db4045f2d8c572efe8c4a060605726", login_url))
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .send(data)

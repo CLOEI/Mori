@@ -63,6 +63,7 @@ pub struct Bot {
     pub automation: Mutex<Automation>,
     pub astar: Mutex<AStar>,
     pub temporary_data: TemporaryData,
+    pub proxy_url: Option<String>,
 }
 
 impl Bot {
@@ -73,6 +74,14 @@ impl Bot {
         socks5_config: Option<Socks5Config>,
     ) -> Arc<Self> {
         let local_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0));
+        
+        let proxy_url = socks5_config.as_ref().map(|cfg| {
+            if let (Some(username), Some(password)) = (&cfg.username, &cfg.password) {
+                format!("socks5://{}:{}@{}:{}", username, password, cfg.proxy_addr.ip(), cfg.proxy_addr.port())
+            } else {
+                format!("socks5://{}:{}", cfg.proxy_addr.ip(), cfg.proxy_addr.port())
+            }
+        });
         
         let host = if let Some(socks5_cfg) = socks5_config {
             let socks5_socket = Socks5UdpSocket::bind_through_proxy(
@@ -139,6 +148,7 @@ impl Bot {
             automation: Mutex::new(Automation::default()),
             astar: Mutex::new(AStar::new()),
             temporary_data: TemporaryData::default(),
+            proxy_url,
         })
     }
 
@@ -158,13 +168,13 @@ impl Bot {
             {
                 let mut login_info = self.info.login_info.lock().unwrap();
                 let info_data = login_info.as_mut().expect("Login info not set");
-                let server_data = server::get_server_data(false, info_data);
+                let server_data = server::get_server_data_with_proxy(false, info_data, self.proxy_url.as_deref());
                 match server_data {
                     Ok(data) => {
                         info_data.meta = data.meta.clone();
                         let mut server = self.info.server_data.lock().unwrap();
                         *server = Some(data.clone());
-                        let dashboard_data = server::get_dashboard(&data.loginurl, info_data)
+                        let dashboard_data = server::get_dashboard_with_proxy(&data.loginurl, info_data, self.proxy_url.as_deref())
                             .expect("Failed to get dashboard data");
                         let mut dashboard = self.info.dashboard_links.lock().unwrap();
                         *dashboard = Some(dashboard_data);
@@ -211,7 +221,7 @@ impl Bot {
             (login_info.ltoken.clone(), login_info.to_string())
         };
 
-        if let Ok(ltoken) = server::check_token(&ltoken, &login_data) {
+        if let Ok(ltoken) = server::check_token_with_proxy(&ltoken, &login_data, self.proxy_url.as_deref()) {
             println!("Refreshed token: {}", ltoken);
             let mut login_info_lock = self.info.login_info.lock().unwrap();
             let login_info = login_info_lock.as_mut().expect("Login info not set");
@@ -245,7 +255,7 @@ impl Bot {
                 let username = &credentials[0];
                 let password = &credentials[1];
                 let growtopia_url = urls.as_ref().and_then(|links| links.growtopia.clone());
-                login::get_legacy_token(&growtopia_url.unwrap(), username, password)
+                login::get_legacy_token_with_proxy(&growtopia_url.unwrap(), username, password, self.proxy_url.as_deref())
                     .expect("Failed to get legacy token")
             }
             _ => todo!("Login method not implemented"),

@@ -296,10 +296,10 @@ impl rusty_enet::Socket for Socks5UdpSocket {
         
         let mut packet = header;
         packet.extend_from_slice(buffer);
-        
+
         match self.udp_socket.send_to(&packet, self.relay_addr) {
             Ok(sent) => {
-                if sent >= packet.len() {
+                 if sent >= packet.len() {
                     Ok(buffer.len())
                 } else {
                     Ok(0)
