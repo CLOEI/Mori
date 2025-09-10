@@ -13,8 +13,9 @@ use egui_flex::{item, Flex};
 use egui_virtual_list::VirtualList;
 use gt_core::gtitem_r;
 use gt_core::gtitem_r::structs::ItemDatabase;
-use gt_core::Bot;
+use gt_core::{Bot, Socks5Config};
 use gt_core::types::bot::LoginVia;
+use std::net::ToSocketAddrs;
 
 #[derive(Debug, PartialEq, Clone)]
 enum LoginType {
@@ -37,6 +38,7 @@ struct UiState {
     login_type: LoginType,
     ltoken_string: String,
     legacy_fields: [String; 2],
+    socks5_string: String,
     // Bots list
     bots: Vec<Arc<Bot>>,
 }
@@ -60,6 +62,7 @@ impl Default for UiState {
             login_type: LoginType::LEGACY,
             ltoken_string: String::new(),
             legacy_fields: Default::default(),
+            socks5_string: String::new(),
             bots: Vec::new(),
         }
     }
@@ -71,6 +74,7 @@ fn main() {
         .add_plugins(EguiPlugin::default())
         .insert_resource(UiState {
             selected_bot: 0,
+            socks5_string: String::new(),
             ..Default::default()
         })
         .add_systems(Startup, setup_camera_system)
@@ -203,7 +207,7 @@ fn setup_ui_system(
                         ui.label("Google login - Click connect to authenticate");
                         if ui.button("Connect Google").clicked() {
                             let item_database = Arc::clone(&ui_state.item_database);
-                            let bot = Bot::new(LoginVia::GOOGLE, Some(Box::new(token::fetch)), item_database);
+                            let bot = Bot::new(LoginVia::GOOGLE, Some(Box::new(token::fetch)), item_database, None);
 
                             let bot_clone = Arc::clone(&bot);
 
@@ -216,6 +220,7 @@ fn setup_ui_system(
                             ui_state.add_bot_window_open = false;
                             ui_state.legacy_fields = Default::default();
                             ui_state.ltoken_string = String::new();
+                            ui_state.socks5_string = String::new();
                             ui_state.login_type = LoginType::LEGACY;
 
                             println!("Google bot created and added to bots list");
@@ -225,7 +230,7 @@ fn setup_ui_system(
                         ui.label("Apple login - Click connect to authenticate");
                         if ui.button("Connect Apple").clicked() {
                             let item_database = Arc::clone(&ui_state.item_database);
-                            let bot = Bot::new(LoginVia::APPLE, Some(Box::new(token::fetch)), item_database);
+                            let bot = Bot::new(LoginVia::APPLE, Some(Box::new(token::fetch)), item_database, None);
 
                             let bot_clone = Arc::clone(&bot);
 
@@ -238,6 +243,7 @@ fn setup_ui_system(
                             ui_state.add_bot_window_open = false;
                             ui_state.legacy_fields = Default::default();
                             ui_state.ltoken_string = String::new();
+                            ui_state.socks5_string = String::new();
                             ui_state.login_type = LoginType::LEGACY;
 
                             println!("Apple bot created and added to bots list");
@@ -264,7 +270,7 @@ fn setup_ui_system(
                                 ]);
 
                                 let item_database = Arc::clone(&ui_state.item_database);
-                                let bot = Bot::new(login_via, None, item_database);
+                                let bot = Bot::new(login_via, None, item_database, None);
 
                                 let bot_clone = Arc::clone(&bot);
 
@@ -296,6 +302,16 @@ fn setup_ui_system(
                             ui.text_edit_singleline(&mut ui_state.legacy_fields[1]);
                         });
                         
+                        ui.separator();
+                        ui.label("SOCKS5 Proxy (optional):");
+                        ui.horizontal(|ui| {
+                            ui.label("Proxy:");
+                            ui.text_edit_singleline(&mut ui_state.socks5_string);
+                        });
+                        ui.label(egui::RichText::new("Format: host:port:username:password")
+                            .size(12.0)
+                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                        
                         if ui.button("Create Legacy Bot").clicked() {
                             if !ui_state.legacy_fields[0].is_empty() && !ui_state.legacy_fields[1].is_empty() {
                                 let login_via = LoginVia::LEGACY([
@@ -303,9 +319,42 @@ fn setup_ui_system(
                                     ui_state.legacy_fields[1].clone()
                                 ]);
 
+                                // Parse SOCKS5 config if provided
+                                let socks5_config = if !ui_state.socks5_string.is_empty() {
+                                    let parts: Vec<&str> = ui_state.socks5_string.split(':').collect();
+                                    if parts.len() == 4 {
+                                        let host = parts[0];
+                                        let port = parts[1];
+                                        
+                                        // Try to resolve the domain name to a socket address
+                                        match format!("{}:{}", host, port).to_socket_addrs() {
+                                            Ok(mut addrs) => {
+                                                if let Some(proxy_addr) = addrs.next() {
+                                                    Some(Socks5Config {
+                                                        proxy_addr,
+                                                        username: Some(parts[2].to_string()),
+                                                        password: Some(parts[3].to_string()),
+                                                    })
+                                                } else {
+                                                    println!("Could not resolve SOCKS5 proxy address: {}:{}", host, port);
+                                                    None
+                                                }
+                                            }
+                                            Err(e) => {
+                                                println!("Failed to resolve SOCKS5 proxy address {}:{}: {}", host, port, e);
+                                                None
+                                            }
+                                        }
+                                    } else {
+                                        println!("Invalid SOCKS5 format. Expected: host:port:username:password");
+                                        None
+                                    }
+                                } else {
+                                    None
+                                };
+
                                 let item_database = Arc::clone(&ui_state.item_database);
-                                // Legacy login doesn't use token fetcher
-                                let bot = Bot::new(login_via, None, item_database);
+                                let bot = Bot::new(login_via, None, item_database, socks5_config);
 
                                 let bot_clone = Arc::clone(&bot);
 
@@ -318,6 +367,7 @@ fn setup_ui_system(
                                 ui_state.add_bot_window_open = false;
                                 ui_state.legacy_fields = Default::default();
                                 ui_state.ltoken_string = String::new();
+                                ui_state.socks5_string = String::new();
                                 ui_state.login_type = LoginType::LEGACY;
 
                                 println!("Legacy bot created and added to bots list");

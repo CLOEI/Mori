@@ -107,6 +107,7 @@ fn main() {
         LoginVia::GOOGLE,
         Some(Box::new(token_fetch)),
         item_database,
+        None,
     );
     let bot_clone = Arc::clone(&bot);
     let t = thread::spawn(move || {

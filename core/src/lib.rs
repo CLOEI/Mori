@@ -8,6 +8,7 @@ use crate::types::net_message::NetMessage;
 use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
+use crate::socks5_udp::Socks5UdpSocket;
 use std::str::FromStr;
 use std::sync::atomic::AtomicI32;
 use std::sync::{Arc, Mutex, RwLock};
@@ -18,6 +19,7 @@ mod inventory;
 mod login;
 mod packet_handler;
 mod server;
+pub mod socks5_udp;
 pub mod types;
 mod utils;
 mod variant_handler;
@@ -28,8 +30,20 @@ pub use gtitem_r;
 
 type TokenFetcher = Box<dyn Fn(String, String) -> String + Send + Sync>;
 
+#[derive(Debug, Clone)]
+pub struct Socks5Config {
+    pub proxy_addr: SocketAddr,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+pub enum BotSocket {
+    Direct(rusty_enet::Host<UdpSocket>),
+    Socks5(rusty_enet::Host<Socks5UdpSocket>),
+}
+
 pub struct Bot {
-    pub host: Mutex<rusty_enet::Host<UdpSocket>>,
+    pub host: Mutex<BotSocket>,
     pub peer_id: Mutex<Option<rusty_enet::PeerID>>,
     pub info: Info,
     pub state: Mutex<State>,
@@ -56,21 +70,48 @@ impl Bot {
         login_via: types::bot::LoginVia,
         token_fetcher: Option<TokenFetcher>,
         item_database: Arc<RwLock<ItemDatabase>>,
+        socks5_config: Option<Socks5Config>,
     ) -> Arc<Self> {
-        let socket =
-            UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).unwrap();
-        let host = rusty_enet::Host::<UdpSocket>::new(
-            socket,
-            rusty_enet::HostSettings {
-                peer_limit: 1,
-                channel_limit: 2,
-                compressor: Some(Box::new(rusty_enet::RangeCoder::new())),
-                checksum: Some(Box::new(rusty_enet::crc32)),
-                using_new_packet: true,
-                ..Default::default()
-            },
-        )
-        .expect("Failed to create host");
+        let local_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0));
+        
+        let host = if let Some(socks5_cfg) = socks5_config {
+            let socks5_socket = Socks5UdpSocket::bind_through_proxy(
+                local_addr,
+                socks5_cfg.proxy_addr,
+                socks5_cfg.username.as_deref(),
+                socks5_cfg.password.as_deref(),
+            ).expect("Failed to create SOCKS5 socket");
+            
+            let host = rusty_enet::Host::<Socks5UdpSocket>::new(
+                socks5_socket,
+                rusty_enet::HostSettings {
+                    peer_limit: 1,
+                    channel_limit: 2,
+                    compressor: Some(Box::new(rusty_enet::RangeCoder::new())),
+                    checksum: Some(Box::new(rusty_enet::crc32)),
+                    using_new_packet: true,
+                    ..Default::default()
+                },
+            ).expect("Failed to create SOCKS5 host");
+            
+            BotSocket::Socks5(host)
+        } else {
+            let socket = UdpSocket::bind(local_addr).expect("Failed to bind UDP socket");
+            
+            let host = rusty_enet::Host::<UdpSocket>::new(
+                socket,
+                rusty_enet::HostSettings {
+                    peer_limit: 1,
+                    channel_limit: 2,
+                    compressor: Some(Box::new(rusty_enet::RangeCoder::new())),
+                    checksum: Some(Box::new(rusty_enet::crc32)),
+                    using_new_packet: true,
+                    ..Default::default()
+                },
+            ).expect("Failed to create direct host");
+            
+            BotSocket::Direct(host)
+        };
 
         Arc::new(Self {
             host: Mutex::new(host),
@@ -143,11 +184,23 @@ impl Bot {
             SocketAddr::from_str(&format!("{}:{}", server.server, server.port)).unwrap();
 
         let mut host = self.host.lock().unwrap();
-        match host.connect(socket_address, 2, 0) {
-            Err(err) => {
-                panic!("Failed to connect to server: {}", err);
+        match &mut *host {
+            BotSocket::Direct(h) => {
+                match h.connect(socket_address, 2, 0) {
+                    Err(err) => {
+                        panic!("Failed to connect to server: {}", err);
+                    }
+                    _ => {}
+                }
             }
-            _ => {}
+            BotSocket::Socks5(h) => {
+                match h.connect(socket_address, 2, 0) {
+                    Err(err) => {
+                        panic!("Failed to connect to server: {}", err);
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -273,9 +326,18 @@ impl Bot {
         };
 
         let mut host_guard = self.host.lock().expect("Failed to lock host");
-        let peer = host_guard.peer_mut(peer_id);
+        let send_result = match &mut *host_guard {
+            BotSocket::Direct(h) => {
+                let peer = h.peer_mut(peer_id);
+                peer.send(0, &enet_packet)
+            },
+            BotSocket::Socks5(h) => {
+                let peer = h.peer_mut(peer_id);
+                peer.send(0, &enet_packet)
+            },
+        };
 
-        if let Err(err) = peer.send(0, &enet_packet) {
+        if let Err(err) = send_result {
             println!("Failed to send packet: {}", err);
         }
     }
@@ -284,8 +346,16 @@ impl Bot {
         let peer_id = self.peer_id.lock().unwrap().clone();
         if let Some(peer_id) = peer_id {
             if let Ok(mut host) = self.host.lock() {
-                let peer = host.peer_mut(peer_id);
-                peer.disconnect(0);
+                match &mut *host {
+                    BotSocket::Direct(h) => {
+                        let peer = h.peer_mut(peer_id);
+                        peer.disconnect(0);
+                    },
+                    BotSocket::Socks5(h) => {
+                        let peer = h.peer_mut(peer_id);
+                        peer.disconnect(0);
+                    },
+                };
             }
         }
     }
@@ -316,19 +386,28 @@ impl Bot {
     }
 
     fn process_event(&self) {
-        let is_running = {
-            let running = self.is_running.lock().unwrap();
-            *running
-        };
-
-        while is_running {
+        loop {
+            let is_running = {
+                let running = self.is_running.lock().unwrap();
+                *running
+            };
+            
+            if !is_running {
+                break;
+            }
             self.connect_to_server();
 
             loop {
                 let event = {
                     let mut host = self.host.lock().unwrap();
-                    let event = host.service();
-                    event.ok().flatten().map(|e| e.no_ref())
+                    match &mut *host {
+                        BotSocket::Direct(h) => {
+                            h.service().ok().flatten().map(|e| e.no_ref())
+                        }
+                        BotSocket::Socks5(h) => {
+                            h.service().ok().flatten().map(|e| e.no_ref())
+                        }
+                    }
                 };
 
                 if let Some(event) = event {
