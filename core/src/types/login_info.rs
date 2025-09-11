@@ -50,7 +50,7 @@ impl LoginInfo {
             fz: "20743704".to_string(),
             f: "1".to_string(),
             player_age: "20".to_string(),
-            game_version: "5.26".to_string(),
+            game_version: "5.27".to_string(),
             lmode: "1".to_string(),
             cbits: "1040".to_string(),
             rid: utils::random::hex(32, true),
