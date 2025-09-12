@@ -27,6 +27,7 @@ mod lua;
 mod astar;
 
 pub use gtitem_r;
+pub use gtworld_r;
 
 type TokenFetcher = Box<dyn Fn(String, String) -> String + Send + Sync>;
 

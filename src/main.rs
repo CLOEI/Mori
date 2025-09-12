@@ -13,6 +13,7 @@ use egui_flex::{item, Flex};
 use egui_virtual_list::VirtualList;
 use gt_core::gtitem_r;
 use gt_core::gtitem_r::structs::ItemDatabase;
+use gt_core::gtworld_r;
 use gt_core::{Bot, Socks5Config};
 use gt_core::types::bot::LoginVia;
 use std::net::ToSocketAddrs;
@@ -30,6 +31,8 @@ struct UiState {
     selected_bot: usize,
     add_bot_window_open: bool,
     item_database_window_open: bool,
+    inventory_window_open: bool,
+    world_info_window_open: bool,
     settings_window_open: bool,
     item_database: Arc<RwLock<ItemDatabase>>,
     virtual_list: VirtualList,
@@ -55,6 +58,8 @@ impl Default for UiState {
             selected_bot: 0,
             add_bot_window_open: false,
             item_database_window_open: false,
+            inventory_window_open: false,
+            world_info_window_open: false,
             settings_window_open: false,
             item_database: Arc::new(RwLock::new(item_database)),
             virtual_list: VirtualList::new(),
@@ -75,6 +80,8 @@ fn main() {
         .insert_resource(UiState {
             selected_bot: 0,
             socks5_string: String::new(),
+            inventory_window_open: false,
+            world_info_window_open: false,
             ..Default::default()
         })
         .add_systems(Startup, setup_camera_system)
@@ -117,6 +124,21 @@ fn setup_ui_system(
                 let bot_count = ui_state.bots.len();
                 let selected_text = if bot_count == 0 {
                     "No bots".to_string()
+                } else if ui_state.selected_bot < bot_count {
+                    let bot = &ui_state.bots[ui_state.selected_bot];
+                    if let Ok(login_info_lock) = bot.info.login_info.try_lock() {
+                        if let Some(login_info) = login_info_lock.as_ref() {
+                            if !login_info.tank_id_name.is_empty() {
+                                login_info.tank_id_name.clone()
+                            } else {
+                                format!("Bot {}", ui_state.selected_bot + 1)
+                            }
+                        } else {
+                            format!("Bot {}", ui_state.selected_bot + 1)
+                        }
+                    } else {
+                        format!("Bot {}", ui_state.selected_bot + 1)
+                    }
                 } else {
                     format!("Bot {}", ui_state.selected_bot + 1)
                 };
@@ -125,7 +147,22 @@ fn setup_ui_system(
                     .selected_text(&selected_text)
                     .show_ui(ui, |ui| {
                         for index in 0..bot_count {
-                            if ui.selectable_value(&mut ui_state.selected_bot, index, format!("Bot {}", index + 1)).clicked() {
+                            let bot = &ui_state.bots[index];
+                            let bot_label = if let Ok(login_info_lock) = bot.info.login_info.try_lock() {
+                                if let Some(login_info) = login_info_lock.as_ref() {
+                                    if !login_info.tank_id_name.is_empty() {
+                                        login_info.tank_id_name.clone()
+                                    } else {
+                                        format!("Bot {}", index + 1)
+                                    }
+                                } else {
+                                    format!("Bot {}", index + 1)
+                                }
+                            } else {
+                                format!("Bot {}", index + 1)
+                            };
+                            
+                            if ui.selectable_value(&mut ui_state.selected_bot, index, bot_label).clicked() {
                                 // Selection updated
                             }
                         }
@@ -168,8 +205,12 @@ fn setup_ui_system(
                            
                            ui.label(format!("{} Gems: {}", egui_material_icons::icons::ICON_DIAMOND, gems));
                            ui.label(format!("{} Ping: {}ms", egui_material_icons::icons::ICON_WIFI, ping));
-                           if ui.button(format!("{} World info", egui_material_icons::icons::ICON_PUBLIC)).clicked() {}
-                           if ui.button(format!("{} Inventory", egui_material_icons::icons::ICON_BACKPACK)).clicked() {}
+                           if ui.button(format!("{} World info", egui_material_icons::icons::ICON_PUBLIC)).clicked() {
+                               ui_state.world_info_window_open = !ui_state.world_info_window_open;
+                           }
+                           if ui.button(format!("{} Inventory", egui_material_icons::icons::ICON_BACKPACK)).clicked() {
+                               ui_state.inventory_window_open = !ui_state.inventory_window_open;
+                           }
                        });
                    })
             });
@@ -594,6 +635,470 @@ fn setup_ui_system(
                             });
                     });
             });
+    }
+
+    if ui_state.inventory_window_open {
+        let current_bot = if !ui_state.bots.is_empty() && ui_state.selected_bot < ui_state.bots.len() {
+            Some(&ui_state.bots[ui_state.selected_bot])
+        } else {
+            None
+        };
+        
+        let selected_bot_index = ui_state.selected_bot;
+        let item_database = Arc::clone(&ui_state.item_database);
+
+        let mut close_inventory = false;
+        
+        egui::Window::new(format!("{} Inventory", egui_material_icons::icons::ICON_BACKPACK))
+            .default_size([600.0, 500.0])
+            .resizable(true)
+            .collapsible(false)
+            .show(contexts.ctx_mut()?, |ui| {
+                if let Some(bot) = current_bot {
+                    let bot_name = if let Ok(login_info_lock) = bot.info.login_info.try_lock() {
+                        if let Some(login_info) = login_info_lock.as_ref() {
+                            if !login_info.tank_id_name.is_empty() {
+                                login_info.tank_id_name.clone()
+                            } else {
+                                format!("Bot {}", selected_bot_index + 1)
+                            }
+                        } else {
+                            format!("Bot {}", selected_bot_index + 1)
+                        }
+                    } else {
+                        format!("Bot {}", selected_bot_index + 1)
+                    };
+
+                    egui::Frame::new()
+                        .inner_margin(egui::Margin::symmetric(16, 12))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new(format!("Inventory - {}", bot_name))
+                                    .size(16.0)
+                                    .color(egui::Color32::WHITE)
+                                    .strong());
+
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button(format!("{} Close", egui_material_icons::icons::ICON_CLOSE)).clicked() {
+                                        close_inventory = true;
+                                    }
+                                });
+                            });
+                        });
+
+                    ui.add_space(8.0);
+
+                    let inventory_data = if let Ok(inventory_lock) = bot.inventory.try_lock() {
+                        Some((inventory_lock.size, inventory_lock.item_count, inventory_lock.items.clone()))
+                    } else {
+                        None
+                    };
+
+                    if let Some((size, item_count, items)) = inventory_data {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Size: {}", size));
+                            ui.separator();
+                            ui.label(format!("Items: {} / {}", item_count, size));
+                        });
+
+                        ui.add_space(8.0);
+
+                        if items.is_empty() {
+                            ui.vertical_centered(|ui| {
+                                ui.add_space(20.0);
+                                ui.label(egui::RichText::new("Inventory is empty")
+                                    .size(18.0)
+                                    .color(egui::Color32::from_rgb(200, 200, 200)));
+                                ui.add_space(20.0);
+                            });
+                        } else {
+                            let item_db = item_database.read().unwrap();
+                            
+                            let mut sorted_items: Vec<_> = items.iter().collect();
+                            sorted_items.sort_by_key(|(id, _)| *id);
+
+                            egui::Frame::new()
+                                .fill(egui::Color32::from_rgb(25, 25, 30))
+                                .inner_margin(egui::Margin::symmetric(8, 8))
+                                .corner_radius(6.0)
+                                .show(ui, |ui| {
+                                    egui::ScrollArea::vertical()
+                                        .auto_shrink([false, false])
+                                        .show(ui, |ui| {
+                                            ui.set_width(ui.available_width());
+                                            
+                                            egui::Grid::new("inventory_grid")
+                                                .num_columns(4)
+                                                .spacing([10.0, 8.0])
+                                                .show(ui, |ui| {
+                                                    // Header
+                                                    ui.label(egui::RichText::new("ID")
+                                                        .strong()
+                                                        .color(egui::Color32::from_rgb(200, 200, 200)));
+                                                    ui.label(egui::RichText::new("Item Name")
+                                                        .strong()
+                                                        .color(egui::Color32::from_rgb(200, 200, 200)));
+                                                    ui.label(egui::RichText::new("Amount")
+                                                        .strong()
+                                                        .color(egui::Color32::from_rgb(200, 200, 200)));
+                                                    ui.label(egui::RichText::new("Flag")
+                                                        .strong()
+                                                        .color(egui::Color32::from_rgb(200, 200, 200)));
+                                                    ui.end_row();
+
+                                                    ui.separator();
+                                                    ui.separator();
+                                                    ui.separator();
+                                                    ui.separator();
+                                                    ui.end_row();
+
+                                                    // Items
+                                                    for (&item_id, inventory_item) in sorted_items {
+                                                        let item_name = item_db.items.get(&(item_id as u32))
+                                                            .map(|item| item.name.as_str())
+                                                            .unwrap_or("Unknown Item");
+
+                                                        ui.label(egui::RichText::new(format!("{}", item_id))
+                                                            .color(egui::Color32::from_rgb(150, 150, 255)));
+                                                        ui.label(egui::RichText::new(item_name)
+                                                            .color(egui::Color32::WHITE));
+                                                        ui.label(egui::RichText::new(format!("{}", inventory_item.amount))
+                                                            .color(egui::Color32::from_rgb(100, 255, 100)));
+                                                        ui.label(egui::RichText::new(format!("{}", inventory_item.flag))
+                                                            .color(egui::Color32::from_rgb(200, 200, 200)));
+                                                        ui.end_row();
+                                                    }
+                                                });
+                                        });
+                                });
+                        }
+                    } else {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(20.0);
+                            ui.label(egui::RichText::new("Unable to access inventory")
+                                .size(18.0)
+                                .color(egui::Color32::from_rgb(255, 200, 100)));
+                            ui.add_space(8.0);
+                            ui.label(egui::RichText::new("Inventory might be locked or not loaded yet.")
+                                .size(14.0)
+                                .color(egui::Color32::from_rgb(150, 150, 150)));
+                            ui.add_space(20.0);
+                        });
+                    }
+                } else {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(20.0);
+                        ui.label(egui::RichText::new("No bot selected")
+                            .size(18.0)
+                            .color(egui::Color32::from_rgb(255, 200, 100)));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Please select a bot to view its inventory.")
+                            .size(14.0)
+                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                        ui.add_space(20.0);
+                    });
+                }
+            });
+        
+        if close_inventory {
+            ui_state.inventory_window_open = false;
+        }
+    }
+
+    if ui_state.world_info_window_open {
+        let current_bot = if !ui_state.bots.is_empty() && ui_state.selected_bot < ui_state.bots.len() {
+            Some(&ui_state.bots[ui_state.selected_bot])
+        } else {
+            None
+        };
+        
+        let selected_bot_index = ui_state.selected_bot;
+        let item_database = Arc::clone(&ui_state.item_database);
+
+        let mut close_world_info = false;
+        
+        egui::Window::new(format!("{} World Info", egui_material_icons::icons::ICON_PUBLIC))
+            .default_size([700.0, 600.0])
+            .resizable(true)
+            .collapsible(false)
+            .show(contexts.ctx_mut()?, |ui| {
+                if let Some(bot) = current_bot {
+                    let bot_name = if let Ok(login_info_lock) = bot.info.login_info.try_lock() {
+                        if let Some(login_info) = login_info_lock.as_ref() {
+                            if !login_info.tank_id_name.is_empty() {
+                                login_info.tank_id_name.clone()
+                            } else {
+                                format!("Bot {}", selected_bot_index + 1)
+                            }
+                        } else {
+                            format!("Bot {}", selected_bot_index + 1)
+                        }
+                    } else {
+                        format!("Bot {}", selected_bot_index + 1)
+                    };
+
+                    // Header section
+                    egui::Frame::new()
+                        .inner_margin(egui::Margin::symmetric(16, 12))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new(format!("World Info - {}", bot_name))
+                                    .size(16.0)
+                                    .color(egui::Color32::WHITE)
+                                    .strong());
+
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button(format!("{} Close", egui_material_icons::icons::ICON_CLOSE)).clicked() {
+                                        close_world_info = true;
+                                    }
+                                });
+                            });
+                        });
+
+                    ui.add_space(8.0);
+
+                    // Get world data and players
+                    let world_data = if let Ok(world_lock) = bot.world.data.try_lock() {
+                        Some((
+                            world_lock.name.clone(),
+                            world_lock.width,
+                            world_lock.height,
+                            world_lock.tiles.clone()
+                        ))
+                    } else {
+                        None
+                    };
+
+                    let players_data = if let Ok(players_lock) = bot.world.players.try_lock() {
+                        Some(players_lock.clone())
+                    } else {
+                        None
+                    };
+
+                    if let Some((world_name, width, height, tiles)) = world_data {
+                        // World basic info
+                        egui::Frame::new()
+                            .fill(egui::Color32::from_rgb(35, 35, 40))
+                            .inner_margin(egui::Margin::symmetric(12, 10))
+                            .corner_radius(6.0)
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("World Name:")
+                                        .strong()
+                                        .color(egui::Color32::from_rgb(200, 200, 200)));
+                                    ui.label(egui::RichText::new(&world_name)
+                                        .color(egui::Color32::WHITE)
+                                        .strong());
+                                    
+                                    ui.separator();
+                                    
+                                    ui.label(egui::RichText::new("Dimensions:")
+                                        .strong()
+                                        .color(egui::Color32::from_rgb(200, 200, 200)));
+                                    ui.label(egui::RichText::new(format!("{}x{}", width, height))
+                                        .color(egui::Color32::WHITE));
+                                        
+                                    ui.separator();
+                                    
+                                    ui.label(egui::RichText::new("Total Tiles:")
+                                        .strong()
+                                        .color(egui::Color32::from_rgb(200, 200, 200)));
+                                    ui.label(egui::RichText::new(format!("{}", width * height))
+                                        .color(egui::Color32::WHITE));
+                                });
+                            });
+
+                        ui.add_space(8.0);
+
+                        // Players section
+                        if let Some(players) = players_data {
+                            egui::CollapsingHeader::new(format!("{} Players ({})", egui_material_icons::icons::ICON_PEOPLE, players.len()))
+                                .id_source("world_info_players")
+                                .default_open(true)
+                                .show(ui, |ui| {
+                                    if players.is_empty() {
+                                        ui.label(egui::RichText::new("No players in world")
+                                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                                    } else {
+                                        egui::Frame::new()
+                                            .fill(egui::Color32::from_rgb(25, 25, 30))
+                                            .inner_margin(egui::Margin::symmetric(8, 8))
+                                            .corner_radius(6.0)
+                                            .show(ui, |ui| {
+                                                egui::ScrollArea::vertical()
+                                                    .id_source("players_scroll")
+                                                    .max_height(200.0)
+                                                    .show(ui, |ui| {
+                                                        for (net_id, player) in &players {
+                                                            ui.horizontal(|ui| {
+                                                                ui.label(egui::RichText::new(format!("NetID: {}", net_id))
+                                                                    .color(egui::Color32::from_rgb(150, 150, 255)));
+                                                                ui.separator();
+                                                                ui.label(egui::RichText::new(&player.name)
+                                                                    .color(egui::Color32::WHITE));
+                                                                ui.separator();
+                                                                ui.label(egui::RichText::new(format!("Pos: ({:.0}, {:.0})", player.position.0, player.position.1))
+                                                                    .color(egui::Color32::from_rgb(100, 255, 100)));
+                                                            });
+                                                        }
+                                                    });
+                                            });
+                                    }
+                                });
+                        }
+
+                        ui.add_space(8.0);
+
+                        // Tile counts section
+                        egui::CollapsingHeader::new(format!("{} Tile Counts", egui_material_icons::icons::ICON_GRID_VIEW))
+                            .id_source("world_info_tiles")
+                            .default_open(true)
+                            .show(ui, |ui| {
+                                if tiles.is_empty() {
+                                    ui.label(egui::RichText::new("No tile data available")
+                                        .color(egui::Color32::from_rgb(150, 150, 150)));
+                                } else {
+                                    // Aggregate tile counts
+                                    let mut foreground_counts = std::collections::HashMap::new();
+                                    let mut background_counts = std::collections::HashMap::new();
+
+                                    for tile in &tiles {
+                                        if tile.foreground_item_id != 0 {
+                                            *foreground_counts.entry(tile.foreground_item_id).or_insert(0u32) += 1;
+                                        }
+                                        if tile.background_item_id != 0 {
+                                            *background_counts.entry(tile.background_item_id).or_insert(0u32) += 1;
+                                        }
+                                    }
+
+                                    let item_db = item_database.read().unwrap();
+
+                                    // Foreground tiles
+                                    if !foreground_counts.is_empty() {
+                                        ui.label(egui::RichText::new("Foreground Tiles:")
+                                            .strong()
+                                            .color(egui::Color32::from_rgb(255, 200, 100)));
+
+                                        egui::Frame::new()
+                                            .fill(egui::Color32::from_rgb(25, 25, 30))
+                                            .inner_margin(egui::Margin::symmetric(8, 8))
+                                            .corner_radius(6.0)
+                                            .show(ui, |ui| {
+                                                egui::ScrollArea::vertical()
+                                                    .id_source("foreground_tiles_scroll")
+                                                    .max_height(200.0)
+                                                    .show(ui, |ui| {
+                                                        // Sort by ID for consistent ordering
+                                                        let mut sorted_fg: Vec<_> = foreground_counts.iter().collect();
+                                                        sorted_fg.sort_by_key(|(id, _)| *id);
+
+                                                        egui::Grid::new("foreground_grid")
+                                                            .num_columns(3)
+                                                            .spacing([10.0, 4.0])
+                                                            .show(ui, |ui| {
+                                                                for (&item_id, &count) in sorted_fg {
+                                                                    let item_name = item_db.items.get(&(item_id as u32))
+                                                                        .map(|item| item.name.as_str())
+                                                                        .unwrap_or("Unknown Item");
+
+                                                                    ui.label(egui::RichText::new(format!("{}", count))
+                                                                        .color(egui::Color32::from_rgb(100, 255, 100))
+                                                                        .strong());
+                                                                    ui.label(egui::RichText::new(item_name)
+                                                                        .color(egui::Color32::WHITE));
+                                                                    ui.label(egui::RichText::new(format!("(ID: {})", item_id))
+                                                                        .color(egui::Color32::from_rgb(150, 150, 255))
+                                                                        .small());
+                                                                    ui.end_row();
+                                                                }
+                                                            });
+                                                    });
+                                            });
+
+                                        ui.add_space(8.0);
+                                    }
+
+                                    // Background tiles
+                                    if !background_counts.is_empty() {
+                                        ui.label(egui::RichText::new("Background Tiles:")
+                                            .strong()
+                                            .color(egui::Color32::from_rgb(200, 255, 200)));
+
+                                        egui::Frame::new()
+                                            .fill(egui::Color32::from_rgb(25, 25, 30))
+                                            .inner_margin(egui::Margin::symmetric(8, 8))
+                                            .corner_radius(6.0)
+                                            .show(ui, |ui| {
+                                                egui::ScrollArea::vertical()
+                                                    .id_source("background_tiles_scroll")
+                                                    .max_height(200.0)
+                                                    .show(ui, |ui| {
+                                                        // Sort by ID for consistent ordering
+                                                        let mut sorted_bg: Vec<_> = background_counts.iter().collect();
+                                                        sorted_bg.sort_by_key(|(id, _)| *id);
+
+                                                        egui::Grid::new("background_grid")
+                                                            .num_columns(3)
+                                                            .spacing([10.0, 4.0])
+                                                            .show(ui, |ui| {
+                                                                for (&item_id, &count) in sorted_bg {
+                                                                    let item_name = item_db.items.get(&(item_id as u32))
+                                                                        .map(|item| item.name.as_str())
+                                                                        .unwrap_or("Unknown Item");
+
+                                                                    ui.label(egui::RichText::new(format!("{}", count))
+                                                                        .color(egui::Color32::from_rgb(100, 255, 100))
+                                                                        .strong());
+                                                                    ui.label(egui::RichText::new(item_name)
+                                                                        .color(egui::Color32::WHITE));
+                                                                    ui.label(egui::RichText::new(format!("(ID: {})", item_id))
+                                                                        .color(egui::Color32::from_rgb(150, 150, 255))
+                                                                        .small());
+                                                                    ui.end_row();
+                                                                }
+                                                            });
+                                                    });
+                                            });
+                                    }
+
+                                    if foreground_counts.is_empty() && background_counts.is_empty() {
+                                        ui.label(egui::RichText::new("No tiles placed in world")
+                                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                                    }
+                                }
+                            });
+
+                    } else {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(20.0);
+                            ui.label(egui::RichText::new("Unable to access world data")
+                                .size(18.0)
+                                .color(egui::Color32::from_rgb(255, 200, 100)));
+                            ui.add_space(8.0);
+                            ui.label(egui::RichText::new("World data might be locked or not loaded yet.")
+                                .size(14.0)
+                                .color(egui::Color32::from_rgb(150, 150, 150)));
+                            ui.add_space(20.0);
+                        });
+                    }
+                } else {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(20.0);
+                        ui.label(egui::RichText::new("No bot selected")
+                            .size(18.0)
+                            .color(egui::Color32::from_rgb(255, 200, 100)));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Please select a bot to view world information.")
+                            .size(14.0)
+                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                        ui.add_space(20.0);
+                    });
+                }
+            });
+        
+        if close_world_info {
+            ui_state.world_info_window_open = false;
+        }
     }
 
     if ui_state.settings_window_open {
