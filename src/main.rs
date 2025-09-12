@@ -152,8 +152,22 @@ fn setup_ui_system(
                            ui.label("Created with ❤ by Cendy");
                        });
                        flex.add_ui(item(), |ui| {
-                           ui.label(format!("{} Gems: {}", egui_material_icons::icons::ICON_DIAMOND, "0"));
-                           ui.label(format!("{} Ping: {}", egui_material_icons::icons::ICON_WIFI, "0"));
+                           let current_bot = if !ui_state.bots.is_empty() && ui_state.selected_bot < ui_state.bots.len() {
+                               Some(&ui_state.bots[ui_state.selected_bot])
+                           } else {
+                               None
+                           };
+                           
+                           let gems = current_bot
+                               .map(|bot| bot.gems.load(std::sync::atomic::Ordering::Relaxed).to_string())
+                               .unwrap_or_else(|| "0".to_string());
+                           
+                           let ping = current_bot
+                               .map(|bot| bot.ping.load(std::sync::atomic::Ordering::Relaxed).to_string())
+                               .unwrap_or_else(|| "0".to_string());
+                           
+                           ui.label(format!("{} Gems: {}", egui_material_icons::icons::ICON_DIAMOND, gems));
+                           ui.label(format!("{} Ping: {}ms", egui_material_icons::icons::ICON_WIFI, ping));
                            if ui.button(format!("{} World info", egui_material_icons::icons::ICON_PUBLIC)).clicked() {}
                            if ui.button(format!("{} Inventory", egui_material_icons::icons::ICON_BACKPACK)).clicked() {}
                        });

@@ -10,7 +10,7 @@ use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use crate::socks5_udp::Socks5UdpSocket;
 use std::str::FromStr;
-use std::sync::atomic::AtomicI32;
+use std::sync::atomic::{AtomicI32, AtomicU32};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -57,6 +57,7 @@ pub struct Bot {
     pub world: World,
     pub inventory: Mutex<Inventory>,
     pub gems: AtomicI32,
+    pub ping: AtomicU32,
     pub token_fetcher: Option<TokenFetcher>,
     pub scripting: Scripting,
     pub delay_config: Mutex<DelayConfig>,
@@ -142,6 +143,7 @@ impl Bot {
             item_database,
             inventory: Mutex::new(Inventory::new()),
             gems: AtomicI32::new(0),
+            ping: std::sync::atomic::AtomicU32::new(0),
             token_fetcher,
             scripting: Scripting::default(),
             delay_config: Mutex::new(DelayConfig::default()),
@@ -160,6 +162,8 @@ impl Bot {
             let mut info = self.info.login_info.lock().unwrap();
             *info = Some(LoginInfo::new());
         }
+        
+        self.spawn_polling();
         self.process_event();
     }
 
@@ -393,6 +397,62 @@ impl Bot {
     pub fn set_place_delay(&self, delay: u32) {
         let mut delay_config = self.delay_config.lock().unwrap();
         delay_config.place_delay = delay;
+    }
+
+    fn spawn_polling(self: &Arc<Self>) {
+        let bot_arc = Arc::clone(self);
+        thread::spawn(move || {
+            const COLLECT_INTERVAL: Duration = Duration::from_millis(500);
+            const LOOP_DELAY: Duration = Duration::from_millis(100);
+            
+            loop {
+                let is_running = {
+                    let running = bot_arc.is_running.lock().unwrap();
+                    *running
+                };
+                
+                if !is_running {
+                    break;
+                }
+                
+                let has_peer = {
+                    let peer_id = bot_arc.peer_id.lock().unwrap();
+                    if let Some(peer_id) = *peer_id {
+                        let mut host = bot_arc.host.lock().unwrap();
+                        let ping = match &mut *host {
+                            BotSocket::Direct(h) => {
+                                let peer = h.peer_mut(peer_id);
+                                peer.round_trip_time().as_millis()
+                            },
+                            BotSocket::Socks5(h) => {
+                                let peer = h.peer_mut(peer_id);
+                                peer.round_trip_time().as_millis()
+                            },
+                        };
+                        bot_arc.ping.store(ping as u32, std::sync::atomic::Ordering::Relaxed);
+                        true
+                    } else {
+                        false
+                    }
+                };
+                
+                if !has_peer {
+                    thread::sleep(LOOP_DELAY);
+                    continue;
+                }
+                
+                let should_collect = {
+                    let automation = bot_arc.automation.lock().unwrap();
+                    automation.auto_collect
+                };
+                
+                if should_collect {
+                    bot_arc.collect();
+                }
+                
+                thread::sleep(COLLECT_INTERVAL);
+            }
+        });
     }
 
     fn process_event(&self) {
