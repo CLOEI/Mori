@@ -634,7 +634,7 @@ impl Bot {
             NetMessage::GamePacket,
             pkt.to_bytes().as_slice(),
             None,
-            true,
+            false,
         );
     }
 
@@ -759,7 +759,7 @@ impl Bot {
                     }
                     (inv.size, inv.items.len() as u32, item_amounts)
                 },
-                Err(_) => return 0, 
+                Err(_) => return 0,
             }
         };
 
@@ -769,17 +769,17 @@ impl Bot {
             match self.world.data.try_lock() {
                 Ok(world) => {
                     let mut nearby_items = Vec::with_capacity(std::cmp::min(world.dropped.items.len(), 50));
-                    
+
                     for item in &world.dropped.items {
                         let dx = bot_tile_x - item.x;
                         let dy = bot_tile_y - item.y;
                         let distance_squared = dx * dx + dy * dy;
-                        
+
                         if distance_squared <= 25.0 {
                             nearby_items.push((item.clone(), distance_squared));
                         }
                     }
-                    
+
                     nearby_items.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
                     nearby_items.into_iter().map(|(item, _)| item).collect::<Vec<_>>()
                 },
@@ -825,5 +825,66 @@ impl Bot {
         }
 
         collected_count
+    }
+
+}
+
+pub fn test_socks5_proxy(socks5_config: &Socks5Config) -> (bool, bool) {
+    let server_data_success = test_server_data_fetch(socks5_config);
+    let server_connection_success = test_server_connection(socks5_config);
+
+    (server_data_success, server_connection_success)
+}
+
+fn test_server_data_fetch(socks5_config: &Socks5Config) -> bool {
+    let proxy_url = if let (Some(username), Some(password)) = (&socks5_config.username, &socks5_config.password) {
+        format!("socks5://{}:{}@{}:{}", username, password, socks5_config.proxy_addr.ip(), socks5_config.proxy_addr.port())
+    } else {
+        format!("socks5://{}:{}", socks5_config.proxy_addr.ip(), socks5_config.proxy_addr.port())
+    };
+
+    let login_info = LoginInfo::new();
+    match server::get_server_data_with_proxy(false, &login_info, Some(&proxy_url)) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+fn test_server_connection(socks5_config: &Socks5Config) -> bool {
+    let local_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0));
+
+    let socks5_socket = match Socks5UdpSocket::bind_through_proxy(
+        local_addr,
+        socks5_config.proxy_addr,
+        socks5_config.username.as_deref(),
+        socks5_config.password.as_deref(),
+    ) {
+        Ok(socket) => socket,
+        Err(_) => return false,
+    };
+
+    let mut host = match rusty_enet::Host::<Socks5UdpSocket>::new(
+        socks5_socket,
+        rusty_enet::HostSettings {
+            peer_limit: 1,
+            channel_limit: 2,
+            compressor: Some(Box::new(rusty_enet::RangeCoder::new())),
+            checksum: Some(Box::new(rusty_enet::crc32)),
+            using_new_packet: true,
+            ..Default::default()
+        },
+    ) {
+        Ok(host) => host,
+        Err(_) => return false,
+    };
+
+    let test_server_addr = match SocketAddr::from_str("213.179.209.168:17091") {
+        Ok(addr) => addr,
+        Err(_) => return false,
+    };
+
+    match host.connect(test_server_addr, 2, 0) {
+        Ok(_) => true,
+        Err(_) => false,
     }
 }

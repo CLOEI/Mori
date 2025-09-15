@@ -1,7 +1,7 @@
 use headless_chrome::{Browser, LaunchOptions};
 use serde_json::Value;
 
-pub fn fetch(bot_name: String, url: String) -> String {
+pub fn fetch(_bot_name: String, url: String) -> String {
     let launch_options = LaunchOptions {
         headless: false,
         ..Default::default()

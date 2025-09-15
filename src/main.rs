@@ -13,10 +13,11 @@ use egui_flex::{item, Flex};
 use egui_virtual_list::VirtualList;
 use gt_core::gtitem_r;
 use gt_core::gtitem_r::structs::ItemDatabase;
-use gt_core::gtworld_r;
-use gt_core::{Bot, Socks5Config};
+use gt_core::{Bot, Socks5Config, test_socks5_proxy};
 use gt_core::types::bot::LoginVia;
 use std::net::ToSocketAddrs;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Mutex;
 
 #[derive(Debug, PartialEq, Clone)]
 enum LoginType {
@@ -24,6 +25,21 @@ enum LoginType {
     APPLE,
     LTOKEN,
     LEGACY,
+}
+
+#[derive(Debug, Clone)]
+struct ProxyEntry {
+    ip: String,
+    http_success: Option<bool>,
+    server_success: Option<bool>,
+    testing: bool,
+}
+
+#[derive(Debug)]
+struct ProxyTestResult {
+    proxy_ip: String,
+    http_success: bool,
+    server_success: bool,
 }
 
 #[derive(Resource)]
@@ -34,6 +50,7 @@ struct UiState {
     inventory_window_open: bool,
     world_info_window_open: bool,
     settings_window_open: bool,
+    proxies_window_open: bool,
     item_database: Arc<RwLock<ItemDatabase>>,
     virtual_list: VirtualList,
     search_text: String,
@@ -44,6 +61,11 @@ struct UiState {
     socks5_string: String,
     // Bots list
     bots: Vec<Arc<Bot>>,
+    // Proxies list
+    proxies: Vec<ProxyEntry>,
+    new_proxy_input: String,
+    proxy_test_receiver: Option<Arc<Mutex<Receiver<ProxyTestResult>>>>,
+    proxy_test_sender: Option<Arc<Mutex<Sender<ProxyTestResult>>>>,
 }
 
 impl Default for UiState {
@@ -61,6 +83,7 @@ impl Default for UiState {
             inventory_window_open: false,
             world_info_window_open: false,
             settings_window_open: false,
+            proxies_window_open: false,
             item_database: Arc::new(RwLock::new(item_database)),
             virtual_list: VirtualList::new(),
             search_text: String::new(),
@@ -69,6 +92,10 @@ impl Default for UiState {
             legacy_fields: Default::default(),
             socks5_string: String::new(),
             bots: Vec::new(),
+            proxies: Vec::new(),
+            new_proxy_input: String::new(),
+            proxy_test_receiver: None,
+            proxy_test_sender: None,
         }
     }
 }
@@ -77,13 +104,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(EguiPlugin::default())
-        .insert_resource(UiState {
-            selected_bot: 0,
-            socks5_string: String::new(),
-            inventory_window_open: false,
-            world_info_window_open: false,
-            ..Default::default()
-        })
+        .insert_resource(UiState::default())
         .add_systems(Startup, setup_camera_system)
         .add_systems(EguiPrimaryContextPass, setup_ui_system)
         .run();
@@ -173,6 +194,9 @@ fn setup_ui_system(
                 }
                 if ui.button(format!("{} Item Database", egui_material_icons::icons::ICON_DATABASE)).clicked() {
                     ui_state.item_database_window_open = !ui_state.item_database_window_open;
+                }
+                if ui.button(format!("{} Proxies", egui_material_icons::icons::ICON_VPN_KEY)).clicked() {
+                    ui_state.proxies_window_open = !ui_state.proxies_window_open;
                 }
                 if ui.button(format!("{} Settings", egui_material_icons::icons::ICON_SETTINGS)).clicked() {
                     ui_state.settings_window_open = !ui_state.settings_window_open;
@@ -1099,6 +1123,361 @@ fn setup_ui_system(
         if close_world_info {
             ui_state.world_info_window_open = false;
         }
+    }
+
+    if ui_state.proxies_window_open {
+        // Initialize channel if needed
+        if ui_state.proxy_test_receiver.is_none() {
+            let (sender, receiver) = mpsc::channel();
+            ui_state.proxy_test_receiver = Some(Arc::new(Mutex::new(receiver)));
+            ui_state.proxy_test_sender = Some(Arc::new(Mutex::new(sender)));
+        }
+
+        // Process proxy test results
+        let mut results_to_process = Vec::new();
+        if let Some(receiver_arc) = &ui_state.proxy_test_receiver {
+            if let Ok(receiver) = receiver_arc.try_lock() {
+                while let Ok(result) = receiver.try_recv() {
+                    results_to_process.push(result);
+                }
+            }
+        }
+
+        // Apply results to proxies
+        for result in results_to_process {
+            for proxy in &mut ui_state.proxies {
+                if proxy.ip == result.proxy_ip {
+                    proxy.testing = false;
+                    proxy.http_success = Some(result.http_success);
+                    proxy.server_success = Some(result.server_success);
+                    break;
+                }
+            }
+        }
+
+        egui::Window::new(format!("{} Proxies", egui_material_icons::icons::ICON_VPN_KEY))
+            .default_size([800.0, 600.0])
+            .resizable(true)
+            .collapsible(false)
+            .show(contexts.ctx_mut()?, |ui| {
+                // Header section
+                egui::Frame::new()
+                    .inner_margin(egui::Margin::symmetric(16, 12))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Proxy Manager")
+                                .size(16.0)
+                                .color(egui::Color32::WHITE)
+                                .strong());
+
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.button(format!("{} Close", egui_material_icons::icons::ICON_CLOSE)).clicked() {
+                                    ui_state.proxies_window_open = false;
+                                }
+                            });
+                        });
+                    });
+
+                ui.add_space(8.0);
+
+                // Add proxy section
+                egui::Frame::new()
+                    .fill(egui::Color32::from_rgb(35, 35, 40))
+                    .inner_margin(egui::Margin::symmetric(12, 10))
+                    .corner_radius(6.0)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Add Proxy:");
+                            ui.text_edit_singleline(&mut ui_state.new_proxy_input);
+                            ui.label(egui::RichText::new("Format: host:port or host:port:username:password")
+                                .size(11.0)
+                                .color(egui::Color32::from_rgb(150, 150, 150)));
+
+                            if ui.button(format!("{} Add", egui_material_icons::icons::ICON_ADD)).clicked() {
+                                if !ui_state.new_proxy_input.is_empty() {
+                                    let proxy_input = ui_state.new_proxy_input.clone();
+                                    ui_state.proxies.push(ProxyEntry {
+                                        ip: proxy_input,
+                                        http_success: None,
+                                        server_success: None,
+                                        testing: false,
+                                    });
+                                    ui_state.new_proxy_input.clear();
+                                }
+                            }
+
+                            if ui.button(format!("{} Test All", egui_material_icons::icons::ICON_PLAY_ARROW)).clicked() {
+                                let sender_arc = ui_state.proxy_test_sender.clone();
+                                for proxy in &mut ui_state.proxies {
+                                    if !proxy.testing {
+                                        proxy.testing = true;
+                                        proxy.http_success = None;
+                                        proxy.server_success = None;
+
+                                        let proxy_string = proxy.ip.clone();
+                                        let parts: Vec<&str> = proxy_string.split(':').collect();
+
+                                        if parts.len() >= 2 {
+                                            let socks5_config = match parts.len() {
+                                                2 => {
+                                                    let host = parts[0];
+                                                    let port = parts[1];
+
+                                                    match format!("{}:{}", host, port).to_socket_addrs() {
+                                                        Ok(mut addrs) => {
+                                                            if let Some(proxy_addr) = addrs.next() {
+                                                                Some(Socks5Config {
+                                                                    proxy_addr,
+                                                                    username: None,
+                                                                    password: None,
+                                                                })
+                                                            } else {
+                                                                None
+                                                            }
+                                                        }
+                                                        Err(_) => None,
+                                                    }
+                                                }
+                                                4 => {
+                                                    let host = parts[0];
+                                                    let port = parts[1];
+
+                                                    match format!("{}:{}", host, port).to_socket_addrs() {
+                                                        Ok(mut addrs) => {
+                                                            if let Some(proxy_addr) = addrs.next() {
+                                                                Some(Socks5Config {
+                                                                    proxy_addr,
+                                                                    username: Some(parts[2].to_string()),
+                                                                    password: Some(parts[3].to_string()),
+                                                                })
+                                                            } else {
+                                                                None
+                                                            }
+                                                        }
+                                                        Err(_) => None,
+                                                    }
+                                                }
+                                                _ => None,
+                                            };
+
+                                            if let Some(config) = socks5_config {
+                                                if let Some(sender_arc_inner) = &sender_arc {
+                                                    let proxy_ip = proxy.ip.clone();
+                                                    let sender_arc_inner = sender_arc_inner.clone();
+                                                    thread::spawn(move || {
+                                                        let (http_success, server_success) = test_socks5_proxy(&config);
+                                                        if let Ok(sender) = sender_arc_inner.lock() {
+                                                            let _ = sender.send(ProxyTestResult {
+                                                                proxy_ip,
+                                                                http_success,
+                                                                server_success,
+                                                            });
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    });
+
+                ui.add_space(8.0);
+
+                // Proxies table
+                if ui_state.proxies.is_empty() {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(20.0);
+                        ui.label(egui::RichText::new("No proxies added")
+                            .size(18.0)
+                            .color(egui::Color32::from_rgb(200, 200, 200)));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Add a proxy above to get started.")
+                            .size(14.0)
+                            .color(egui::Color32::from_rgb(150, 150, 150)));
+                        ui.add_space(20.0);
+                    });
+                } else {
+                    egui::Frame::new()
+                        .fill(egui::Color32::from_rgb(25, 25, 30))
+                        .inner_margin(egui::Margin::symmetric(8, 8))
+                        .corner_radius(6.0)
+                        .show(ui, |ui| {
+                            egui::ScrollArea::vertical()
+                                .auto_shrink([false, false])
+                                .show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+
+                                    egui::Grid::new("proxies_grid")
+                                        .num_columns(5)
+                                        .spacing([15.0, 8.0])
+                                        .striped(true)
+                                        .show(ui, |ui| {
+                                            // Header
+                                            ui.label(egui::RichText::new("Proxy")
+                                                .strong()
+                                                .color(egui::Color32::from_rgb(200, 200, 200)));
+                                            ui.label(egui::RichText::new("HTTP Test")
+                                                .strong()
+                                                .color(egui::Color32::from_rgb(200, 200, 200)));
+                                            ui.label(egui::RichText::new("Server Test")
+                                                .strong()
+                                                .color(egui::Color32::from_rgb(200, 200, 200)));
+                                            ui.label(egui::RichText::new("Actions")
+                                                .strong()
+                                                .color(egui::Color32::from_rgb(200, 200, 200)));
+                                            ui.label(""); // Empty column for remove button
+                                            ui.end_row();
+
+                                            // Proxies
+                                            let mut indices_to_remove = Vec::new();
+                                            let sender_arc = ui_state.proxy_test_sender.clone();
+                                            for (index, proxy) in ui_state.proxies.iter_mut().enumerate() {
+                                                ui.label(egui::RichText::new(&proxy.ip)
+                                                    .color(egui::Color32::WHITE));
+
+                                                // HTTP Test Status
+                                                match proxy.http_success {
+                                                    Some(true) => {
+                                                        ui.label(egui::RichText::new("✓ Success")
+                                                            .color(egui::Color32::from_rgb(100, 255, 100)));
+                                                    }
+                                                    Some(false) => {
+                                                        ui.label(egui::RichText::new("✗ Failed")
+                                                            .color(egui::Color32::from_rgb(255, 100, 100)));
+                                                    }
+                                                    None => {
+                                                        if proxy.testing {
+                                                            ui.label(egui::RichText::new("⟳ Testing...")
+                                                                .color(egui::Color32::from_rgb(255, 255, 100)));
+                                                        } else {
+                                                            ui.label(egui::RichText::new("- Not tested")
+                                                                .color(egui::Color32::from_rgb(150, 150, 150)));
+                                                        }
+                                                    }
+                                                }
+
+                                                // Server Test Status
+                                                match proxy.server_success {
+                                                    Some(true) => {
+                                                        ui.label(egui::RichText::new("✓ Success")
+                                                            .color(egui::Color32::from_rgb(100, 255, 100)));
+                                                    }
+                                                    Some(false) => {
+                                                        ui.label(egui::RichText::new("✗ Failed")
+                                                            .color(egui::Color32::from_rgb(255, 100, 100)));
+                                                    }
+                                                    None => {
+                                                        if proxy.testing {
+                                                            ui.label(egui::RichText::new("⟳ Testing...")
+                                                                .color(egui::Color32::from_rgb(255, 255, 100)));
+                                                        } else {
+                                                            ui.label(egui::RichText::new("- Not tested")
+                                                                .color(egui::Color32::from_rgb(150, 150, 150)));
+                                                        }
+                                                    }
+                                                }
+
+                                                // Test button
+                                                if ui.button(format!("{} Test", egui_material_icons::icons::ICON_PLAY_ARROW)).clicked() {
+                                                    if !proxy.testing {
+                                                        proxy.testing = true;
+                                                        proxy.http_success = None;
+                                                        proxy.server_success = None;
+
+
+                                                        let proxy_string = proxy.ip.clone();
+                                                        let parts: Vec<&str> = proxy_string.split(':').collect();
+
+                                                        if parts.len() >= 2 {
+                                                            let socks5_config = match parts.len() {
+                                                                2 => {
+                                                                    let host = parts[0];
+                                                                    let port = parts[1];
+
+                                                                    match format!("{}:{}", host, port).to_socket_addrs() {
+                                                                        Ok(mut addrs) => {
+                                                                            if let Some(proxy_addr) = addrs.next() {
+                                                                                Some(Socks5Config {
+                                                                                    proxy_addr,
+                                                                                    username: None,
+                                                                                    password: None,
+                                                                                })
+                                                                            } else {
+                                                                                None
+                                                                            }
+                                                                        }
+                                                                        Err(_) => None,
+                                                                    }
+                                                                }
+                                                                4 => {
+                                                                    let host = parts[0];
+                                                                    let port = parts[1];
+
+                                                                    match format!("{}:{}", host, port).to_socket_addrs() {
+                                                                        Ok(mut addrs) => {
+                                                                            if let Some(proxy_addr) = addrs.next() {
+                                                                                Some(Socks5Config {
+                                                                                    proxy_addr,
+                                                                                    username: Some(parts[2].to_string()),
+                                                                                    password: Some(parts[3].to_string()),
+                                                                                })
+                                                                            } else {
+                                                                                None
+                                                                            }
+                                                                        }
+                                                                        Err(_) => None,
+                                                                    }
+                                                                }
+                                                                _ => None,
+                                                            };
+
+                                                            if let Some(config) = socks5_config {
+                                                                if let Some(sender_arc_inner) = &sender_arc {
+                                                                    let proxy_ip = proxy.ip.clone();
+                                                                    let sender_arc_inner = sender_arc_inner.clone();
+                                                                    thread::spawn(move || {
+                                                                        let (http_success, server_success) = test_socks5_proxy(&config);
+                                                                        if let Ok(sender) = sender_arc_inner.lock() {
+                                                                            let _ = sender.send(ProxyTestResult {
+                                                                                proxy_ip,
+                                                                                http_success,
+                                                                                server_success,
+                                                                            });
+                                                                        }
+                                                                    });
+                                                                }
+                                                            } else {
+                                                                proxy.testing = false;
+                                                                proxy.http_success = Some(false);
+                                                                proxy.server_success = Some(false);
+                                                            }
+                                                        } else {
+                                                            proxy.testing = false;
+                                                            proxy.http_success = Some(false);
+                                                            proxy.server_success = Some(false);
+                                                        }
+                                                    }
+                                                }
+
+                                                // Remove button
+                                                if ui.button(format!("{} Remove", egui_material_icons::icons::ICON_DELETE)).clicked() {
+                                                    indices_to_remove.push(index);
+                                                }
+
+                                                ui.end_row();
+                                            }
+
+                                            // Remove proxies in reverse order to maintain correct indices
+                                            for &index in indices_to_remove.iter().rev() {
+                                                ui_state.proxies.remove(index);
+                                            }
+                                        });
+                                });
+                        });
+                }
+            });
     }
 
     if ui_state.settings_window_open {
