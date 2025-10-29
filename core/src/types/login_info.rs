@@ -44,7 +44,7 @@ impl LoginInfo {
             tank_id_pass: String::new(),
             f: "1".to_string(),
             protocol: "217".to_string(),
-            game_version: "5.27".to_string(),
+            game_version: "5.33".to_string(),
             fz: "22243512".to_string(),
             cbits: "1024".to_string(),
             player_age: "20".to_string(),

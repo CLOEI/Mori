@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mori - Growtopia Multi Bot</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #121212; }
+    </style>
+</head>
+<body class="text-gray-100">
+    <div x-data="{
+        bots: [],
+        selectedBotId: null,
+        showAddBot: false,
+        loginMethod: 'legacy',
+        credentials: { growid: '', password: '', token: '' },
+        socks5: '',
+
+        async loadBots() {
+            const response = await fetch('/api/bots');
+            const result = await response.json();
+            if (result.success) {
+                this.bots = result.data.bots;
+                if (this.bots.length > 0 && !this.selectedBotId) {
+                    this.selectedBotId = this.bots[0].id;
+                }
+            }
+        },
+
+        get selectedBot() {
+            return this.bots.find(b => b.id === this.selectedBotId);
+        },
+
+        async createBot() {
+            const payload = {
+                login_method: this.loginMethod,
+                socks5: this.socks5 || null
+            };
+
+            if (this.loginMethod === 'ltoken') {
+                payload.credentials = { token: this.credentials.token };
+            } else if (this.loginMethod === 'legacy') {
+                payload.credentials = {
+                    growid: this.credentials.growid,
+                    password: this.credentials.password
+                };
+            }
+
+            const response = await fetch('/api/bots', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                this.showAddBot = false;
+                this.credentials = { growid: '', password: '', token: '' };
+                this.socks5 = '';
+                this.loadBots();
+            }
+        },
+
+        async removeBot(id) {
+            if (confirm('Are you sure you want to remove this bot?')) {
+                await fetch(`/api/bots/${id}`, { method: 'DELETE' });
+                this.loadBots();
+            }
+        }
+    }"
+    x-init="loadBots(); setInterval(() => loadBots(), 2000)"
+    class="min-h-screen">
+
+        <!-- Header -->
+        <header class="bg-gray-800 border-b border-gray-700">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold text-blue-400">Mori</h1>
+
+                    <div class="flex items-center gap-4">
+                        <!-- Bot Selector -->
+                        <select
+                            x-model="selectedBotId"
+                            class="bg-gray-700 text-gray-100 px-4 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500"
+                        >
+                            <option value="">No bot selected</option>
+                            <template x-for="bot in bots" :key="bot.id">
+                                <option :value="bot.id" x-text="bot.name"></option>
+                            </template>
+                        </select>
+
+                        <button
+                            @click="showAddBot = true"
+                            class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium transition flex items-center gap-2"
+                        >
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            Add Bot
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                <!-- Bot List Sidebar -->
+                <div class="lg:col-span-1">
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <h2 class="text-xl font-bold mb-4">Bots (<span x-text="bots.length"></span>)</h2>
+
+                        <div class="space-y-2">
+                            <template x-for="bot in bots" :key="bot.id">
+                                <div
+                                    class="bg-gray-700 rounded-lg p-3 border transition cursor-pointer"
+                                    :class="selectedBotId === bot.id ? 'border-blue-500' : 'border-gray-600 hover:border-gray-500'"
+                                    @click="selectedBotId = bot.id"
+                                >
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-medium" x-text="bot.name"></span>
+                                        <span class="text-xs px-2 py-1 rounded-full bg-green-600" x-text="bot.status"></span>
+                                    </div>
+                                    <div class="text-sm text-gray-400 space-y-1">
+                                        <div class="flex items-center gap-1">
+                                            <i data-lucide="gem" class="w-4 h-4"></i>
+                                            Gems: <span x-text="bot.gems"></span>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <i data-lucide="signal" class="w-4 h-4"></i>
+                                            Ping: <span x-text="bot.ping"></span>ms
+                                        </div>
+                                        <div x-show="bot.world" class="flex items-center gap-1">
+                                            <i data-lucide="globe" class="w-4 h-4"></i>
+                                            World: <span x-text="bot.world"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div x-show="bots.length === 0" class="text-center text-gray-500 py-8">
+                                No bots yet. Click "Add Bot" to create one.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bot Details & Controls -->
+                <div class="lg:col-span-2">
+                    <template x-if="selectedBot">
+                        <div class="space-y-4">
+                            <!-- Bot Stats -->
+                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                                <h2 class="text-2xl font-bold mb-4" x-text="selectedBot.name"></h2>
+
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div class="bg-gray-700 rounded-lg p-4">
+                                        <div class="text-sm text-gray-400">Gems</div>
+                                        <div class="text-2xl font-bold text-yellow-400" x-text="selectedBot.gems"></div>
+                                    </div>
+                                    <div class="bg-gray-700 rounded-lg p-4">
+                                        <div class="text-sm text-gray-400">Ping</div>
+                                        <div class="text-2xl font-bold text-green-400" x-text="selectedBot.ping + 'ms'"></div>
+                                    </div>
+                                    <div class="bg-gray-700 rounded-lg p-4 col-span-2">
+                                        <div class="text-sm text-gray-400">World</div>
+                                        <div class="text-xl font-bold text-blue-400" x-text="selectedBot.world || 'Not in world'"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Actions -->
+                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                                <h3 class="text-lg font-bold mb-4">Quick Actions</h3>
+
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <button
+                                        @click="fetch(`/api/bots/${selectedBotId}/connect`, {method: 'POST'})"
+                                        class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition flex items-center justify-center gap-2"
+                                    >
+                                        <i data-lucide="plug" class="w-4 h-4"></i>
+                                        Connect
+                                    </button>
+                                    <button
+                                        @click="fetch(`/api/bots/${selectedBotId}/disconnect`, {method: 'POST'})"
+                                        class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition flex items-center justify-center gap-2"
+                                    >
+                                        <i data-lucide="plug-zap" class="w-4 h-4"></i>
+                                        Disconnect
+                                    </button>
+                                    <button
+                                        @click="fetch(`/api/bots/${selectedBotId}/collect`, {method: 'POST'})"
+                                        class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition flex items-center justify-center gap-2"
+                                    >
+                                        <i data-lucide="package" class="w-4 h-4"></i>
+                                        Collect
+                                    </button>
+                                    <button
+                                        @click="const world = prompt('Enter world name:'); if(world) fetch(`/api/bots/${selectedBotId}/warp`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({world_name: world})})"
+                                        class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition flex items-center justify-center gap-2"
+                                    >
+                                        <i data-lucide="globe" class="w-4 h-4"></i>
+                                        Warp
+                                    </button>
+                                    <button
+                                        @click="const msg = prompt('Enter message:'); if(msg) fetch(`/api/bots/${selectedBotId}/say`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: msg})})"
+                                        class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition flex items-center justify-center gap-2"
+                                    >
+                                        <i data-lucide="message-circle" class="w-4 h-4"></i>
+                                        Say
+                                    </button>
+                                    <button
+                                        @click="removeBot(selectedBotId)"
+                                        class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg transition flex items-center justify-center gap-2"
+                                    >
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Inventory & World Info Tabs -->
+                            <div class="bg-gray-800 rounded-lg border border-gray-700" x-data="{ tab: 'inventory', inventoryData: null, worldData: null }">
+                                <div class="flex border-b border-gray-700">
+                                    <button
+                                        @click="tab = 'inventory'; if(!inventoryData) fetch(`/api/bots/${selectedBotId}/inventory`).then(r => r.json()).then(d => inventoryData = d.data)"
+                                        class="px-6 py-3 font-medium transition flex items-center gap-2"
+                                        :class="tab === 'inventory' ? 'bg-gray-700 text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200'"
+                                    >
+                                        <i data-lucide="backpack" class="w-4 h-4"></i>
+                                        Inventory
+                                    </button>
+                                    <button
+                                        @click="tab = 'world'; if(!worldData) fetch(`/api/bots/${selectedBotId}/world`).then(r => r.json()).then(d => worldData = d.data)"
+                                        class="px-6 py-3 font-medium transition flex items-center gap-2"
+                                        :class="tab === 'world' ? 'bg-gray-700 text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200'"
+                                    >
+                                        <i data-lucide="globe" class="w-4 h-4"></i>
+                                        World Info
+                                    </button>
+                                    <button
+                                        @click="tab = 'logs'"
+                                        class="px-6 py-3 font-medium transition flex items-center gap-2"
+                                        :class="tab === 'logs' ? 'bg-gray-700 text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200'"
+                                    >
+                                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                                        Logs
+                                    </button>
+                                </div>
+
+                                <div class="p-6">
+                                    <!-- Inventory Tab -->
+                                    <div x-show="tab === 'inventory'" x-cloak>
+                                        <template x-if="inventoryData">
+                                            <div>
+                                                <div class="mb-4 text-sm text-gray-400">
+                                                    Items: <span x-text="inventoryData.item_count"></span> / <span x-text="inventoryData.size"></span>
+                                                </div>
+                                                <div class="overflow-auto max-h-96">
+                                                    <table class="w-full">
+                                                        <thead class="bg-gray-700 sticky top-0">
+                                                            <tr>
+                                                                <th class="px-4 py-2 text-left">Item</th>
+                                                                <th class="px-4 py-2 text-left">Amount</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <template x-for="item in inventoryData.items" :key="item.id">
+                                                                <tr class="border-t border-gray-700">
+                                                                    <td class="px-4 py-2" x-text="item.name"></td>
+                                                                    <td class="px-4 py-2" x-text="item.amount"></td>
+                                                                </tr>
+                                                            </template>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <div x-show="!inventoryData" class="text-center text-gray-500 py-8">
+                                            Loading inventory...
+                                        </div>
+                                    </div>
+
+                                    <!-- World Tab -->
+                                    <div x-show="tab === 'world'" x-cloak>
+                                        <template x-if="worldData">
+                                            <div>
+                                                <div class="mb-4 space-y-2">
+                                                    <div>World: <span class="font-bold" x-text="worldData.name"></span></div>
+                                                    <div>Size: <span x-text="worldData.width"></span> x <span x-text="worldData.height"></span></div>
+                                                    <div>Players: <span x-text="worldData.players.length"></span></div>
+                                                </div>
+
+                                                <h4 class="font-bold mb-2">Players</h4>
+                                                <div class="space-y-2 max-h-64 overflow-auto">
+                                                    <template x-for="player in worldData.players" :key="player.net_id">
+                                                        <div class="bg-gray-700 rounded p-2">
+                                                            <span x-text="player.name"></span>
+                                                            <span class="text-gray-400 text-sm">
+                                                                (Pos: <span x-text="Math.floor(player.position[0])"></span>,
+                                                                <span x-text="Math.floor(player.position[1])"></span>)
+                                                            </span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <div x-show="!worldData" class="text-center text-gray-500 py-8">
+                                            Loading world data...
+                                        </div>
+                                    </div>
+
+                                    <!-- Logs Tab -->
+                                    <div x-show="tab === 'logs'" x-cloak
+                                         x-data="{ logs: [] }"
+                                         x-init="fetch(`/api/bots/${selectedBotId}/logs`).then(r => r.json()).then(d => logs = d.data.logs)">
+                                        <div class="bg-black rounded p-4 h-96 overflow-auto font-mono text-sm">
+                                            <template x-for="log in logs" :key="log">
+                                                <div class="text-green-400" x-text="log"></div>
+                                            </template>
+                                            <div x-show="logs.length === 0" class="text-gray-500">No logs yet...</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div x-show="!selectedBot" class="bg-gray-800 rounded-lg p-12 border border-gray-700 text-center">
+                        <div class="text-gray-500 text-lg">Select a bot or create a new one</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Add Bot Modal -->
+        <div x-show="showAddBot"
+             x-cloak
+             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+             @click.self="showAddBot = false">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700">
+                <h2 class="text-2xl font-bold mb-4">Add New Bot</h2>
+
+                <div class="space-y-4">
+                    <!-- Login Method -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Login Method</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button
+                                @click="loginMethod = 'google'"
+                                class="px-4 py-2 rounded transition"
+                                :class="loginMethod === 'google' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
+                            >Google</button>
+                            <button
+                                @click="loginMethod = 'apple'"
+                                class="px-4 py-2 rounded transition"
+                                :class="loginMethod === 'apple' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
+                            >Apple</button>
+                            <button
+                                @click="loginMethod = 'ltoken'"
+                                class="px-4 py-2 rounded transition"
+                                :class="loginMethod === 'ltoken' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
+                            >LTOKEN</button>
+                            <button
+                                @click="loginMethod = 'legacy'"
+                                class="px-4 py-2 rounded transition"
+                                :class="loginMethod === 'legacy' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'"
+                            >Legacy</button>
+                        </div>
+                    </div>
+
+                    <!-- Credentials -->
+                    <div x-show="loginMethod === 'ltoken'" x-cloak>
+                        <label class="block text-sm font-medium mb-2">LTOKEN (4 values separated by :)</label>
+                        <input
+                            x-model="credentials.token"
+                            type="text"
+                            class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                            placeholder="value1:value2:value3:value4"
+                        >
+                    </div>
+
+                    <div x-show="loginMethod === 'legacy'" x-cloak class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">GrowID</label>
+                            <input
+                                x-model="credentials.growid"
+                                type="text"
+                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Password</label>
+                            <input
+                                x-model="credentials.password"
+                                type="password"
+                                class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                            >
+                        </div>
+                    </div>
+
+                    <div x-show="loginMethod === 'google' || loginMethod === 'apple'" x-cloak class="text-sm text-gray-400">
+                        Click "Create Bot" to authenticate via <span x-text="loginMethod"></span>
+                    </div>
+
+                    <!-- SOCKS5 Proxy (Optional) -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2">SOCKS5 Proxy (Optional)</label>
+                        <input
+                            x-model="socks5"
+                            type="text"
+                            class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                            placeholder="host:port or host:port:user:pass"
+                        >
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex gap-3 pt-4">
+                        <button
+                            @click="createBot()"
+                            class="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium transition"
+                        >
+                            Create Bot
+                        </button>
+                        <button
+                            @click="showAddBot = false"
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="container mx-auto px-4 py-6 mt-8 text-center text-gray-500">
+            <div class="flex items-center justify-center gap-1">
+                Created with <i data-lucide="heart" class="w-4 h-4 text-red-500"></i> by Cendy
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize Lucide icons once on load
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        // Re-initialize icons only when Alpine finishes initialization
+        document.addEventListener('alpine:initialized', () => {
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
