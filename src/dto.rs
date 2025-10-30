@@ -35,6 +35,12 @@ pub struct WalkRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct MoveRequest {
+    pub direction: String, // "left", "right", "up", "down"
+    pub tiles: Option<i32>, // Optional: number of tiles to move (default: 1)
+}
+
+#[derive(Debug, Deserialize)]
 pub struct PunchRequest {
     pub offset_x: i32,
     pub offset_y: i32,

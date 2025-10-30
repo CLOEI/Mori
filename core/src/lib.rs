@@ -11,7 +11,7 @@ use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -19,6 +19,7 @@ mod astar;
 mod authentication_context;
 mod bot_configuration;
 mod bot_inventory;
+pub mod events;
 mod game_world;
 mod inventory;
 mod login;
@@ -34,6 +35,7 @@ mod utils;
 mod variant_handler;
 
 pub use authentication_context::AuthenticationContext;
+pub use events::{BotEvent, EventBroadcaster, EventType, LogLevel};
 pub use gtitem_r;
 pub use gtworld_r;
 pub use movement_controller::MovementController;
@@ -61,6 +63,7 @@ pub struct Bot {
     pub config: BotConfiguration,
     pub temporary_data: TemporaryData,
     pub proxy_url: Option<String>,
+    pub events: EventBroadcaster,
 }
 
 impl Bot {
@@ -69,7 +72,7 @@ impl Bot {
         token_fetcher: Option<TokenFetcher>,
         item_database: Arc<RwLock<ItemDatabase>>,
         socks5_config: Option<Socks5Config>,
-    ) -> Arc<Self> {
+    ) -> (Arc<Self>, mpsc::Receiver<BotEvent>) {
         let local_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0));
 
         let proxy_url = socks5_config.as_ref().map(|cfg| {
@@ -87,8 +90,9 @@ impl Bot {
         });
 
         let network = NetworkSession::new(local_addr, socks5_config);
+        let (event_broadcaster, event_receiver) = events::create_event_channel();
 
-        Arc::new(Self {
+        let bot = Arc::new(Self {
             network,
             auth: AuthenticationContext::new(login_via, token_fetcher),
             movement: MovementController::new(),
@@ -100,7 +104,10 @@ impl Bot {
             config: BotConfiguration::new(),
             temporary_data: TemporaryData::default(),
             proxy_url,
-        })
+            events: event_broadcaster,
+        });
+
+        (bot, event_receiver)
     }
 
     pub fn logon(self: Arc<Self>, data: Option<&str>) {
@@ -162,7 +169,7 @@ impl Bot {
         };
 
         if let Ok(ltoken) =
-            server::check_token_with_proxy(&ltoken, &login_data, self.proxy_url.as_deref())
+            server::check_token(&ltoken, &login_data, self.proxy_url.as_deref())
         {
             println!("Refreshed token: {}", ltoken);
             let mut login_info_lock = self.auth.login_info();
@@ -462,6 +469,12 @@ impl Bot {
 
         let position = self.movement.position();
 
+        // Emit PositionChanged event
+        self.events.emit(BotEvent::new(EventType::PositionChanged {
+            x: position.0,
+            y: position.1,
+        }));
+
         let mut pkt = NetGamePacketData::default();
         {
             pkt._type = NetGamePacket::State;
@@ -486,13 +499,19 @@ impl Bot {
     pub fn find_path(&self, x: u32, y: u32) {
         let position = self.movement.position();
 
+        // Emit PathfindingStarted event
+        self.events.emit(BotEvent::new(EventType::PathfindingStarted {
+            target_x: x,
+            target_y: y,
+        }));
+
         let paths = {
             let mut astar = self.movement.astar();
             astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
         };
 
         let delay = self.config.findpath_delay();
-        if let Some(paths) = paths {
+        if let Some(paths) = &paths {
             for node in paths {
                 self.movement
                     .set_position(node.x as f32 * 32.0, node.y as f32 * 32.0);
@@ -500,6 +519,12 @@ impl Bot {
                 thread::sleep(Duration::from_millis(delay as u64));
             }
         }
+
+        // Emit PathfindingCompleted event
+        self.events.emit(BotEvent::new(EventType::PathfindingCompleted {
+            success: paths.is_some(),
+            steps: paths.as_ref().map(|p| p.len()).unwrap_or(0),
+        }));
     }
 
     pub fn drop_item(&self, item_id: u32, amount: u32) {

@@ -184,6 +184,56 @@
                                 </div>
                             </div>
 
+                            <!-- Movement Controls -->
+                            <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                                <h3 class="text-lg font-bold mb-4">Movement Controls</h3>
+
+                                <div class="flex flex-col items-center gap-2">
+                                    <!-- Up Button -->
+                                    <button
+                                        @click="fetch(`/api/bots/${selectedBotId}/move`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({direction: 'up', tiles: 1})})"
+                                        class="bg-blue-600 hover:bg-blue-700 w-16 h-16 rounded-lg transition flex items-center justify-center"
+                                        title="Move Up"
+                                    >
+                                        <i data-lucide="arrow-up" class="w-6 h-6"></i>
+                                    </button>
+
+                                    <!-- Left, Center, Right -->
+                                    <div class="flex gap-2">
+                                        <button
+                                            @click="fetch(`/api/bots/${selectedBotId}/move`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({direction: 'left', tiles: 1})})"
+                                            class="bg-blue-600 hover:bg-blue-700 w-16 h-16 rounded-lg transition flex items-center justify-center"
+                                            title="Move Left"
+                                        >
+                                            <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                                        </button>
+                                        <div class="w-16 h-16 bg-gray-700 rounded-lg flex items-center justify-center">
+                                            <i data-lucide="move" class="w-6 h-6 text-gray-500"></i>
+                                        </div>
+                                        <button
+                                            @click="fetch(`/api/bots/${selectedBotId}/move`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({direction: 'right', tiles: 1})})"
+                                            class="bg-blue-600 hover:bg-blue-700 w-16 h-16 rounded-lg transition flex items-center justify-center"
+                                            title="Move Right"
+                                        >
+                                            <i data-lucide="arrow-right" class="w-6 h-6"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Down Button -->
+                                    <button
+                                        @click="fetch(`/api/bots/${selectedBotId}/move`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({direction: 'down', tiles: 1})})"
+                                        class="bg-blue-600 hover:bg-blue-700 w-16 h-16 rounded-lg transition flex items-center justify-center"
+                                        title="Move Down"
+                                    >
+                                        <i data-lucide="arrow-down" class="w-6 h-6"></i>
+                                    </button>
+                                </div>
+
+                                <div class="mt-4 text-center text-sm text-gray-400">
+                                    Use arrow buttons to move the bot
+                                </div>
+                            </div>
+
                             <!-- Quick Actions -->
                             <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
                                 <h3 class="text-lg font-bold mb-4">Quick Actions</h3>

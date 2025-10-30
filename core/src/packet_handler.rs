@@ -1,3 +1,4 @@
+use crate::events::{BotEvent, EventType};
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
 use crate::utils::proton::HashMode;
@@ -98,6 +99,13 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     let mut world_lock = bot.world.data.lock().unwrap();
                     let _ = world_lock.parse(&data[60..], &item_database);
 
+                    // Emit WorldLoaded event
+                    bot.events.emit(BotEvent::new(EventType::WorldLoaded {
+                        name: world_lock.name.clone(),
+                        width: world_lock.width,
+                        height: world_lock.height,
+                    }));
+
                     if !world_lock.tiles.is_empty() {
                         let mut collision_data = Vec::with_capacity(world_lock.tiles.len());
                         for tile in &world_lock.tiles {
@@ -119,7 +127,16 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         );
                     }
                 }
-                NetGamePacket::SendInventoryState => bot.inventory.parse(&data[60..]),
+                NetGamePacket::SendInventoryState => {
+                    bot.inventory.parse(&data[60..]);
+
+                    // Emit InventoryParsed event
+                    let (size, item_count) = bot.inventory.size_and_count();
+                    bot.events.emit(BotEvent::new(EventType::InventoryParsed {
+                        size,
+                        item_count,
+                    }));
+                }
                 NetGamePacket::SetCharacterState => {
                     let hack_type = parsed.value;
                     let build_length = parsed.jump_count - 126;
@@ -232,6 +249,15 @@ fn handle_tile_change_request(bot: &Bot, tank_packet: &NetGamePacketData) {
     if tank_packet.value == 18 {
         update_tile_for_punch(bot, tank_packet);
         update_single_tile_astar(bot, tank_packet.int_x as u32, tank_packet.int_y as u32, 0);
+
+        // Emit TileChanged event (punch = remove)
+        bot.events.emit(BotEvent::new(EventType::TileChanged {
+            x: tank_packet.int_x as u32,
+            y: tank_packet.int_y as u32,
+            foreground_id: 0,
+            background_id: 0,
+        }));
+
         return;
     }
 
@@ -250,6 +276,23 @@ fn handle_tile_change_request(bot: &Bot, tank_packet: &NetGamePacketData) {
         tank_packet.int_y as u32,
         collision_type,
     );
+
+    // Emit TileChanged event (place)
+    let (fg, bg) = {
+        let world = bot.world.data.lock().unwrap();
+        if let Some(tile) = world.get_tile(tank_packet.int_x as u32, tank_packet.int_y as u32) {
+            (tile.foreground_item_id, tile.background_item_id)
+        } else {
+            (0, 0)
+        }
+    };
+
+    bot.events.emit(BotEvent::new(EventType::TileChanged {
+        x: tank_packet.int_x as u32,
+        y: tank_packet.int_y as u32,
+        foreground_id: fg,
+        background_id: bg,
+    }));
 }
 
 fn handle_item_change_object(bot: &Bot, tank_packet: &NetGamePacketData) {
@@ -266,9 +309,26 @@ fn handle_item_change_object(bot: &Bot, tank_packet: &NetGamePacketData) {
                 uid: world.dropped.last_dropped_item_uid + 1,
             };
 
+            let item_uid = item.uid;
+            let item_id = item.id;
+            let item_x = item.x;
+            let item_y = item.y;
+            let item_count = item.count;
+
             world.dropped.items.push(item);
             world.dropped.last_dropped_item_uid += 1;
             world.dropped.items_count += 1;
+
+            drop(world);
+
+            // Emit ItemDropped event
+            bot.events.emit(BotEvent::new(EventType::ItemDropped {
+                uid: item_uid,
+                item_id,
+                x: item_x,
+                y: item_y,
+                count: item_count,
+            }));
         }
         net_id if net_id == u32::MAX - 3 => {
             if let Some(obj) = world.dropped.items.iter_mut().find(|obj| {
@@ -289,18 +349,35 @@ fn handle_item_change_object(bot: &Bot, tank_packet: &NetGamePacketData) {
                 .map(|(i, obj)| (i, obj.clone()))
             {
                 let our_net_id = bot.runtime.net_id();
-                if tank_packet.net_id == our_net_id {
+                let is_our_collection = tank_packet.net_id == our_net_id;
+
+                if is_our_collection {
                     update_player_inventory_from_dropped_item(bot, &collected_item);
                 }
 
                 world.dropped.items.remove(index);
                 world.dropped.items_count -= 1;
+
+                let item_uid = collected_item.uid;
+                let item_id = collected_item.id;
+                let item_count = collected_item.count;
+
+                drop(world);
+
+                // Emit ItemCollected event (only for our own collection)
+                if is_our_collection {
+                    bot.events.emit(BotEvent::new(EventType::ItemCollected {
+                        uid: item_uid,
+                        item_id,
+                        count: item_count,
+                    }));
+                }
+            } else {
+                drop(world);
             }
         }
         _ => {}
     }
-
-    drop(world);
 }
 
 fn handle_send_tile_tree_state(bot: &Bot, tank_packet: &NetGamePacketData) {

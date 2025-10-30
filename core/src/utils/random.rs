@@ -6,10 +6,10 @@ pub fn hex(length: u32, upper: bool) -> String {
     } else {
         "0123456789abcdef"
     };
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     (0..length)
         .map(|_| {
-            let idx = rng.gen_range(0..chars.len());
+            let idx = rng.random_range(0..chars.len());
             chars.chars().nth(idx).unwrap()
         })
         .collect()

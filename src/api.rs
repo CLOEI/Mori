@@ -1,7 +1,8 @@
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, State, ws::{WebSocket, WebSocketUpgrade, Message}},
     http::StatusCode,
+    response::Response,
 };
 use gt_core::Socks5Config;
 use gt_core::types::bot::LoginVia;
@@ -277,6 +278,41 @@ pub async fn walk(
     })))
 }
 
+pub async fn move_bot(
+    State(manager): State<Arc<BotManager>>,
+    Path(id): Path<Uuid>,
+    Json(request): Json<MoveRequest>,
+) -> Result<Json<ApiResponse<MessageResponse>>, StatusCode> {
+    let bot = manager.get_bot(&id).ok_or(StatusCode::NOT_FOUND)?;
+
+    let tiles = request.tiles.unwrap_or(1);
+
+    // Get current position in tiles
+    let position = bot.movement.position();
+    let current_x = (position.0 / 32.0).floor() as i32;
+    let current_y = (position.1 / 32.0).floor() as i32;
+
+    // Calculate new absolute position based on direction
+    let (new_x, new_y) = match request.direction.to_lowercase().as_str() {
+        "left" => (current_x - tiles, current_y),
+        "right" => (current_x + tiles, current_y),
+        "up" => (current_x, current_y - tiles),
+        "down" => (current_x, current_y + tiles),
+        _ => {
+            return Ok(Json(ApiResponse::error(format!(
+                "Invalid direction: {}. Use 'left', 'right', 'up', or 'down'",
+                request.direction
+            ))));
+        }
+    };
+
+    bot.walk(new_x, new_y, false);
+
+    Ok(Json(ApiResponse::success(MessageResponse {
+        message: format!("Moving {} {} tile(s) to ({}, {})", request.direction, tiles, new_x, new_y),
+    })))
+}
+
 pub async fn collect(
     State(manager): State<Arc<BotManager>>,
     Path(id): Path<Uuid>,
@@ -459,6 +495,34 @@ pub async fn update_config(
     Ok(Json(ApiResponse::success(MessageResponse {
         message: "Configuration updated".to_string(),
     })))
+}
+
+// Bot Events WebSocket Endpoint
+
+pub async fn bot_events_websocket(
+    ws: WebSocketUpgrade,
+    State(manager): State<Arc<BotManager>>,
+    Path(id): Path<Uuid>,
+) -> Result<Response, StatusCode> {
+    let event_rx = manager
+        .subscribe_to_events(&id)
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(ws.on_upgrade(move |socket| async move {
+        handle_event_stream(socket, event_rx).await
+    }))
+}
+
+async fn handle_event_stream(
+    mut socket: WebSocket,
+    mut event_rx: tokio::sync::broadcast::Receiver<gt_core::BotEvent>,
+) {
+    while let Ok(event) = event_rx.recv().await {
+        let json = serde_json::to_string(&event).unwrap_or_else(|_| "{}".to_string());
+        if socket.send(Message::Text(json.into())).await.is_err() {
+            break;
+        }
+    }
 }
 
 // Helper functions

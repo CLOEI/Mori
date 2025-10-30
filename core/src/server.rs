@@ -13,11 +13,7 @@ pub struct DashboardLinks {
     pub growtopia: Option<String>,
 }
 
-pub fn check_token(token: &str, login_info: &str) -> Result<String> {
-    check_token_with_proxy(token, login_info, None)
-}
-
-pub fn check_token_with_proxy(
+pub fn check_token(
     token: &str,
     login_info: &str,
     proxy: Option<&str>,

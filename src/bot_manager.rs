@@ -1,17 +1,20 @@
 use gt_core::gtitem_r;
 use gt_core::gtitem_r::structs::ItemDatabase;
 use gt_core::types::bot::LoginVia;
-use gt_core::{Bot, Socks5Config};
+use gt_core::{Bot, BotEvent, Socks5Config};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, RwLock};
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
 pub struct BotEntry {
     pub id: Uuid,
     pub bot: Arc<Bot>,
     pub login_method: String,
+    pub event_broadcast: broadcast::Sender<BotEvent>,
 }
 
 pub struct BotManager {
@@ -43,7 +46,7 @@ impl BotManager {
         let bot_id = Uuid::new_v4();
         let item_db = Arc::clone(&self.item_database);
 
-        let bot = Bot::new(login_via.clone(), token_fetcher, item_db, socks5_config);
+        let (bot, event_rx) = Bot::new(login_via.clone(), token_fetcher, item_db, socks5_config);
 
         let login_method = match login_via {
             LoginVia::GOOGLE => "Google".to_string(),
@@ -52,11 +55,18 @@ impl BotManager {
             LoginVia::LEGACY(_) => "Legacy".to_string(),
         };
 
+        // Create broadcast channel for WebSocket consumers
+        let (event_broadcast, _) = broadcast::channel(1000);
+
         let bot_entry = BotEntry {
             id: bot_id,
             bot: Arc::clone(&bot),
             login_method,
+            event_broadcast: event_broadcast.clone(),
         };
+
+        // Spawn event bridge task (sync mpsc -> async broadcast)
+        Self::spawn_event_bridge(bot_id, event_rx, event_broadcast.clone());
 
         // Spawn bot thread
         let bot_clone = Arc::clone(&bot);
@@ -82,6 +92,7 @@ impl BotManager {
             id: entry.id,
             bot: Arc::clone(&entry.bot),
             login_method: entry.login_method.clone(),
+            event_broadcast: entry.event_broadcast.clone(),
         })
     }
 
@@ -105,5 +116,38 @@ impl BotManager {
 
     pub fn get_item_database(&self) -> Arc<RwLock<ItemDatabase>> {
         Arc::clone(&self.item_database)
+    }
+
+    /// Subscribe to events from a specific bot
+    pub fn subscribe_to_events(&self, bot_id: &Uuid) -> Option<broadcast::Receiver<BotEvent>> {
+        let bots = self.bots.read().unwrap();
+        bots.get(bot_id)
+            .map(|entry| entry.event_broadcast.subscribe())
+    }
+
+    /// Spawn event bridge task to convert sync mpsc receiver to async broadcast sender
+    fn spawn_event_bridge(
+        bot_id: Uuid,
+        event_rx: Receiver<BotEvent>,
+        broadcast_tx: broadcast::Sender<BotEvent>,
+    ) {
+        tokio::spawn(async move {
+            // Use blocking task to avoid blocking async runtime
+            tokio::task::spawn_blocking(move || {
+                loop {
+                    match event_rx.recv() {
+                        Ok(event) => {
+                            // Send to broadcast channel (ignore if no receivers)
+                            let _ = broadcast_tx.send(event);
+                        }
+                        Err(_) => {
+                            // Channel closed, bot removed
+                            println!("Event channel closed for bot {}", bot_id);
+                            break;
+                        }
+                    }
+                }
+            });
+        });
     }
 }

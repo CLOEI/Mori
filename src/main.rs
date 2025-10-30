@@ -27,6 +27,7 @@ async fn main() {
         .route("/api/bots/{id}/warp", post(api::warp_bot))
         .route("/api/bots/{id}/say", post(api::say))
         .route("/api/bots/{id}/walk", post(api::walk))
+        .route("/api/bots/{id}/move", post(api::move_bot))
         .route("/api/bots/{id}/collect", post(api::collect))
         .route("/api/bots/{id}/punch", post(api::punch))
         .route("/api/bots/{id}/place", post(api::place))
@@ -35,6 +36,8 @@ async fn main() {
         .route("/api/bots/{id}/world", get(api::get_world))
         .route("/api/bots/{id}/logs", get(api::get_logs))
         .route("/api/bots/{id}/config", post(api::update_config))
+        // API routes - Bot events (WebSocket)
+        .route("/api/bots/{id}/events", get(api::bot_events_websocket))
         // Static files
         .nest_service("/static", ServeDir::new("static"))
         .with_state(bot_manager)

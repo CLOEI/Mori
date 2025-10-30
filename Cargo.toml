@@ -8,13 +8,14 @@ authors = ["Cendy"]
 gt-core = { path = "./core" }
 serde_json = "1.0.143"
 
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["fs", "cors"] }
 serde = { version = "1.0", features = ["derive"] }
 uuid = { version = "1.11", features = ["v4", "serde"] }
 axum-extra = { version = "0.10", features = ["typed-header"] }
+futures-util = "0.3"
 
 askama = "0.14"
 askama_web = { version = "0.14", features = ["axum-0.8"] }

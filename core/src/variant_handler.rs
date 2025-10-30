@@ -123,19 +123,20 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 );
             } else {
                 let player = Player {
-                    _type: data["type"].clone(),
-                    avatar: data["avatar"].clone(),
+                    _type: data.get("spawn").unwrap_or(&String::new()).clone(),
+                    avatar: data.get("avatar").unwrap_or(&String::new()).clone(),
                     net_id: data["netID"].parse().expect("Failed to parse netid"),
-                    online_id: data["onlineID"].parse().expect("Failed to parse onlineid"),
-                    e_id: data["eid"].parse().expect("Failed to parse eid"),
+                    online_id: data.get("onlineID").unwrap_or(&String::new()).clone(),
+                    e_id: data["eid"].clone(),
                     ip: data["ip"].clone(),
                     col_rect: data["colrect"].clone(),
-                    title_icon: data["titleIcon"].clone(),
+                    title_icon: data.get("titleIcon").unwrap_or(&String::new()).clone(),
                     m_state: data["mstate"].parse().expect("Failed to parse mstate"),
                     user_id: data["userID"].parse().expect("Failed to parse userid"),
-                    invisible: data["invisible"]
-                        .parse()
-                        .expect("Failed to parse invisible"),
+                    invisible: data.get("invis")
+                        .unwrap_or(&"0".to_string())
+                        .parse::<u32>()
+                        .expect("Failed to parse invisible") != 0,
                     name: data["name"].clone(),
                     country: data["country"].clone(),
                     position: {
