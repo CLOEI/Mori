@@ -1,12 +1,12 @@
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
 };
-use gt_core::types::bot::LoginVia;
 use gt_core::Socks5Config;
+use gt_core::types::bot::LoginVia;
 use std::net::ToSocketAddrs;
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::bot_manager::BotManager;
@@ -55,7 +55,7 @@ pub async fn create_bot(
             return Ok(Json(ApiResponse::error(format!(
                 "Invalid login method: {}",
                 request.login_method
-            ))))
+            ))));
         }
     };
 
@@ -78,7 +78,7 @@ pub async fn create_bot(
 
     // Get bot summary
     if let Some(bot) = manager.get_bot(&bot_id) {
-        let name = if let Ok(login_info_lock) = bot.info.login_info.try_lock() {
+        let name = if let Some(login_info_lock) = bot.auth.try_login_info() {
             login_info_lock
                 .as_ref()
                 .map(|info| info.tank_id_name.clone())
@@ -93,7 +93,7 @@ pub async fn create_bot(
             login_method: request.login_method,
             status: "connecting".to_string(),
             gems: bot.inventory.gems(),
-            ping: bot.ping.load(Ordering::Relaxed),
+            ping: bot.runtime.ping(),
             world: None,
         };
 
@@ -111,7 +111,7 @@ pub async fn list_bots(
     let summaries: Vec<BotSummary> = bots
         .iter()
         .map(|(id, login_method, bot)| {
-            let name = if let Ok(login_info_lock) = bot.info.login_info.try_lock() {
+            let name = if let Some(login_info_lock) = bot.auth.try_login_info() {
                 login_info_lock
                     .as_ref()
                     .map(|info| info.tank_id_name.clone())
@@ -132,7 +132,7 @@ pub async fn list_bots(
                 login_method: login_method.clone(),
                 status: "connected".to_string(),
                 gems: bot.inventory.gems(),
-                ping: bot.ping.load(Ordering::Relaxed),
+                ping: bot.runtime.ping(),
                 world,
             }
         })
@@ -145,13 +145,11 @@ pub async fn get_bot(
     State(manager): State<Arc<BotManager>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<BotDetailResponse>>, StatusCode> {
-    let bot_entry = manager
-        .get_bot_entry(&id)
-        .ok_or(StatusCode::NOT_FOUND)?;
+    let bot_entry = manager.get_bot_entry(&id).ok_or(StatusCode::NOT_FOUND)?;
 
     let bot = bot_entry.bot;
 
-    let name = if let Ok(login_info_lock) = bot.info.login_info.try_lock() {
+    let name = if let Some(login_info_lock) = bot.auth.try_login_info() {
         login_info_lock
             .as_ref()
             .map(|info| info.tank_id_name.clone())
@@ -160,7 +158,7 @@ pub async fn get_bot(
         "Unknown".to_string()
     };
 
-    let position = *bot.position.read().unwrap();
+    let position = bot.movement.position();
 
     let world = if let Ok(world_lock) = bot.world.data.try_lock() {
         let player_count = bot.world.players.try_lock().map(|p| p.len()).unwrap_or(0);
@@ -189,7 +187,7 @@ pub async fn get_bot(
         login_method: bot_entry.login_method,
         status: "connected".to_string(),
         gems: bot.inventory.gems(),
-        ping: bot.ping.load(Ordering::Relaxed),
+        ping: bot.runtime.ping(),
         position,
         world,
         config,
@@ -202,9 +200,7 @@ pub async fn remove_bot(
     State(manager): State<Arc<BotManager>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<MessageResponse>>, StatusCode> {
-    manager
-        .remove_bot(&id)
-        .map_err(|_| StatusCode::NOT_FOUND)?;
+    manager.remove_bot(&id).map_err(|_| StatusCode::NOT_FOUND)?;
 
     Ok(Json(ApiResponse::success(MessageResponse {
         message: "Bot removed successfully".to_string(),
@@ -428,7 +424,7 @@ pub async fn get_logs(
 ) -> Result<Json<ApiResponse<LogsResponse>>, StatusCode> {
     let bot = manager.get_bot(&id).ok_or(StatusCode::NOT_FOUND)?;
 
-    let logs = bot.logs.read().unwrap().clone();
+    let logs = bot.runtime.logs_snapshot();
 
     Ok(Json(ApiResponse::success(LogsResponse { logs })))
 }

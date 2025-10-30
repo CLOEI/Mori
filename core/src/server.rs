@@ -3,8 +3,8 @@ use crate::types::server_data::ServerData;
 use anyhow::Result;
 use scraper::{Html, Selector};
 use serde_json::Value;
-use urlencoding::encode;
 use ureq::config::Config;
+use urlencoding::encode;
 
 #[derive(Debug, Clone)]
 pub struct DashboardLinks {
@@ -17,18 +17,18 @@ pub fn check_token(token: &str, login_info: &str) -> Result<String> {
     check_token_with_proxy(token, login_info, None)
 }
 
-pub fn check_token_with_proxy(token: &str, login_info: &str, proxy: Option<&str>) -> Result<String> {
+pub fn check_token_with_proxy(
+    token: &str,
+    login_info: &str,
+    proxy: Option<&str>,
+) -> Result<String> {
     if token.is_empty() {
         return Err(anyhow::anyhow!("Token is empty"));
     }
 
     let agent = if let Some(proxy_url) = proxy {
         let proxy = ureq::Proxy::new(proxy_url)?;
-        ureq::Agent::new_with_config(
-            Config::builder()
-                .proxy(Some(proxy))
-                .build()
-        )
+        ureq::Agent::new_with_config(Config::builder().proxy(Some(proxy)).build())
     } else {
         ureq::Agent::new_with_defaults()
     };
@@ -61,7 +61,11 @@ pub fn get_server_data(alternate: bool, login_info: &LoginInfo) -> Result<Server
     get_server_data_with_proxy(alternate, login_info, None)
 }
 
-pub fn get_server_data_with_proxy(alternate: bool, login_info: &LoginInfo, proxy: Option<&str>) -> Result<ServerData> {
+pub fn get_server_data_with_proxy(
+    alternate: bool,
+    login_info: &LoginInfo,
+    proxy: Option<&str>,
+) -> Result<ServerData> {
     let url = if alternate {
         "https://www.growtopia1.com/growtopia/server_data.php"
     } else {
@@ -70,11 +74,7 @@ pub fn get_server_data_with_proxy(alternate: bool, login_info: &LoginInfo, proxy
 
     let agent = if let Some(proxy_url) = proxy {
         let proxy = ureq::Proxy::new(proxy_url)?;
-        ureq::Agent::new_with_config(
-            Config::builder()
-                .proxy(Some(proxy))
-                .build()
-        )
+        ureq::Agent::new_with_config(Config::builder().proxy(Some(proxy)).build())
     } else {
         ureq::Agent::new_with_defaults()
     };
@@ -100,16 +100,16 @@ pub fn get_dashboard(login_url: &str, login_info: &LoginInfo) -> Result<Dashboar
     get_dashboard_with_proxy(login_url, login_info, None)
 }
 
-pub fn get_dashboard_with_proxy(login_url: &str, login_info: &LoginInfo, proxy: Option<&str>) -> Result<DashboardLinks> {
+pub fn get_dashboard_with_proxy(
+    login_url: &str,
+    login_info: &LoginInfo,
+    proxy: Option<&str>,
+) -> Result<DashboardLinks> {
     let data = encode(&login_info.to_string()).to_string();
-    
+
     let agent = if let Some(proxy_url) = proxy {
         let proxy = ureq::Proxy::new(proxy_url)?;
-        ureq::Agent::new_with_config(
-            Config::builder()
-                .proxy(Some(proxy))
-                .build()
-        )
+        ureq::Agent::new_with_config(Config::builder().proxy(Some(proxy)).build())
     } else {
         ureq::Agent::new_with_defaults()
     };

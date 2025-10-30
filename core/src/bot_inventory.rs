@@ -1,5 +1,8 @@
 use crate::inventory::{Inventory, InventoryItem};
-use std::sync::{Mutex, atomic::{AtomicI32, Ordering}};
+use std::sync::{
+    Mutex,
+    atomic::{AtomicI32, Ordering},
+};
 
 #[derive(Debug)]
 pub struct BotInventory {
@@ -52,7 +55,10 @@ impl BotInventory {
 
     pub fn get_all_items(&self) -> Vec<(u16, InventoryItem)> {
         let inv = self.items.lock().unwrap();
-        inv.items.iter().map(|(id, item)| (*id, item.clone())).collect()
+        inv.items
+            .iter()
+            .map(|(id, item)| (*id, item.clone()))
+            .collect()
     }
 
     pub fn update(&self, new_inventory: Inventory) {
@@ -62,7 +68,8 @@ impl BotInventory {
 
     pub fn add_item(&self, item_id: u16, amount: u8) {
         let mut inv = self.items.lock().unwrap();
-        inv.items.entry(item_id)
+        inv.items
+            .entry(item_id)
             .and_modify(|item| item.amount = item.amount.saturating_add(amount))
             .or_insert(InventoryItem {
                 id: item_id,

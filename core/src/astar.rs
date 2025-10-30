@@ -111,11 +111,11 @@ impl AStar {
         } else {
             self.path_cache.clear();
         }
-        
+
         self.grid.clear();
         self.grid.extend_from_slice(collision_data);
     }
-    
+
     pub fn update_from_tiles(&mut self, width: u32, height: u32, tiles: &[(u16, u8)]) {
         if self.width != width || self.height != height {
             self.reset();
@@ -125,48 +125,65 @@ impl AStar {
         } else {
             self.path_cache.clear();
         }
-        
+
         self.grid.clear();
         for &(_, collision_type) in tiles {
             self.grid.push(collision_type);
         }
     }
 
-    pub fn find_path(&mut self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> Option<Vec<Node>> {
+    pub fn find_path(
+        &mut self,
+        from_x: u32,
+        from_y: u32,
+        to_x: u32,
+        to_y: u32,
+    ) -> Option<Vec<Node>> {
         let cache_key = (from_x, from_y, to_x, to_y);
         if let Some(cached_path) = self.path_cache.get(&cache_key) {
             self.cache_hits += 1;
             return cached_path.as_ref().map(|path| {
-                path.iter().map(|&(x, y)| {
-                    let index = (y * self.width + x) as usize;
-                    let collision_type = self.grid.get(index).copied().unwrap_or(0);
-                    Node::new(x, y, collision_type)
-                }).collect()
+                path.iter()
+                    .map(|&(x, y)| {
+                        let index = (y * self.width + x) as usize;
+                        let collision_type = self.grid.get(index).copied().unwrap_or(0);
+                        Node::new(x, y, collision_type)
+                    })
+                    .collect()
             });
         }
-        
+
         self.cache_misses += 1;
-        
-        if from_x >= self.width || from_y >= self.height || to_x >= self.width || to_y >= self.height {
+
+        if from_x >= self.width
+            || from_y >= self.height
+            || to_x >= self.width
+            || to_y >= self.height
+        {
             self.path_cache.insert(cache_key, None);
             return None;
         }
-        
+
         let start_index = (from_y * self.width + from_x) as usize;
         let end_index = (to_y * self.width + to_x) as usize;
-        
+
         if self.is_blocked(start_index) || self.is_blocked(end_index) {
             self.path_cache.insert(cache_key, None);
             return None;
         }
-        
+
         if from_x == to_x && from_y == to_y {
             let result = vec![(from_x, from_y)];
             self.path_cache.insert(cache_key, Some(result.clone()));
-            return Some(result.into_iter().map(|(x, y)| {
-                let collision_type = self.grid[start_index];
-                Node::new(x, y, collision_type)
-            }).collect());
+            return Some(
+                result
+                    .into_iter()
+                    .map(|(x, y)| {
+                        let collision_type = self.grid[start_index];
+                        Node::new(x, y, collision_type)
+                    })
+                    .collect(),
+            );
         }
 
         let mut open_list = BinaryHeap::new();
@@ -176,21 +193,26 @@ impl AStar {
 
         let start_h = self.calculate_h(from_x, from_y, to_x, to_y);
         let start_node = PathNode::new(from_x, from_y, 0, start_h);
-        
+
         open_list.push(start_node);
         g_scores.insert((from_x, from_y), 0);
 
         while let Some(current) = open_list.pop() {
             let current_pos = (current.x, current.y);
-            
+
             if current.x == to_x && current.y == to_y {
-                let path = self.reconstruct_optimized_path(&came_from, current_pos, (from_x, from_y));
+                let path =
+                    self.reconstruct_optimized_path(&came_from, current_pos, (from_x, from_y));
                 self.path_cache.insert(cache_key, Some(path.clone()));
-                return Some(path.into_iter().map(|(x, y)| {
-                    let index = (y * self.width + x) as usize;
-                    let collision_type = self.grid.get(index).copied().unwrap_or(0);
-                    Node::new(x, y, collision_type)
-                }).collect());
+                return Some(
+                    path.into_iter()
+                        .map(|(x, y)| {
+                            let index = (y * self.width + x) as usize;
+                            let collision_type = self.grid.get(index).copied().unwrap_or(0);
+                            Node::new(x, y, collision_type)
+                        })
+                        .collect(),
+                );
             }
 
             if closed_set.contains(&current_pos) {
@@ -199,7 +221,15 @@ impl AStar {
 
             closed_set.insert(current_pos);
 
-            self.process_neighbors(current, to_x, to_y, &mut open_list, &mut came_from, &mut g_scores, &closed_set);
+            self.process_neighbors(
+                current,
+                to_x,
+                to_y,
+                &mut open_list,
+                &mut came_from,
+                &mut g_scores,
+                &closed_set,
+            );
         }
 
         self.path_cache.insert(cache_key, None);
@@ -210,11 +240,11 @@ impl AStar {
     fn movement_cost(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> u32 {
         let dx = from_x.abs_diff(to_x);
         let dy = from_y.abs_diff(to_y);
-        
+
         if dx == 1 && dy == 1 {
-            14  // Diagonal movement
+            14 // Diagonal movement
         } else {
-            10  // Orthogonal movement
+            10 // Orthogonal movement
         }
     }
 
@@ -248,8 +278,14 @@ impl AStar {
         closed_set: &HashSet<(u32, u32)>,
     ) {
         const DIRECTIONS: [(i32, i32); 8] = [
-            (-1, 0), (1, 0), (0, -1), (0, 1),      // Orthogonal
-            (-1, -1), (-1, 1), (1, -1), (1, 1)    // Diagonal
+            (-1, 0),
+            (1, 0),
+            (0, -1),
+            (0, 1), // Orthogonal
+            (-1, -1),
+            (-1, 1),
+            (1, -1),
+            (1, 1), // Diagonal
         ];
 
         for &(dx, dy) in &DIRECTIONS {
@@ -269,7 +305,7 @@ impl AStar {
             }
 
             let index = (new_y * self.width + new_x) as usize;
-            
+
             if self.is_blocked(index) {
                 continue;
             }
@@ -280,7 +316,11 @@ impl AStar {
                 let adj2_x = current.x as i32;
                 let adj2_y = current.y as i32 + dy;
 
-                if adj1_x < 0 || adj1_x >= self.width as i32 || adj2_y < 0 || adj2_y >= self.height as i32 {
+                if adj1_x < 0
+                    || adj1_x >= self.width as i32
+                    || adj2_y < 0
+                    || adj2_y >= self.height as i32
+                {
                     continue;
                 }
 
@@ -293,7 +333,7 @@ impl AStar {
             }
 
             let tentative_g = current.g + self.movement_cost(current.x, current.y, new_x, new_y);
-            
+
             // Check if we found a better path
             if let Some(&existing_g) = g_scores.get(&new_pos) {
                 if tentative_g >= existing_g {
@@ -355,8 +395,8 @@ impl AStar {
             if index < self.grid.len() {
                 self.grid[index] = collision_type;
                 self.path_cache.retain(|&(from_x, from_y, to_x, to_y), _| {
-                    !((from_x <= x + 1 && from_x + 1 >= x && from_y <= y + 1 && from_y + 1 >= y) ||
-                      (to_x <= x + 1 && to_x + 1 >= x && to_y <= y + 1 && to_y + 1 >= y))
+                    !((from_x <= x + 1 && from_x + 1 >= x && from_y <= y + 1 && from_y + 1 >= y)
+                        || (to_x <= x + 1 && to_x + 1 >= x && to_y <= y + 1 && to_y + 1 >= y))
                 });
             }
         }

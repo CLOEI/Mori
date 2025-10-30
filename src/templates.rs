@@ -8,4 +8,3 @@ pub struct IndexTemplate {}
 pub async fn index() -> IndexTemplate {
     IndexTemplate {}
 }
-

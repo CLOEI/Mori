@@ -14,13 +14,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
 
     match packet_type {
         NetMessage::ServerHello => {
-            let is_redirecting = {
-                let is_redirecting_lock = bot.is_redirecting.lock().unwrap();
-                *is_redirecting_lock
-            };
+            let is_redirecting = bot.runtime.is_redirecting();
 
-            let login_info_lock = &bot.info.login_info.lock().unwrap();
-            let login_info = login_info_lock.as_ref().unwrap();
+            let login_info_guard = bot.auth.login_info();
+            let login_info = login_info_guard.as_ref().unwrap();
 
             let data;
 
@@ -61,10 +58,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     login_info.aat,
                 );
 
-                {
-                    let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
-                    *is_redirecting_lock = false;
-                }
+                bot.runtime.set_redirecting(false);
             } else {
                 data = format!(
                     "protocol|{}\nltoken|{}\nplatformID|{}\n",
@@ -99,29 +93,33 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 NetGamePacket::SendMapData => {
                     let world_data = &data[60..];
                     fs::write("world.dat", world_data).expect("Unable to write world data");
-                    let item_database_lock = bot.item_database.read().unwrap();
+                    let item_database_lock = bot.world.item_database.read().unwrap();
                     let item_database = item_database_lock.deref();
                     let mut world_lock = bot.world.data.lock().unwrap();
                     let _ = world_lock.parse(&data[60..], &item_database);
-                    
+
                     if !world_lock.tiles.is_empty() {
                         let mut collision_data = Vec::with_capacity(world_lock.tiles.len());
                         for tile in &world_lock.tiles {
-                            let collision_type = if let Some(item) = item_database.get_item(&(tile.foreground_item_id as u32)) {
+                            let collision_type = if let Some(item) =
+                                item_database.get_item(&(tile.foreground_item_id as u32))
+                            {
                                 item.collision_type
                             } else {
                                 0
                             };
                             collision_data.push(collision_type);
                         }
-                        
-                        let mut astar_lock = bot.astar.lock().unwrap();
-                        astar_lock.update_from_collision_data(world_lock.width, world_lock.height, &collision_data);
+
+                        let mut astar_lock = bot.movement.astar();
+                        astar_lock.update_from_collision_data(
+                            world_lock.width,
+                            world_lock.height,
+                            &collision_data,
+                        );
                     }
                 }
-                NetGamePacket::SendInventoryState => {
-                    bot.inventory.parse(&data[60..])
-                }
+                NetGamePacket::SendInventoryState => bot.inventory.parse(&data[60..]),
                 NetGamePacket::SetCharacterState => {
                     let hack_type = parsed.value;
                     let build_length = parsed.jump_count - 126;
@@ -129,7 +127,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     let gravity = parsed.vector_x2;
                     let velocity = parsed.vector_y2;
 
-                    let mut state_lock = bot.state.lock().unwrap();
+                    let mut state_lock = bot.movement.state();
                     state_lock.hack_type = hack_type;
                     state_lock.build_length = build_length;
                     state_lock.punch_length = punch_length;
@@ -145,7 +143,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
 
                     let value = parsed.value;
                     let (hack_type, build_length, punch_length, gravity, velocity) = {
-                        let state_lock = bot.state.lock().unwrap();
+                        let state_lock = bot.movement.state();
                         (
                             state_lock.hack_type,
                             state_lock.build_length,
@@ -202,11 +200,11 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                         None,
                         true,
                     );
-                    let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
-                    *is_redirecting_lock = false;
+                    bot.runtime.set_redirecting(false);
 
-                    let item_database = gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
-                    *bot.item_database.write().unwrap() = item_database;
+                    let item_database =
+                        gtitem_r::load_from_file("items.dat").expect("Failed to load items.dat");
+                    *bot.world.item_database.write().unwrap() = item_database;
                 }
                 NetGamePacket::TileChangeRequest => {
                     handle_tile_change_request(bot, &parsed);
@@ -237,24 +235,26 @@ fn handle_tile_change_request(bot: &Bot, tank_packet: &NetGamePacketData) {
         return;
     }
 
-    let should_update_inventory = {
-        let net_id = bot.net_id.lock().unwrap();
-        *net_id == tank_packet.net_id
-    };
+    let should_update_inventory = bot.runtime.net_id() == tank_packet.net_id;
 
     if should_update_inventory {
         update_inventory_for_tile_change(bot, tank_packet);
     }
 
     update_tile_for_place(bot, tank_packet);
-    
+
     let collision_type = get_collision_type_for_item(bot, tank_packet.value);
-    update_single_tile_astar(bot, tank_packet.int_x as u32, tank_packet.int_y as u32, collision_type);
+    update_single_tile_astar(
+        bot,
+        tank_packet.int_x as u32,
+        tank_packet.int_y as u32,
+        collision_type,
+    );
 }
 
 fn handle_item_change_object(bot: &Bot, tank_packet: &NetGamePacketData) {
     let mut world = bot.world.data.lock().unwrap();
-    
+
     match tank_packet.net_id {
         u32::MAX => {
             let item = gtworld_r::DroppedItem {
@@ -288,7 +288,7 @@ fn handle_item_change_object(bot: &Bot, tank_packet: &NetGamePacketData) {
                 .find(|(_, obj)| obj.uid == tank_packet.value)
                 .map(|(i, obj)| (i, obj.clone()))
             {
-                let our_net_id = *bot.net_id.lock().unwrap();
+                let our_net_id = bot.runtime.net_id();
                 if tank_packet.net_id == our_net_id {
                     update_player_inventory_from_dropped_item(bot, &collected_item);
                 }
@@ -299,10 +299,9 @@ fn handle_item_change_object(bot: &Bot, tank_packet: &NetGamePacketData) {
         }
         _ => {}
     }
-    
+
     drop(world);
 }
-
 
 fn handle_send_tile_tree_state(bot: &Bot, tank_packet: &NetGamePacketData) {
     let mut world = bot.world.data.lock().unwrap();
@@ -311,7 +310,7 @@ fn handle_send_tile_tree_state(bot: &Bot, tank_packet: &NetGamePacketData) {
         tile.tile_type = gtworld_r::TileType::Basic;
     }
     drop(world);
-    
+
     update_single_tile_astar(bot, tank_packet.int_x as u32, tank_packet.int_y as u32, 0);
 }
 
@@ -334,13 +333,13 @@ fn update_tile_for_punch(bot: &Bot, tank_packet: &NetGamePacketData) {
 fn update_tile_for_place(bot: &Bot, tank_packet: &NetGamePacketData) {
     let mut world = bot.world.data.lock().unwrap();
     if let Some(tile) = world.get_tile_mut(tank_packet.int_x as u32, tank_packet.int_y as u32) {
-        let item_database = bot.item_database.read().unwrap();
+        let item_database = bot.world.item_database.read().unwrap();
         if let Some(item) = item_database.items.get(&tank_packet.value) {
             if matches!(item.action_type, 22 | 28 | 18) {
                 tile.background_item_id = tank_packet.value as u16;
             } else {
                 tile.foreground_item_id = tank_packet.value as u16;
-                
+
                 if item.id % 2 != 0 {
                     tile.tile_type = gtworld_r::TileType::Seed {
                         ready_to_harvest: false,
@@ -363,7 +362,7 @@ fn update_player_inventory_from_dropped_item(bot: &Bot, dropped_item: &gtworld_r
 }
 
 fn get_collision_type_for_item(bot: &Bot, item_id: u32) -> u8 {
-    let item_database = bot.item_database.read().unwrap();
+    let item_database = bot.world.item_database.read().unwrap();
     if let Some(item) = item_database.get_item(&item_id) {
         item.collision_type
     } else {
@@ -372,7 +371,7 @@ fn get_collision_type_for_item(bot: &Bot, item_id: u32) -> u8 {
 }
 
 fn update_single_tile_astar(bot: &Bot, x: u32, y: u32, new_collision_type: u8) {
-    let mut astar = bot.astar.lock().unwrap();
+    let mut astar = bot.movement.astar();
     astar.update_single_tile(x, y, new_collision_type);
 }
 
@@ -386,20 +385,20 @@ fn handle_modify_item_inventory(bot: &Bot, tank_packet: &NetGamePacketData) {
 fn handle_send_tile_update_data(bot: &Bot, tank_packet: &NetGamePacketData, data: &[u8]) {
     let tile_x = tank_packet.int_x as u32;
     let tile_y = tank_packet.int_y as u32;
-    
+
     let world_bounds = {
         let world = bot.world.data.lock().unwrap();
         (world.width, world.height)
     };
-    
+
     if tile_x >= world_bounds.0 || tile_y >= world_bounds.1 {
         return;
     }
-    
+
     let old_collision_type = {
         let world = bot.world.data.lock().unwrap();
         if let Some(tile) = world.get_tile(tile_x, tile_y) {
-            let item_database = bot.item_database.read().unwrap();
+            let item_database = bot.world.item_database.read().unwrap();
             if let Some(item) = item_database.get_item(&(tile.foreground_item_id as u32)) {
                 item.collision_type
             } else {
@@ -409,19 +408,21 @@ fn handle_send_tile_update_data(bot: &Bot, tank_packet: &NetGamePacketData, data
             return;
         }
     };
-    
+
     let tile_data = &data[56..];
     let mut cursor = Cursor::new(tile_data);
-    
+
     let new_collision_type = {
-        let item_database = bot.item_database.read().unwrap();
+        let item_database = bot.world.item_database.read().unwrap();
         let mut world = bot.world.data.lock().unwrap();
         if let Some(tile) = world.get_tile(tile_x, tile_y) {
             let tile_clone = tile.clone();
             let _ = world.update_tile(tile_clone, &mut cursor, true, &item_database);
-            
+
             if let Some(updated_tile) = world.get_tile(tile_x, tile_y) {
-                if let Some(item) = item_database.get_item(&(updated_tile.foreground_item_id as u32)) {
+                if let Some(item) =
+                    item_database.get_item(&(updated_tile.foreground_item_id as u32))
+                {
                     item.collision_type
                 } else {
                     0
@@ -433,7 +434,7 @@ fn handle_send_tile_update_data(bot: &Bot, tank_packet: &NetGamePacketData, data
             0
         }
     };
-    
+
     if old_collision_type != new_collision_type {
         update_single_tile_astar(bot, tile_x, tile_y, new_collision_type);
     }

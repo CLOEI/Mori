@@ -1,12 +1,7 @@
-use std::sync::atomic::AtomicBool;
-use crate::server::DashboardLinks;
-use crate::types::login_info::LoginInfo;
-use crate::types::player::Player;
-use crate::types::server_data::ServerData;
 use crate::Bot;
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 use mlua::{Lua, UserData, UserDataMethods};
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Default)]
 pub struct State {
@@ -30,13 +25,6 @@ pub struct Automation {
     pub auto_reconnect: bool,
 }
 
-pub struct Info {
-    pub login_via: LoginVia,
-    pub login_info: Mutex<Option<LoginInfo>>,
-    pub server_data: Mutex<Option<ServerData>>,
-    pub dashboard_links: Mutex<Option<DashboardLinks>>,
-}
-
 pub struct Scripting {
     pub data: Mutex<String>,
     pub currently_executing: AtomicBool,
@@ -49,21 +37,6 @@ impl Default for Scripting {
             data: Mutex::new(String::new()),
             currently_executing: AtomicBool::new(false),
             lua: Lua::new(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct World {
-    pub data: Mutex<gtworld_r::World>,
-    pub players: Mutex<HashMap<u32, Player>>,
-}
-
-impl Default for World {
-    fn default() -> Self {
-        World {
-            data: Mutex::new(gtworld_r::World::new()),
-            players: Mutex::new(HashMap::<u32, Player>::new()),
         }
     }
 }
@@ -106,7 +79,8 @@ impl UserData for BotArc {
         methods.add_method(
             "sendPacket",
             |_, this, (packet_type, message): (u32, String)| {
-                this.0.send_packet(packet_type.into(), message.as_bytes(), None, true);
+                this.0
+                    .send_packet(packet_type.into(), message.as_bytes(), None, true);
                 Ok(())
             },
         );
@@ -181,16 +155,13 @@ impl UserData for BotArc {
             let collected = this.0.collect();
             Ok(collected)
         });
-
     }
 
     fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("pos", |_, this| {
-            let pos = this.0.position.read().unwrap();
+            let pos = this.0.movement.position();
             Ok(Position(pos.0, pos.1))
         });
-        fields.add_field_method_get("gems", |_, this| {
-            Ok(this.0.inventory.gems())
-        });
+        fields.add_field_method_get("gems", |_, this| Ok(this.0.inventory.gems()));
     }
 }

@@ -1,7 +1,7 @@
-use gt_core::{Bot, Socks5Config};
 use gt_core::gtitem_r;
 use gt_core::gtitem_r::structs::ItemDatabase;
 use gt_core::types::bot::LoginVia;
+use gt_core::{Bot, Socks5Config};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, RwLock};

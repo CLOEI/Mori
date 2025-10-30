@@ -7,14 +7,15 @@ pub fn get_legacy_token(url: &str, username: &str, password: &str) -> Result<Str
     get_legacy_token_with_proxy(url, username, password, None)
 }
 
-pub fn get_legacy_token_with_proxy(url: &str, username: &str, password: &str, proxy: Option<&str>) -> Result<String> {
+pub fn get_legacy_token_with_proxy(
+    url: &str,
+    username: &str,
+    password: &str,
+    proxy: Option<&str>,
+) -> Result<String> {
     let agent = if let Some(proxy_url) = proxy {
         let proxy = ureq::Proxy::new(proxy_url)?;
-        ureq::Agent::new_with_config(
-            Config::builder()
-                .proxy(Some(proxy))
-                .build()
-        )
+        ureq::Agent::new_with_config(Config::builder().proxy(Some(proxy)).build())
     } else {
         ureq::Agent::new_with_defaults()
     };

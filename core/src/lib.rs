@@ -1,39 +1,46 @@
-use crate::astar::AStar;
 use crate::bot_configuration::BotConfiguration;
 use crate::bot_inventory::BotInventory;
-use crate::inventory::Inventory;
-use crate::types::bot::{Info, LoginVia, Scripting, State, TemporaryData, World};
+use crate::game_world::GameWorld;
+use crate::socks5_udp::Socks5UdpSocket;
+use crate::types::bot::{LoginVia, Scripting, TemporaryData};
 use crate::types::flags::PacketFlag;
 use crate::types::login_info::LoginInfo;
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
 use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
-use crate::socks5_udp::Socks5UdpSocket;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::str::FromStr;
-use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod astar;
+mod authentication_context;
+mod bot_configuration;
+mod bot_inventory;
+mod game_world;
 mod inventory;
 mod login;
+mod lua;
+mod movement_controller;
+mod network_session;
 mod packet_handler;
+mod runtime_context;
 mod server;
 pub mod socks5_udp;
 pub mod types;
 mod utils;
 mod variant_handler;
-mod lua;
-mod astar;
-mod bot_configuration;
-mod bot_inventory;
 
+pub use authentication_context::AuthenticationContext;
 pub use gtitem_r;
 pub use gtworld_r;
+pub use movement_controller::MovementController;
+pub use network_session::NetworkSession;
+pub use runtime_context::RuntimeContext;
 
-type TokenFetcher = Box<dyn Fn(String, String) -> String + Send + Sync>;
+pub type TokenFetcher = Box<dyn Fn(String, String) -> String + Send + Sync>;
 
 #[derive(Debug, Clone)]
 pub struct Socks5Config {
@@ -42,30 +49,16 @@ pub struct Socks5Config {
     pub password: Option<String>,
 }
 
-pub enum BotSocket {
-    Direct(rusty_enet::Host<UdpSocket>),
-    Socks5(rusty_enet::Host<Socks5UdpSocket>),
-}
-
 pub struct Bot {
-    pub host: Mutex<BotSocket>,
-    pub peer_id: Mutex<Option<rusty_enet::PeerID>>,
-    pub info: Info,
-    pub state: Mutex<State>,
-    pub position: RwLock<(f32, f32)>,
-    pub logs: RwLock<Vec<String>>,
+    pub network: NetworkSession,
+    pub auth: AuthenticationContext,
+    pub movement: MovementController,
     pub duration: Mutex<Instant>,
-    pub net_id: Mutex<u32>,
-    pub is_running: Mutex<bool>,
-    pub is_redirecting: Mutex<bool>,
-    pub item_database: Arc<RwLock<ItemDatabase>>,
-    pub world: World,
+    pub world: GameWorld,
     pub inventory: BotInventory,
-    pub ping: AtomicU32,
-    pub token_fetcher: Option<TokenFetcher>,
+    pub runtime: RuntimeContext,
     pub scripting: Scripting,
     pub config: BotConfiguration,
-    pub astar: Mutex<AStar>,
     pub temporary_data: TemporaryData,
     pub proxy_url: Option<String>,
 }
@@ -78,78 +71,33 @@ impl Bot {
         socks5_config: Option<Socks5Config>,
     ) -> Arc<Self> {
         let local_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0));
-        
+
         let proxy_url = socks5_config.as_ref().map(|cfg| {
             if let (Some(username), Some(password)) = (&cfg.username, &cfg.password) {
-                format!("socks5://{}:{}@{}:{}", username, password, cfg.proxy_addr.ip(), cfg.proxy_addr.port())
+                format!(
+                    "socks5://{}:{}@{}:{}",
+                    username,
+                    password,
+                    cfg.proxy_addr.ip(),
+                    cfg.proxy_addr.port()
+                )
             } else {
                 format!("socks5://{}:{}", cfg.proxy_addr.ip(), cfg.proxy_addr.port())
             }
         });
-        
-        let host = if let Some(socks5_cfg) = socks5_config {
-            let socks5_socket = Socks5UdpSocket::bind_through_proxy(
-                local_addr,
-                socks5_cfg.proxy_addr,
-                socks5_cfg.username.as_deref(),
-                socks5_cfg.password.as_deref(),
-            ).expect("Failed to create SOCKS5 socket");
-            
-            let host = rusty_enet::Host::<Socks5UdpSocket>::new(
-                socks5_socket,
-                rusty_enet::HostSettings {
-                    peer_limit: 1,
-                    channel_limit: 2,
-                    compressor: Some(Box::new(rusty_enet::RangeCoder::new())),
-                    checksum: Some(Box::new(rusty_enet::crc32)),
-                    using_new_packet: true,
-                    ..Default::default()
-                },
-            ).expect("Failed to create SOCKS5 host");
-            
-            BotSocket::Socks5(host)
-        } else {
-            let socket = UdpSocket::bind(local_addr).expect("Failed to bind UDP socket");
-            
-            let host = rusty_enet::Host::<UdpSocket>::new(
-                socket,
-                rusty_enet::HostSettings {
-                    peer_limit: 1,
-                    channel_limit: 2,
-                    compressor: Some(Box::new(rusty_enet::RangeCoder::new())),
-                    checksum: Some(Box::new(rusty_enet::crc32)),
-                    using_new_packet: true,
-                    ..Default::default()
-                },
-            ).expect("Failed to create direct host");
-            
-            BotSocket::Direct(host)
-        };
+
+        let network = NetworkSession::new(local_addr, socks5_config);
 
         Arc::new(Self {
-            host: Mutex::new(host),
-            peer_id: Mutex::new(None),
-            info: Info {
-                login_via,
-                login_info: Mutex::new(None),
-                server_data: Mutex::new(None),
-                dashboard_links: Mutex::new(None),
-            },
-            position: RwLock::new((0.0, 0.0)),
-            state: Mutex::new(State::default()),
-            logs: RwLock::new(Vec::new()),
+            network,
+            auth: AuthenticationContext::new(login_via, token_fetcher),
+            movement: MovementController::new(),
             duration: Mutex::new(Instant::now()),
-            net_id: Mutex::new(0),
-            is_running: Mutex::new(true),
-            is_redirecting: Mutex::new(false),
-            world: World::default(),
-            item_database,
+            world: GameWorld::new(item_database),
             inventory: BotInventory::new(),
-            ping: std::sync::atomic::AtomicU32::new(0),
-            token_fetcher,
+            runtime: RuntimeContext::new(),
             scripting: Scripting::default(),
             config: BotConfiguration::new(),
-            astar: Mutex::new(AStar::new()),
             temporary_data: TemporaryData::default(),
             proxy_url,
         })
@@ -160,28 +108,33 @@ impl Bot {
         if data.is_some() {
             todo!("Implement logon with pre-existing credentials");
         } else {
-            let mut info = self.info.login_info.lock().unwrap();
-            *info = Some(LoginInfo::new());
+            let mut login_info = self.auth.login_info();
+            *login_info = Some(LoginInfo::new());
         }
-        
+
         self.spawn_polling();
         self.process_event();
     }
 
     pub fn connect_to_server(&self) {
-        if !*self.is_redirecting.lock().unwrap() {
+        if !self.runtime.is_redirecting() {
             {
-                let mut login_info = self.info.login_info.lock().unwrap();
+                let mut login_info = self.auth.login_info();
                 let info_data = login_info.as_mut().expect("Login info not set");
-                let server_data = server::get_server_data_with_proxy(false, info_data, self.proxy_url.as_deref());
+                let server_data =
+                    server::get_server_data_with_proxy(false, info_data, self.proxy_url.as_deref());
                 match server_data {
                     Ok(data) => {
                         info_data.meta = data.meta.clone();
-                        let mut server = self.info.server_data.lock().unwrap();
+                        let mut server = self.auth.server_data();
                         *server = Some(data.clone());
-                        let dashboard_data = server::get_dashboard_with_proxy(&data.loginurl, info_data, self.proxy_url.as_deref())
-                            .expect("Failed to get dashboard data");
-                        let mut dashboard = self.info.dashboard_links.lock().unwrap();
+                        let dashboard_data = server::get_dashboard_with_proxy(
+                            &data.loginurl,
+                            info_data,
+                            self.proxy_url.as_deref(),
+                        )
+                        .expect("Failed to get dashboard data");
+                        let mut dashboard = self.auth.dashboard_links();
                         *dashboard = Some(dashboard_data);
                     }
                     Err(e) => {
@@ -192,82 +145,69 @@ impl Bot {
             self.get_token();
         }
 
-        let server_data = self.info.server_data.lock().unwrap();
-        let server = server_data.as_ref().expect("Server data not set");
+        let server_address = {
+            let server_data = self.auth.server_data();
+            let server = server_data.as_ref().expect("Server data not set");
+            SocketAddr::from_str(&format!("{}:{}", server.server, server.port)).unwrap()
+        };
 
-        let socket_address =
-            SocketAddr::from_str(&format!("{}:{}", server.server, server.port)).unwrap();
-
-        let mut host = self.host.lock().unwrap();
-        match &mut *host {
-            BotSocket::Direct(h) => {
-                match h.connect(socket_address, 2, 0) {
-                    Err(err) => {
-                        panic!("Failed to connect to server: {}", err);
-                    }
-                    _ => {}
-                }
-            }
-            BotSocket::Socks5(h) => {
-                match h.connect(socket_address, 2, 0) {
-                    Err(err) => {
-                        panic!("Failed to connect to server: {}", err);
-                    }
-                    _ => {}
-                }
-            }
-        }
+        self.network.connect(server_address);
     }
 
     pub fn get_token(&self) {
         let (ltoken, login_data) = {
-            let login_info_lock = self.info.login_info.lock().unwrap();
+            let login_info_lock = self.auth.login_info();
             let login_info = login_info_lock.as_ref().expect("Login info not set");
             (login_info.ltoken.clone(), login_info.to_string())
         };
 
-        if let Ok(ltoken) = server::check_token_with_proxy(&ltoken, &login_data, self.proxy_url.as_deref()) {
+        if let Ok(ltoken) =
+            server::check_token_with_proxy(&ltoken, &login_data, self.proxy_url.as_deref())
+        {
             println!("Refreshed token: {}", ltoken);
-            let mut login_info_lock = self.info.login_info.lock().unwrap();
+            let mut login_info_lock = self.auth.login_info();
             let login_info = login_info_lock.as_mut().expect("Login info not set");
             login_info.ltoken = ltoken;
             return;
         }
 
-        let dashboard_links = self.info.dashboard_links.lock().unwrap();
-        let urls = dashboard_links.as_ref();
+        let urls = self.auth.dashboard_links_clone();
 
-        if let Some(token_fetcher) = &self.token_fetcher {
-            let login_via = &self.info.login_via;
+        if let Some(token_fetcher) = self.auth.token_fetcher() {
+            let login_via = self.auth.login_via();
             let url = match login_via {
-                LoginVia::APPLE => urls.and_then(|links| links.apple.clone()),
-                LoginVia::GOOGLE => urls.and_then(|links| links.google.clone()),
-                LoginVia::LEGACY(_) => urls.and_then(|links| links.growtopia.clone()),
+                LoginVia::APPLE => urls.as_ref().and_then(|links| links.apple.clone()),
+                LoginVia::GOOGLE => urls.as_ref().and_then(|links| links.google.clone()),
+                LoginVia::LEGACY(_) => urls.as_ref().and_then(|links| links.growtopia.clone()),
                 LoginVia::LTOKEN(_) => None,
             };
 
             if let Some(url) = url {
                 let token = token_fetcher("place_holder".to_string(), url);
-                let mut login_info_lock = self.info.login_info.lock().unwrap();
+                let mut login_info_lock = self.auth.login_info();
                 let login_info = login_info_lock.as_mut().expect("Login info not set");
                 login_info.ltoken = token.clone();
                 return;
             }
         }
 
-        let token = match &self.info.login_via {
+        let token = match self.auth.login_via() {
             LoginVia::LEGACY(credentials) => {
                 let username = &credentials[0];
                 let password = &credentials[1];
-                let growtopia_url = urls.as_ref().and_then(|links| links.growtopia.clone());
-                login::get_legacy_token_with_proxy(&growtopia_url.unwrap(), username, password, self.proxy_url.as_deref())
-                    .expect("Failed to get legacy token")
+                let growtopia_url = urls.and_then(|links| links.growtopia.clone());
+                login::get_legacy_token_with_proxy(
+                    &growtopia_url.unwrap(),
+                    username,
+                    password,
+                    self.proxy_url.as_deref(),
+                )
+                .expect("Failed to get legacy token")
             }
             _ => todo!("Login method not implemented"),
-
         };
 
-        let mut login_info_lock = self.info.login_info.lock().unwrap();
+        let mut login_info_lock = self.auth.login_info();
         let login_info = login_info_lock.as_mut().expect("Login info not set");
         login_info.ltoken = token.clone();
     }
@@ -334,45 +274,13 @@ impl Bot {
             Packet::unreliable(final_payload)
         };
 
-        let peer_id_guard = self.peer_id.lock().expect("Failed to lock peer_id");
-        let Some(peer_id) = *peer_id_guard else {
+        if !self.network.send(enet_packet) {
             println!("Cannot send packet: No active peer connection.");
-            return;
-        };
-
-        let mut host_guard = self.host.lock().expect("Failed to lock host");
-        let send_result = match &mut *host_guard {
-            BotSocket::Direct(h) => {
-                let peer = h.peer_mut(peer_id);
-                peer.send(0, &enet_packet)
-            },
-            BotSocket::Socks5(h) => {
-                let peer = h.peer_mut(peer_id);
-                peer.send(0, &enet_packet)
-            },
-        };
-
-        if let Err(err) = send_result {
-            println!("Failed to send packet: {}", err);
         }
     }
 
     fn disconnect(&self) {
-        let peer_id = self.peer_id.lock().unwrap().clone();
-        if let Some(peer_id) = peer_id {
-            if let Ok(mut host) = self.host.lock() {
-                match &mut *host {
-                    BotSocket::Direct(h) => {
-                        let peer = h.peer_mut(peer_id);
-                        peer.disconnect(0);
-                    },
-                    BotSocket::Socks5(h) => {
-                        let peer = h.peer_mut(peer_id);
-                        peer.disconnect(0);
-                    },
-                };
-            }
-        }
+        self.network.disconnect();
     }
 
     pub fn set_auto_collect(&self, enabled: bool) {
@@ -400,47 +308,27 @@ impl Bot {
         thread::spawn(move || {
             const COLLECT_INTERVAL: Duration = Duration::from_millis(500);
             const LOOP_DELAY: Duration = Duration::from_millis(100);
-            
+
             loop {
-                let is_running = {
-                    let running = bot_arc.is_running.lock().unwrap();
-                    *running
-                };
-                
+                let is_running = bot_arc.runtime.is_running();
+
                 if !is_running {
                     break;
                 }
-                
-                let has_peer = {
-                    let peer_id = bot_arc.peer_id.lock().unwrap();
-                    if let Some(peer_id) = *peer_id {
-                        let mut host = bot_arc.host.lock().unwrap();
-                        let ping = match &mut *host {
-                            BotSocket::Direct(h) => {
-                                let peer = h.peer_mut(peer_id);
-                                peer.round_trip_time().as_millis()
-                            },
-                            BotSocket::Socks5(h) => {
-                                let peer = h.peer_mut(peer_id);
-                                peer.round_trip_time().as_millis()
-                            },
-                        };
-                        bot_arc.ping.store(ping as u32, std::sync::atomic::Ordering::Relaxed);
-                        true
-                    } else {
-                        false
-                    }
-                };
-                
-                if !has_peer {
+
+                if !bot_arc.network.is_connected() {
                     thread::sleep(LOOP_DELAY);
                     continue;
                 }
-                
+
+                if let Some(ping) = bot_arc.network.update_ping() {
+                    bot_arc.runtime.set_ping(ping);
+                }
+
                 if bot_arc.config.auto_collect() {
                     bot_arc.collect();
                 }
-                
+
                 thread::sleep(COLLECT_INTERVAL);
             }
         });
@@ -448,39 +336,25 @@ impl Bot {
 
     fn process_event(&self) {
         loop {
-            let is_running = {
-                let running = self.is_running.lock().unwrap();
-                *running
-            };
-            
+            let is_running = self.runtime.is_running();
+
             if !is_running {
                 break;
             }
             self.connect_to_server();
 
             loop {
-                let event = {
-                    let mut host = self.host.lock().unwrap();
-                    match &mut *host {
-                        BotSocket::Direct(h) => {
-                            h.service().ok().flatten().map(|e| e.no_ref())
-                        }
-                        BotSocket::Socks5(h) => {
-                            h.service().ok().flatten().map(|e| e.no_ref())
-                        }
-                    }
-                };
+                let event = self.network.service();
 
                 if let Some(event) = event {
                     match event {
                         rusty_enet::EventNoRef::Connect { peer, .. } => {
                             println!("Connected to server");
-                            let mut peer_id_lock = self.peer_id.lock().unwrap();
-                            *peer_id_lock = Some(peer);
+                            self.network.set_peer_id(Some(peer));
                         }
                         rusty_enet::EventNoRef::Receive {
-                            peer,
-                            channel_id,
+                            peer: _,
+                            channel_id: _,
                             packet,
                         } => {
                             let data = packet.data();
@@ -489,8 +363,9 @@ impl Bot {
                             }
                             packet_handler::handle(self, data);
                         }
-                        rusty_enet::EventNoRef::Disconnect { peer, data } => {
+                        rusty_enet::EventNoRef::Disconnect { peer: _, data: _ } => {
                             println!("Disconnected from server");
+                            self.network.set_peer_id(None);
                             break;
                         }
                     }
@@ -523,19 +398,14 @@ impl Bot {
     pub fn place(&self, offset_x: i32, offset_y: i32, item_id: u32) {
         let mut pkt = NetGamePacketData::default();
         pkt._type = NetGamePacket::TileChangeRequest;
-        let (base_x, base_y) = {
-            let position = self.position.read().unwrap();
-            pkt.vector_x = position.0;
-            pkt.vector_y = position.1;
-            pkt.int_x = (position.0 / 32.0).floor() as i32 + offset_x;
-            pkt.int_y = (position.1 / 32.0).floor() as i32 + offset_y;
-            pkt.value = item_id;
-
-            (
-                (position.0 / 32.0).floor() as i32,
-                (position.1 / 32.0).floor() as i32,
-            )
-        };
+        let position = self.movement.position();
+        pkt.vector_x = position.0;
+        pkt.vector_y = position.1;
+        let base_x = (position.0 / 32.0).floor() as i32;
+        let base_y = (position.1 / 32.0).floor() as i32;
+        pkt.int_x = base_x + offset_x;
+        pkt.int_y = base_y + offset_y;
+        pkt.value = item_id;
 
         if pkt.int_x <= base_x + 4
             && pkt.int_x >= base_x - 4
@@ -587,19 +457,10 @@ impl Bot {
 
     pub fn walk(&self, x: i32, y: i32, ap: bool) {
         if !ap {
-            let mut position = self.position.write().expect("Failed to lock position");
-            *position = (position.0 + (x * 32) as f32, position.1 + (y * 32) as f32);
+            self.movement.translate((x * 32) as f32, (y * 32) as f32);
         }
 
-        let position = {
-            let position = self
-                .position
-                .read()
-                .expect("Failed to lock position")
-                .clone();
-
-            position
-        };
+        let position = self.movement.position();
 
         let mut pkt = NetGamePacketData::default();
         {
@@ -609,14 +470,8 @@ impl Bot {
             pkt.int_x = -1;
             pkt.int_y = -1;
             pkt.flags = PacketFlag::WALK | PacketFlag::STANDING;
-            
 
-            let face_left = if position.0 < x as f32 * 32.0 {
-                false
-            } else {
-                true
-            };
-
+            let face_left = position.0 >= x as f32 * 32.0;
             pkt.flags.set(PacketFlag::FACING_LEFT, face_left);
         }
 
@@ -629,24 +484,18 @@ impl Bot {
     }
 
     pub fn find_path(&self, x: u32, y: u32) {
-        let position = {
-            let position = self.position.read().expect("Failed to lock position");
-            position.clone()
-        };
+        let position = self.movement.position();
 
         let paths = {
-            let mut astar = self.astar.lock().expect("Failed to lock astar");
+            let mut astar = self.movement.astar();
             astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
         };
 
         let delay = self.config.findpath_delay();
         if let Some(paths) = paths {
             for node in paths {
-                {
-                    let mut position = self.position.write().expect("Failed to lock position");
-                    position.0 = node.x as f32 * 32.0;
-                    position.1 = node.y as f32 * 32.0;
-                }
+                self.movement
+                    .set_position(node.x as f32 * 32.0, node.y as f32 * 32.0);
                 self.walk(node.x as i32, node.y as i32, true);
                 thread::sleep(Duration::from_millis(delay as u64));
             }
@@ -672,7 +521,8 @@ impl Bot {
                 format!(
                     "action|dialog_return\ndialog_name|drop_item\nitemID|{}|\ncount|{}\n",
                     drop.0, drop.1
-                ).as_bytes(),
+                )
+                .as_bytes(),
                 None,
                 true,
             );
@@ -700,7 +550,8 @@ impl Bot {
                 format!(
                     "action|dialog_return\ndialog_name|trash_item\nitemID|{}|\ncount|{}\n",
                     trash.0, trash.1
-                ).as_bytes(),
+                )
+                .as_bytes(),
                 None,
                 true,
             );
@@ -721,11 +572,9 @@ impl Bot {
             return 0;
         }
 
-        let bot_position = {
-            match self.position.try_read() {
-                Ok(pos) => (pos.0, pos.1),
-                Err(_) => return 0,
-            }
+        let bot_position = match self.movement.try_position() {
+            Some(pos) => pos,
+            None => return 0,
         };
 
         let bot_tile_x = bot_position.0 / 32.0;
@@ -743,7 +592,8 @@ impl Bot {
         let collectible_items = {
             match self.world.data.try_lock() {
                 Ok(world) => {
-                    let mut nearby_items = Vec::with_capacity(std::cmp::min(world.dropped.items.len(), 50));
+                    let mut nearby_items =
+                        Vec::with_capacity(std::cmp::min(world.dropped.items.len(), 50));
 
                     for item in &world.dropped.items {
                         let dx = bot_tile_x - item.x;
@@ -755,9 +605,13 @@ impl Bot {
                         }
                     }
 
-                    nearby_items.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-                    nearby_items.into_iter().map(|(item, _)| item).collect::<Vec<_>>()
-                },
+                    nearby_items
+                        .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                    nearby_items
+                        .into_iter()
+                        .map(|(item, _)| item)
+                        .collect::<Vec<_>>()
+                }
                 Err(_) => return 0,
             }
         };
@@ -791,17 +645,11 @@ impl Bot {
         }
 
         for packet in packets_to_send {
-            self.send_packet(
-                NetMessage::GamePacket,
-                &packet.to_bytes(),
-                None,
-                true,
-            );
+            self.send_packet(NetMessage::GamePacket, &packet.to_bytes(), None, true);
         }
 
         collected_count
     }
-
 }
 
 pub fn test_socks5_proxy(socks5_config: &Socks5Config) -> (bool, bool) {
@@ -812,10 +660,22 @@ pub fn test_socks5_proxy(socks5_config: &Socks5Config) -> (bool, bool) {
 }
 
 fn test_server_data_fetch(socks5_config: &Socks5Config) -> bool {
-    let proxy_url = if let (Some(username), Some(password)) = (&socks5_config.username, &socks5_config.password) {
-        format!("socks5://{}:{}@{}:{}", username, password, socks5_config.proxy_addr.ip(), socks5_config.proxy_addr.port())
+    let proxy_url = if let (Some(username), Some(password)) =
+        (&socks5_config.username, &socks5_config.password)
+    {
+        format!(
+            "socks5://{}:{}@{}:{}",
+            username,
+            password,
+            socks5_config.proxy_addr.ip(),
+            socks5_config.proxy_addr.port()
+        )
     } else {
-        format!("socks5://{}:{}", socks5_config.proxy_addr.ip(), socks5_config.proxy_addr.port())
+        format!(
+            "socks5://{}:{}",
+            socks5_config.proxy_addr.ip(),
+            socks5_config.proxy_addr.port()
+        )
     };
 
     let login_info = LoginInfo::new();

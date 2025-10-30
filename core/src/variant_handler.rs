@@ -24,16 +24,15 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                 .collect();
             let aat = variant.get(5).unwrap().as_int32();
 
-            let mut server_data_lock = bot.info.server_data.lock().unwrap();
+            let mut server_data_lock = bot.auth.server_data();
             let server_data = server_data_lock.as_mut().unwrap();
 
             server_data.server = parsed_server_data[0].clone();
             server_data.port = port as u16;
 
-            let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
-            *is_redirecting_lock = true;
+            bot.runtime.set_redirecting(true);
 
-            let mut login_info_lock = bot.info.login_info.lock().unwrap();
+            let mut login_info_lock = bot.auth.login_info();
             let login_info = login_info_lock.as_mut().unwrap();
 
             login_info.token = token.to_string();
@@ -61,11 +60,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                             None,
                             true,
                         );
-                        let mut is_redirecting_lock = bot.is_redirecting.lock().unwrap();
-                        *is_redirecting_lock = false;
+                        bot.runtime.set_redirecting(false);
                         let item_database = gtitem_r::load_from_file("items.dat")
                             .expect("Failed to load items.dat");
-                        let mut item_database_lock = bot.item_database.write().unwrap();
+                        let mut item_database_lock = bot.world.item_database.write().unwrap();
                         *item_database_lock = item_database;
                         return;
                     }
@@ -84,8 +82,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
         }
         "OnSetPos" => {
             let pos = variant.get(1).unwrap().as_vec2();
-            let mut position_lock = bot.position.write().unwrap();
-            *position_lock = pos;
+            bot.movement.set_position(pos.0, pos.1);
         }
         "OnTalkBubble" => {
             let message = variant.get(2).unwrap().as_string();
@@ -101,7 +98,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();
-            let mut login_info_lock = bot.info.login_info.lock().unwrap();
+            let mut login_info_lock = bot.auth.login_info();
             let login_info = login_info_lock.as_mut().unwrap();
             login_info.tank_id_name = growid;
         }
@@ -118,12 +115,12 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             let data = parse_and_store_as_map(&message);
 
             if data.contains_key("type") {
-                let mut net_id_lock = bot.net_id.lock().unwrap();
-                *net_id_lock = data
-                    .get("netID")
-                    .unwrap()
-                    .parse()
-                    .expect("Failed to parse netid");
+                bot.runtime.set_net_id(
+                    data.get("netID")
+                        .unwrap()
+                        .parse()
+                        .expect("Failed to parse netid"),
+                );
             } else {
                 let player = Player {
                     _type: data["type"].clone(),
@@ -176,7 +173,9 @@ pub fn handle(bot: &Bot, data: &[u8]) {
             if message.contains("Gazette") {
                 bot.send_packet(
                     NetMessage::GenericText,
-                    "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n".to_string().as_bytes(),
+                    "action|dialog_return\ndialog_name|gazette\nbuttonClicked|banner\n"
+                        .to_string()
+                        .as_bytes(),
                     None,
                     true,
                 );
