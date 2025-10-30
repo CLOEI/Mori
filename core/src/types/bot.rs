@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use crate::server::DashboardLinks;
 use crate::types::login_info::LoginInfo;
 use crate::types::player::Player;
@@ -17,14 +17,14 @@ pub struct State {
     pub gravity: f32,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct DelayConfig {
     pub findpath_delay: u32,
     pub punch_delay: u32,
     pub place_delay: u32,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Automation {
     pub auto_collect: bool,
     pub auto_reconnect: bool,
@@ -190,8 +190,7 @@ impl UserData for BotArc {
             Ok(Position(pos.0, pos.1))
         });
         fields.add_field_method_get("gems", |_, this| {
-            let gems = this.0.gems.load(Ordering::SeqCst);
-            Ok(gems)
+            Ok(this.0.inventory.gems())
         });
     }
 }

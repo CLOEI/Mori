@@ -7,3 +7,5 @@ android/
 # Added by cargo
 
 /target
+!README.md
+*.md

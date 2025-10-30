@@ -92,7 +92,7 @@ pub async fn create_bot(
             name,
             login_method: request.login_method,
             status: "connecting".to_string(),
-            gems: bot.gems.load(Ordering::Relaxed),
+            gems: bot.inventory.gems(),
             ping: bot.ping.load(Ordering::Relaxed),
             world: None,
         };
@@ -131,7 +131,7 @@ pub async fn list_bots(
                 name,
                 login_method: login_method.clone(),
                 status: "connected".to_string(),
-                gems: bot.gems.load(Ordering::Relaxed),
+                gems: bot.inventory.gems(),
                 ping: bot.ping.load(Ordering::Relaxed),
                 world,
             }
@@ -174,25 +174,13 @@ pub async fn get_bot(
         None
     };
 
-    let config = if let (Ok(automation), Ok(delay_config)) = (
-        bot.automation.try_lock(),
-        bot.delay_config.try_lock(),
-    ) {
-        BotConfig {
-            auto_collect: automation.auto_collect,
-            auto_reconnect: automation.auto_reconnect,
-            findpath_delay: delay_config.findpath_delay,
-            punch_delay: delay_config.punch_delay,
-            place_delay: delay_config.place_delay,
-        }
-    } else {
-        BotConfig {
-            auto_collect: false,
-            auto_reconnect: false,
-            findpath_delay: 0,
-            punch_delay: 0,
-            place_delay: 0,
-        }
+    let (automation, delay_config) = bot.config.get_all();
+    let config = BotConfig {
+        auto_collect: automation.auto_collect,
+        auto_reconnect: automation.auto_reconnect,
+        findpath_delay: delay_config.findpath_delay,
+        punch_delay: delay_config.punch_delay,
+        place_delay: delay_config.place_delay,
     };
 
     let detail = BotDetailResponse {
@@ -200,7 +188,7 @@ pub async fn get_bot(
         name,
         login_method: bot_entry.login_method,
         status: "connected".to_string(),
-        gems: bot.gems.load(Ordering::Relaxed),
+        gems: bot.inventory.gems(),
         ping: bot.ping.load(Ordering::Relaxed),
         position,
         world,
@@ -343,15 +331,12 @@ pub async fn get_inventory(
     let bot = manager.get_bot(&id).ok_or(StatusCode::NOT_FOUND)?;
     let item_db = manager.get_item_database();
 
-    let inventory_data = bot
-        .inventory
-        .try_lock()
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let all_items = bot.inventory.get_all_items();
+    let (size, item_count) = bot.inventory.size_and_count();
 
     let item_db_lock = item_db.read().unwrap();
 
-    let items: Vec<InventoryItemDto> = inventory_data
-        .items
+    let items: Vec<InventoryItemDto> = all_items
         .iter()
         .map(|(id, item)| {
             let name = item_db_lock
@@ -370,8 +355,8 @@ pub async fn get_inventory(
         .collect();
 
     let response = InventoryResponse {
-        size: inventory_data.size,
-        item_count: inventory_data.item_count,
+        size,
+        item_count,
         items,
     };
 

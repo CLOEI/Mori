@@ -120,7 +120,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
                     }
                 }
                 NetGamePacket::SendInventoryState => {
-                    bot.inventory.lock().unwrap().parse(&data[60..])
+                    bot.inventory.parse(&data[60..])
                 }
                 NetGamePacket::SetCharacterState => {
                     let hack_type = parsed.value;
@@ -317,14 +317,7 @@ fn handle_send_tile_tree_state(bot: &Bot, tank_packet: &NetGamePacketData) {
 
 fn update_inventory_for_tile_change(bot: &Bot, tank_packet: &NetGamePacketData) {
     let item_id = tank_packet.value as u16;
-    let mut inventory = bot.inventory.lock().unwrap();
-    
-    if let Some(item) = inventory.items.get_mut(&item_id) {
-        item.amount = item.amount.saturating_sub(1);
-        if item.amount == 0 {
-            inventory.items.remove(&item_id);
-        }
-    }
+    bot.inventory.remove_item(item_id, 1);
 }
 
 fn update_tile_for_punch(bot: &Bot, tank_packet: &NetGamePacketData) {
@@ -363,20 +356,9 @@ fn update_tile_for_place(bot: &Bot, tank_packet: &NetGamePacketData) {
 
 fn update_player_inventory_from_dropped_item(bot: &Bot, dropped_item: &gtworld_r::DroppedItem) {
     if dropped_item.id == 112 {
-        bot.gems.fetch_add(dropped_item.count as i32, std::sync::atomic::Ordering::SeqCst);
+        bot.inventory.add_gems(dropped_item.count as i32);
     } else {
-        let mut inventory = bot.inventory.lock().unwrap();
-        if let Some(item) = inventory.items.get_mut(&dropped_item.id) {
-            let new_amount = (item.amount + dropped_item.count).min(200);
-            item.amount = new_amount;
-        } else {
-            let item = crate::inventory::InventoryItem {
-                id: dropped_item.id,
-                amount: dropped_item.count,
-                flag: 0,
-            };
-            inventory.items.insert(dropped_item.id, item);
-        }
+        bot.inventory.add_item(dropped_item.id, dropped_item.count);
     }
 }
 
@@ -397,14 +379,8 @@ fn update_single_tile_astar(bot: &Bot, x: u32, y: u32, new_collision_type: u8) {
 fn handle_modify_item_inventory(bot: &Bot, tank_packet: &NetGamePacketData) {
     let item_id = tank_packet.value as u16;
     let amount_to_remove = tank_packet.jump_count;
-    
-    let mut inventory = bot.inventory.lock().unwrap();
-    if let Some(item) = inventory.items.get_mut(&item_id) {
-        item.amount = item.amount.saturating_sub(amount_to_remove);
-        if item.amount == 0 {
-            inventory.items.remove(&item_id);
-        }
-    }
+
+    bot.inventory.remove_item(item_id, amount_to_remove);
 }
 
 fn handle_send_tile_update_data(bot: &Bot, tank_packet: &NetGamePacketData, data: &[u8]) {

@@ -5,7 +5,6 @@ use crate::utils::variant::VariantList;
 use crate::{Bot, utils};
 use std::collections::HashMap;
 use std::fs;
-use std::sync::atomic::Ordering;
 
 pub fn handle(bot: &Bot, data: &[u8]) {
     let variant = VariantList::deserialize(&data).expect("Failed to deserialize variant list");
@@ -98,8 +97,7 @@ pub fn handle(bot: &Bot, data: &[u8]) {
         }
         "OnSetBux" => {
             let gems = variant.get(1).unwrap().as_int32();
-            let current = bot.gems.load(Ordering::SeqCst);
-            bot.gems.store(current + gems, Ordering::SeqCst);
+            bot.inventory.add_gems(gems);
         }
         "SetHasGrowID" => {
             let growid = variant.get(2).unwrap().as_string();

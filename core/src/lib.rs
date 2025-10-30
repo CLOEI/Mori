@@ -1,6 +1,8 @@
 use crate::astar::AStar;
+use crate::bot_configuration::BotConfiguration;
+use crate::bot_inventory::BotInventory;
 use crate::inventory::Inventory;
-use crate::types::bot::{Automation, DelayConfig, Info, LoginVia, Scripting, State, TemporaryData, World};
+use crate::types::bot::{Info, LoginVia, Scripting, State, TemporaryData, World};
 use crate::types::flags::PacketFlag;
 use crate::types::login_info::LoginInfo;
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
@@ -10,7 +12,7 @@ use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use crate::socks5_udp::Socks5UdpSocket;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicI32, AtomicU32};
+use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -25,6 +27,8 @@ mod utils;
 mod variant_handler;
 mod lua;
 mod astar;
+mod bot_configuration;
+mod bot_inventory;
 
 pub use gtitem_r;
 pub use gtworld_r;
@@ -56,13 +60,11 @@ pub struct Bot {
     pub is_redirecting: Mutex<bool>,
     pub item_database: Arc<RwLock<ItemDatabase>>,
     pub world: World,
-    pub inventory: Mutex<Inventory>,
-    pub gems: AtomicI32,
+    pub inventory: BotInventory,
     pub ping: AtomicU32,
     pub token_fetcher: Option<TokenFetcher>,
     pub scripting: Scripting,
-    pub delay_config: Mutex<DelayConfig>,
-    pub automation: Mutex<Automation>,
+    pub config: BotConfiguration,
     pub astar: Mutex<AStar>,
     pub temporary_data: TemporaryData,
     pub proxy_url: Option<String>,
@@ -142,13 +144,11 @@ impl Bot {
             is_redirecting: Mutex::new(false),
             world: World::default(),
             item_database,
-            inventory: Mutex::new(Inventory::new()),
-            gems: AtomicI32::new(0),
+            inventory: BotInventory::new(),
             ping: std::sync::atomic::AtomicU32::new(0),
             token_fetcher,
             scripting: Scripting::default(),
-            delay_config: Mutex::new(DelayConfig::default()),
-            automation: Mutex::new(Automation::default()),
+            config: BotConfiguration::new(),
             astar: Mutex::new(AStar::new()),
             temporary_data: TemporaryData::default(),
             proxy_url,
@@ -376,28 +376,23 @@ impl Bot {
     }
 
     pub fn set_auto_collect(&self, enabled: bool) {
-        let mut automation = self.automation.lock().unwrap();
-        automation.auto_collect = enabled;
+        self.config.set_auto_collect(enabled);
     }
 
     pub fn set_auto_reconnect(&self, enabled: bool) {
-        let mut automation = self.automation.lock().unwrap();
-        automation.auto_reconnect = enabled;
+        self.config.set_auto_reconnect(enabled);
     }
 
     pub fn set_findpath_delay(&self, delay: u32) {
-        let mut delay_config = self.delay_config.lock().unwrap();
-        delay_config.findpath_delay = delay;
+        self.config.set_findpath_delay(delay);
     }
 
     pub fn set_punch_delay(&self, delay: u32) {
-        let mut delay_config = self.delay_config.lock().unwrap();
-        delay_config.punch_delay = delay;
+        self.config.set_punch_delay(delay);
     }
 
     pub fn set_place_delay(&self, delay: u32) {
-        let mut delay_config = self.delay_config.lock().unwrap();
-        delay_config.place_delay = delay;
+        self.config.set_place_delay(delay);
     }
 
     fn spawn_polling(self: &Arc<Self>) {
@@ -442,12 +437,7 @@ impl Bot {
                     continue;
                 }
                 
-                let should_collect = {
-                    let automation = bot_arc.automation.lock().unwrap();
-                    automation.auto_collect
-                };
-                
-                if should_collect {
+                if bot_arc.config.auto_collect() {
                     bot_arc.collect();
                 }
                 
@@ -649,16 +639,7 @@ impl Bot {
             astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
         };
 
-        let findpath_delay = {
-            let findpath_delay = self
-                .delay_config
-                .lock()
-                .unwrap()
-                .findpath_delay;
-            findpath_delay
-        };
-
-        let delay = findpath_delay;
+        let delay = self.config.findpath_delay();
         if let Some(paths) = paths {
             for node in paths {
                 {
@@ -750,20 +731,14 @@ impl Bot {
         let bot_tile_x = bot_position.0 / 32.0;
         let bot_tile_y = bot_position.1 / 32.0;
 
-        let inventory_state = {
-            match self.inventory.try_lock() {
-                Ok(inv) => {
-                    let mut item_amounts = std::collections::HashMap::with_capacity(inv.items.len());
-                    for (&item_id, item) in &inv.items {
-                        item_amounts.insert(item_id, item.amount);
-                    }
-                    (inv.size, inv.items.len() as u32, item_amounts)
-                },
-                Err(_) => return 0,
-            }
+        let inventory_snapshot = match self.inventory.try_get_snapshot() {
+            Some(snapshot) => snapshot,
+            None => return 0,
         };
 
-        let (inventory_size, current_item_count, item_amounts) = inventory_state;
+        let inventory_size = inventory_snapshot.size;
+        let current_item_count = inventory_snapshot.item_count;
+        let item_amounts = inventory_snapshot.item_amounts;
 
         let collectible_items = {
             match self.world.data.try_lock() {
