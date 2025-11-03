@@ -1,53 +1,12 @@
-mod api;
-mod bot_manager;
-mod dto;
-mod templates;
-
-use axum::{
-    Router,
-    routing::{get, post},
-};
 use std::sync::Arc;
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use std::sync::RwLock;
+use gt_core::{Bot, gtitem_r};
 
-use crate::bot_manager::BotManager;
+fn main() {
+    let item_database = Arc::new(RwLock::new(gtitem_r::load_from_file("items.dat").unwrap()));
+    println!("Loaded {} items from items.dat", item_database.read().unwrap().item_count);
+    let (bot, _) = Bot::new(gt_core::types::bot::LoginVia::LEGACY(["".into(), "".into()]), None, item_database.clone(), None);
+    bot.logon(None);
 
-#[tokio::main]
-async fn main() {
-    let bot_manager = Arc::new(BotManager::new());
-    let app = Router::new()
-        // Web UI routes
-        .route("/", get(templates::index))
-        // API routes - Bot management
-        .route("/api/bots", get(api::list_bots).post(api::create_bot))
-        .route("/api/bots/{id}", get(api::get_bot).delete(api::remove_bot))
-        // API routes - Bot actions
-        .route("/api/bots/{id}/connect", post(api::connect_bot))
-        .route("/api/bots/{id}/disconnect", post(api::disconnect_bot))
-        .route("/api/bots/{id}/warp", post(api::warp_bot))
-        .route("/api/bots/{id}/say", post(api::say))
-        .route("/api/bots/{id}/walk", post(api::walk))
-        .route("/api/bots/{id}/move", post(api::move_bot))
-        .route("/api/bots/{id}/collect", post(api::collect))
-        .route("/api/bots/{id}/punch", post(api::punch))
-        .route("/api/bots/{id}/place", post(api::place))
-        // API routes - Bot data
-        .route("/api/bots/{id}/inventory", get(api::get_inventory))
-        .route("/api/bots/{id}/world", get(api::get_world))
-        .route("/api/bots/{id}/logs", get(api::get_logs))
-        .route("/api/bots/{id}/config", post(api::update_config))
-        // API routes - Bot events (WebSocket)
-        .route("/api/bots/{id}/events", get(api::bot_events_websocket))
-        // Static files
-        .nest_service("/static", ServeDir::new("static"))
-        .with_state(bot_manager)
-        .layer(CorsLayer::permissive());
-
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
-        .await
-        .unwrap();
-
-    println!("🚀 Mori web server starting on http://127.0.0.1:3000");
-
-    axum::serve(listener, app).await.unwrap();
+    loop {}
 }

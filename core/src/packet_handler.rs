@@ -8,8 +8,9 @@ use flate2::read::ZlibDecoder;
 use std::fs;
 use std::io::{Cursor, Read};
 use std::ops::Deref;
+use std::sync::Arc;
 
-pub fn handle(bot: &Bot, data: &[u8]) {
+pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
     let packet_id = LittleEndian::read_u32(&data[0..4]);
     let packet_type = NetMessage::from(packet_id);
 

@@ -11,7 +11,8 @@ use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, RwLock, mpsc};
+use std::sync::mpsc::{self, Sender};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -92,7 +93,7 @@ impl Bot {
         let network = NetworkSession::new(local_addr, socks5_config);
         let (event_broadcaster, event_receiver) = events::create_event_channel();
 
-        let bot = Arc::new(Self {
+        (Arc::new(Self {
             network,
             auth: AuthenticationContext::new(login_via, token_fetcher),
             movement: MovementController::new(),
@@ -105,9 +106,7 @@ impl Bot {
             temporary_data: TemporaryData::default(),
             proxy_url,
             events: event_broadcaster,
-        });
-
-        (bot, event_receiver)
+        }), event_receiver)
     }
 
     pub fn logon(self: Arc<Self>, data: Option<&str>) {
@@ -120,7 +119,8 @@ impl Bot {
         }
 
         self.spawn_polling();
-        self.process_event();
+        let bot_clone = Arc::clone(&self);
+        bot_clone.process_event();
     }
 
     pub fn connect_to_server(&self) {
@@ -341,7 +341,7 @@ impl Bot {
         });
     }
 
-    fn process_event(&self) {
+    fn process_event(self: Arc<Self>) {
         loop {
             let is_running = self.runtime.is_running();
 
@@ -358,6 +358,20 @@ impl Bot {
                         rusty_enet::EventNoRef::Connect { peer, .. } => {
                             println!("Connected to server");
                             self.network.set_peer_id(Some(peer));
+
+                            // Emit Connected event
+                            let (server, port) = {
+                                let server_data = self.auth.server_data();
+                                if let Some(data) = server_data.as_ref() {
+                                    (data.server.clone(), data.port)
+                                } else {
+                                    ("unknown".to_string(), 0)
+                                }
+                            };
+                            self.events.emit(BotEvent::new(EventType::Connected {
+                                server,
+                                port,
+                            }));
                         }
                         rusty_enet::EventNoRef::Receive {
                             peer: _,
@@ -368,11 +382,16 @@ impl Bot {
                             if data.len() < 4 {
                                 continue;
                             }
-                            packet_handler::handle(self, data);
+                            packet_handler::handle(&self, data);
                         }
                         rusty_enet::EventNoRef::Disconnect { peer: _, data: _ } => {
                             println!("Disconnected from server");
                             self.network.set_peer_id(None);
+
+                            // Emit Disconnected event
+                            self.events.emit(BotEvent::new(EventType::Disconnected {
+                                reason: None,
+                            }));
                             break;
                         }
                     }
@@ -496,35 +515,26 @@ impl Bot {
         );
     }
 
-    pub fn find_path(&self, x: u32, y: u32) {
-        let position = self.movement.position();
+    pub fn find_path(self: &Arc<Self>, x: u32, y: u32) {
+        let bot = Arc::clone(self);
+        thread::spawn(move || {
+            let position = bot.movement.position();
 
-        // Emit PathfindingStarted event
-        self.events.emit(BotEvent::new(EventType::PathfindingStarted {
-            target_x: x,
-            target_y: y,
-        }));
+            let paths = {
+                let mut astar = bot.movement.astar();
+                astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
+            };
 
-        let paths = {
-            let mut astar = self.movement.astar();
-            astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
-        };
-
-        let delay = self.config.findpath_delay();
-        if let Some(paths) = &paths {
-            for node in paths {
-                self.movement
-                    .set_position(node.x as f32 * 32.0, node.y as f32 * 32.0);
-                self.walk(node.x as i32, node.y as i32, true);
-                thread::sleep(Duration::from_millis(delay as u64));
+            let delay = bot.config.findpath_delay();
+            if let Some(paths) = &paths {
+                for node in paths {
+                    bot.movement
+                        .set_position(node.x as f32 * 32.0, node.y as f32 * 32.0);
+                    bot.walk(node.x as i32, node.y as i32, true);
+                    thread::sleep(Duration::from_millis(delay as u64));
+                }
             }
-        }
-
-        // Emit PathfindingCompleted event
-        self.events.emit(BotEvent::new(EventType::PathfindingCompleted {
-            success: paths.is_some(),
-            steps: paths.as_ref().map(|p| p.len()).unwrap_or(0),
-        }));
+        });
     }
 
     pub fn drop_item(&self, item_id: u32, amount: u32) {

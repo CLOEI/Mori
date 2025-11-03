@@ -12,11 +12,21 @@ pub struct State {
     pub gravity: f32,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct DelayConfig {
     pub findpath_delay: u32,
     pub punch_delay: u32,
     pub place_delay: u32,
+}
+
+impl Default for DelayConfig {
+    fn default() -> Self {
+        Self {
+            findpath_delay: 300,
+            punch_delay: 100,
+            place_delay: 100,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]

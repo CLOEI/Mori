@@ -31,6 +31,10 @@ pub enum EventType {
         width: u32,
         height: u32,
     },
+    WorldChanged {
+        from: String,
+        to: String,
+    },
     TileChanged {
         x: u32,
         y: u32,
@@ -70,14 +74,6 @@ pub enum EventType {
         x: f32,
         y: f32,
     },
-    PathfindingStarted {
-        target_x: u32,
-        target_y: u32,
-    },
-    PathfindingCompleted {
-        success: bool,
-        steps: usize,
-    },
 
     // Player Events
     PlayerJoined {
@@ -110,6 +106,7 @@ pub enum EventType {
     },
 
     // System Events
+    BotReady,
     Log {
         level: LogLevel,
         message: String,

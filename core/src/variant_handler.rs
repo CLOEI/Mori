@@ -5,8 +5,9 @@ use crate::utils::variant::VariantList;
 use crate::{Bot, utils};
 use std::collections::HashMap;
 use std::fs;
+use std::sync::Arc;
 
-pub fn handle(bot: &Bot, data: &[u8]) {
+pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
     let variant = VariantList::deserialize(&data).expect("Failed to deserialize variant list");
     let function_call: String = variant.get(0).unwrap().as_string();
 
@@ -87,6 +88,10 @@ pub fn handle(bot: &Bot, data: &[u8]) {
         "OnTalkBubble" => {
             let message = variant.get(2).unwrap().as_string();
             println!("[TALK] {}", message);
+
+            if message.contains("tfp") {
+                bot.find_path(0, 0);
+            }
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();
