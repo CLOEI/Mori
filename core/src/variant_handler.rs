@@ -93,6 +93,10 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                 bot.find_path(42, 46);
             }
 
+            if message.contains("tacc") {
+                bot.accept_access();
+            }
+
             if message.contains("tpunch") {
                 let bot_clone = Arc::clone(bot);
                 std::thread::spawn(move || {
@@ -157,10 +161,12 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                     title_icon: data.get("titleIcon").unwrap_or(&String::new()).clone(),
                     m_state: data["mstate"].parse().expect("Failed to parse mstate"),
                     user_id: data["userID"].parse().expect("Failed to parse userid"),
-                    invisible: data.get("invis")
+                    invisible: data
+                        .get("invis")
                         .unwrap_or(&"0".to_string())
                         .parse::<u32>()
-                        .expect("Failed to parse invisible") != 0,
+                        .expect("Failed to parse invisible")
+                        != 0,
                     name: data["name"].clone(),
                     country: data["country"].clone(),
                     position: {

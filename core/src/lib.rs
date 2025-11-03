@@ -93,20 +93,23 @@ impl Bot {
         let network = NetworkSession::new(local_addr, socks5_config);
         let (event_broadcaster, event_receiver) = events::create_event_channel();
 
-        (Arc::new(Self {
-            network,
-            auth: AuthenticationContext::new(login_via, token_fetcher),
-            movement: MovementController::new(),
-            duration: Mutex::new(Instant::now()),
-            world: GameWorld::new(item_database),
-            inventory: BotInventory::new(),
-            runtime: RuntimeContext::new(),
-            scripting: Scripting::default(),
-            config: BotConfiguration::new(),
-            temporary_data: TemporaryData::default(),
-            proxy_url,
-            events: event_broadcaster,
-        }), event_receiver)
+        (
+            Arc::new(Self {
+                network,
+                auth: AuthenticationContext::new(login_via, token_fetcher),
+                movement: MovementController::new(),
+                duration: Mutex::new(Instant::now()),
+                world: GameWorld::new(item_database),
+                inventory: BotInventory::new(),
+                runtime: RuntimeContext::new(),
+                scripting: Scripting::default(),
+                config: BotConfiguration::new(),
+                temporary_data: TemporaryData::default(),
+                proxy_url,
+                events: event_broadcaster,
+            }),
+            event_receiver,
+        )
     }
 
     pub fn logon(self: Arc<Self>, data: Option<&str>) {
@@ -168,9 +171,7 @@ impl Bot {
             (login_info.ltoken.clone(), login_info.to_string())
         };
 
-        if let Ok(ltoken) =
-            server::check_token(&ltoken, &login_data, self.proxy_url.as_deref())
-        {
+        if let Ok(ltoken) = server::check_token(&ltoken, &login_data, self.proxy_url.as_deref()) {
             println!("Refreshed token: {}", ltoken);
             let mut login_info_lock = self.auth.login_info();
             let login_info = login_info_lock.as_mut().expect("Login info not set");
@@ -368,10 +369,8 @@ impl Bot {
                                     ("unknown".to_string(), 0)
                                 }
                             };
-                            self.events.emit(BotEvent::new(EventType::Connected {
-                                server,
-                                port,
-                            }));
+                            self.events
+                                .emit(BotEvent::new(EventType::Connected { server, port }));
                         }
                         rusty_enet::EventNoRef::Receive {
                             peer: _,
@@ -389,9 +388,8 @@ impl Bot {
                             self.network.set_peer_id(None);
 
                             // Emit Disconnected event
-                            self.events.emit(BotEvent::new(EventType::Disconnected {
-                                reason: None,
-                            }));
+                            self.events
+                                .emit(BotEvent::new(EventType::Disconnected { reason: None }));
                             break;
                         }
                     }
@@ -471,6 +469,15 @@ impl Bot {
 
     pub fn wrench(self: &Arc<Self>, offset_x: i32, offset_y: i32) {
         self.place(offset_x, offset_y, 32, false);
+    }
+
+    pub fn wrench_player(&self, net_id: u32) {
+        self.send_packet(
+            NetMessage::GenericText,
+            format!("action|wrench\n|netid|{}\n", net_id).as_bytes(),
+            None,
+            true,
+        );
     }
 
     pub fn wear(&self, item_id: u32) {
@@ -598,6 +605,36 @@ impl Bot {
             );
             *trash = (0, 0);
             *dialog_callback = None;
+        });
+    }
+
+    pub fn accept_access(&self) {
+        let net_id = self.runtime.net_id();
+        self.wrench_player(net_id);
+
+        let mut dialog_callback = self.temporary_data.dialog_callback.lock().unwrap();
+        *dialog_callback = Some(|bot| {
+            let net_id = bot.runtime.net_id();
+            bot.send_packet(
+                NetMessage::GenericText,
+                format!("action|dialog_return\ndialog_name|popup\nnetID|{}|\nbuttonClicked|acceptlock\n", net_id).as_bytes(),
+                None,
+                true,
+            );
+
+            let mut dialog_callback = bot.temporary_data.dialog_callback.lock().unwrap();
+            *dialog_callback = Some(|bot| {
+                bot.send_packet(
+                    NetMessage::GenericText,
+                    "action|dialog_return\ndialog_name|acceptaccess\n"
+                        .to_string()
+                        .as_bytes(),
+                    None,
+                    true,
+                );
+                let mut dialog_callback = bot.temporary_data.dialog_callback.lock().unwrap();
+                *dialog_callback = None;
+            });
         });
     }
 

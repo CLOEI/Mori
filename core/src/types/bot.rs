@@ -161,6 +161,10 @@ impl UserData for BotArc {
             this.0.trash_item(item_id, amount);
             Ok(())
         });
+        methods.add_method("acceptAccess", |_, this, ()| {
+            this.0.accept_access();
+            Ok(())
+        });
         methods.add_method("collect", |_, this, ()| {
             let collected = this.0.collect();
             Ok(collected)
