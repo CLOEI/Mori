@@ -102,6 +102,15 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                     }
                 });
             }
+
+            if message.contains("warp") {
+                let parts: Vec<&str> = message.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let world_name = parts[1].to_string();
+                    println!("Warping to world: {}", world_name);
+                    bot.warp(world_name);
+                }
+            }
         }
         "OnConsoleMessage" => {
             let message = variant.get(1).unwrap().as_string();

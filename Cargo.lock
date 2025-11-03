@@ -889,7 +889,7 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#4525a7509cec824a43157c49876082893fc2f7a8"
+source = "git+https://github.com/CLOEI/gtworld-r.git#4929c176d13c73eae854b432756bb3f451b648e9"
 dependencies = [
  "anyhow",
  "bitflags",
