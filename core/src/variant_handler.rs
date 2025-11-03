@@ -90,7 +90,17 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
             println!("[TALK] {}", message);
 
             if message.contains("tfp") {
-                bot.find_path(0, 0);
+                bot.find_path(42, 46);
+            }
+
+            if message.contains("tpunch") {
+                let bot_clone = Arc::clone(bot);
+                std::thread::spawn(move || {
+                    for _ in 0..10 {
+                        bot_clone.punch(1, 1);
+                        std::thread::sleep(std::time::Duration::from_millis(300));
+                    }
+                });
             }
         }
         "OnConsoleMessage" => {

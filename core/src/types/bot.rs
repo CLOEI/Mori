@@ -117,7 +117,7 @@ impl UserData for BotArc {
         methods.add_method(
             "place",
             |_, this, (offset_x, offset_y, item_id): (i32, i32, u32)| {
-                this.0.place(offset_x, offset_y, item_id);
+                this.0.place(offset_x, offset_y, item_id, false);
                 Ok(())
             },
         );

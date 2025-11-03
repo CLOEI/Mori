@@ -421,49 +421,56 @@ impl Bot {
         );
     }
 
-    pub fn place(&self, offset_x: i32, offset_y: i32, item_id: u32) {
-        let mut pkt = NetGamePacketData::default();
-        pkt._type = NetGamePacket::TileChangeRequest;
-        let position = self.movement.position();
-        pkt.vector_x = position.0;
-        pkt.vector_y = position.1;
-        let base_x = (position.0 / 32.0).floor() as i32;
-        let base_y = (position.1 / 32.0).floor() as i32;
-        pkt.int_x = base_x + offset_x;
-        pkt.int_y = base_y + offset_y;
-        pkt.value = item_id;
+    pub fn place(self: &Arc<Self>, offset_x: i32, offset_y: i32, item_id: u32, is_punch: bool) {
+        let bot = Arc::clone(self);
+        thread::spawn(move || {
+            let mut pkt = NetGamePacketData::default();
+            pkt._type = NetGamePacket::TileChangeRequest;
+            let position = bot.movement.position();
+            pkt.vector_x = position.0;
+            pkt.vector_y = position.1;
+            let base_x = (position.0 / 32.0).floor() as i32;
+            let base_y = (position.1 / 32.0).floor() as i32;
+            pkt.int_x = base_x + offset_x;
+            pkt.int_y = base_y + offset_y;
+            pkt.value = item_id;
 
-        if pkt.int_x <= base_x + 4
-            && pkt.int_x >= base_x - 4
-            && pkt.int_y <= base_y + 4
-            && pkt.int_y >= base_y - 4
-        {
-            self.send_packet(
-                NetMessage::GamePacket,
-                pkt.to_bytes().as_slice(),
-                None,
-                true,
-            );
-            pkt.flags = PacketFlag::PLACE | PacketFlag::STANDING;
-            if base_x > pkt.int_x {
-                pkt.flags |= PacketFlag::FACING_LEFT;
+            if pkt.int_x <= base_x + 4
+                && pkt.int_x >= base_x - 4
+                && pkt.int_y <= base_y + 4
+                && pkt.int_y >= base_y - 4
+            {
+                bot.send_packet(
+                    NetMessage::GamePacket,
+                    pkt.to_bytes().as_slice(),
+                    None,
+                    true,
+                );
+                pkt.flags = if is_punch {
+                    PacketFlag::PUNCH
+                } else {
+                    PacketFlag::PLACE
+                } | PacketFlag::STANDING;
+                if base_x > pkt.int_x {
+                    pkt.flags |= PacketFlag::FACING_LEFT;
+                }
+                pkt._type = NetGamePacket::State;
+                bot.send_packet(
+                    NetMessage::GamePacket,
+                    pkt.to_bytes().as_slice(),
+                    None,
+                    true,
+                );
             }
-            pkt._type = NetGamePacket::State;
-            self.send_packet(
-                NetMessage::GamePacket,
-                pkt.to_bytes().as_slice(),
-                None,
-                true,
-            );
-        }
+        });
     }
 
-    pub fn punch(&self, offset_x: i32, offset_y: i32) {
-        self.place(offset_x, offset_y, 18);
+    pub fn punch(self: &Arc<Self>, offset_x: i32, offset_y: i32) {
+        self.place(offset_x, offset_y, 18, true);
     }
 
-    pub fn wrench(&self, offset_x: i32, offset_y: i32) {
-        self.place(offset_x, offset_y, 32);
+    pub fn wrench(self: &Arc<Self>, offset_x: i32, offset_y: i32) {
+        self.place(offset_x, offset_y, 32, false);
     }
 
     pub fn wear(&self, item_id: u32) {
@@ -488,7 +495,6 @@ impl Bot {
 
         let position = self.movement.position();
 
-        // Emit PositionChanged event
         self.events.emit(BotEvent::new(EventType::PositionChanged {
             x: position.0,
             y: position.1,

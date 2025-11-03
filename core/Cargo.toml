@@ -23,3 +23,4 @@ byteorder = "1.5.0"
 flate2 = "1.1.2"
 mlua = { version = "0.11.3", features = ["lua54", "vendored", "send"] }
 bitflags = "2.9.4"
+image = "0.25"

@@ -108,16 +108,24 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                     }));
 
                     if !world_lock.tiles.is_empty() {
-                        let mut collision_data = Vec::with_capacity(world_lock.tiles.len());
-                        for tile in &world_lock.tiles {
-                            let collision_type = if let Some(item) =
-                                item_database.get_item(&(tile.foreground_item_id as u32))
-                            {
-                                item.collision_type
-                            } else {
-                                0
-                            };
-                            collision_data.push(collision_type);
+                        let width = world_lock.width;
+                        let height = world_lock.height;
+                        let mut collision_data = Vec::with_capacity((width * height) as usize);
+
+                        for y in 0..height {
+                            for x in 0..width {
+                                let collision_type = if let Some(tile) = world_lock.get_tile(x, y) {
+                                    if let Some(item) = item_database.get_item(&(tile.foreground_item_id as u32)) {
+                                        item.collision_type
+                                    } else {
+                                        0
+                                    }
+                                } else {
+                                    // Tile doesn't exist - mark as 255 (special value for yellow rendering)
+                                    255
+                                };
+                                collision_data.push(collision_type);
+                            }
                         }
 
                         let mut astar_lock = bot.movement.astar();
