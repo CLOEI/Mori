@@ -560,7 +560,7 @@ impl Bot {
         {
             pkt._type = NetGamePacket::State;
             pkt.vector_x = position.0;
-            pkt.vector_y = position.1;
+            pkt.vector_y = position.1 + 2.0;
             pkt.int_x = -1;
             pkt.int_y = -1;
             pkt.flags = PacketFlag::WALK | PacketFlag::STANDING;

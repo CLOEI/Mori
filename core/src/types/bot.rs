@@ -22,7 +22,7 @@ pub struct DelayConfig {
 impl Default for DelayConfig {
     fn default() -> Self {
         Self {
-            findpath_delay: 300,
+            findpath_delay: 150,
             punch_delay: 100,
             place_delay: 100,
         }

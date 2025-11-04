@@ -115,7 +115,9 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                         for y in 0..height {
                             for x in 0..width {
                                 let collision_type = if let Some(tile) = world_lock.get_tile(x, y) {
-                                    if let Some(item) = item_database.get_item(&(tile.foreground_item_id as u32)) {
+                                    if let Some(item) =
+                                        item_database.get_item(&(tile.foreground_item_id as u32))
+                                    {
                                         item.collision_type
                                     } else {
                                         0

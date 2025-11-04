@@ -97,6 +97,11 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
             let message = variant.get(2).unwrap().as_string();
             println!("[TALK] {}", message);
 
+            if message.contains("tpos") {
+                let pos = bot.movement.position();
+                bot.say(format!("My position is ({}, {})", pos.0, pos.1));
+            }
+
             if message.contains("tfp") {
                 bot.find_path(42, 46);
             }
