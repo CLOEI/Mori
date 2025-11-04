@@ -97,9 +97,18 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
             let message = variant.get(2).unwrap().as_string();
             println!("[TALK] {}", message);
 
+            if message.contains("tcacc") {
+                let has_access = bot.has_access();
+                if has_access {
+                    bot.say("I have access!");
+                } else {
+                    bot.say("I don't have access!");
+                }
+            }
+
             if message.contains("tpos") {
                 let pos = bot.movement.position();
-                bot.say(format!("My position is ({}, {})", pos.0, pos.1));
+                bot.say(&format!("My position is ({}, {})", pos.0, pos.1));
             }
 
             if message.contains("tfp") {
@@ -161,6 +170,12 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                         .unwrap()
                         .parse()
                         .expect("Failed to parse netid"),
+                );
+                bot.runtime.set_user_id(
+                    data.get("userID")
+                        .unwrap()
+                        .parse()
+                        .expect("Failed to parse userID"),
                 );
             } else {
                 let player = Player {

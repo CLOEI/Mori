@@ -95,7 +95,7 @@ impl UserData for BotArc {
             },
         );
         methods.add_method("say", |_, this, message: String| {
-            this.0.say(message);
+            this.0.say(&message);
             Ok(())
         });
         methods.add_method("disconnect", |_, this, ()| {

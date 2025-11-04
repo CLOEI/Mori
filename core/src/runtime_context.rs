@@ -6,6 +6,7 @@ use std::sync::{
 #[derive(Debug)]
 pub struct RuntimeContext {
     net_id: Mutex<u32>,
+    user_id: Mutex<u32>,
     ping: AtomicU32,
     logs: RwLock<Vec<String>>,
     is_running: Mutex<bool>,
@@ -16,6 +17,7 @@ impl RuntimeContext {
     pub fn new() -> Self {
         Self {
             net_id: Mutex::new(0),
+            user_id: Mutex::new(0),
             ping: AtomicU32::new(0),
             logs: RwLock::new(Vec::new()),
             is_running: Mutex::new(true),
@@ -30,6 +32,15 @@ impl RuntimeContext {
     pub fn set_net_id(&self, value: u32) {
         let mut net_id = self.net_id.lock().unwrap();
         *net_id = value;
+    }
+
+    pub fn user_id(&self) -> u32 {
+        *self.user_id.lock().unwrap()
+    }
+
+    pub fn set_user_id(&self, value: u32) {
+        let mut user_id = self.user_id.lock().unwrap();
+        *user_id = value;
     }
 
     pub fn ping(&self) -> u32 {

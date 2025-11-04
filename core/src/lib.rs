@@ -450,7 +450,7 @@ impl Bot {
 
 // packet methods
 impl Bot {
-    pub fn say(&self, message: String) {
+    pub fn say(&self, message: &str) {
         self.send_packet(
             NetMessage::GenericText,
             format!("action|input\n|text|{}\n", message).as_bytes(),
@@ -685,6 +685,27 @@ impl Bot {
                 *dialog_callback = None;
             });
         });
+    }
+
+    pub fn has_access(&self) -> bool {
+        const LOCK_ITEM_IDS: &[u16] = &[242, 1796, 2408, 7188, 10410];
+
+        let world_lock = match self.world.data.try_lock() {
+            Ok(world) => world,
+            Err(_) => return false,
+        };
+
+        let bot_uid = self.runtime.user_id();
+
+        for tile in &world_lock.tiles {
+            if LOCK_ITEM_IDS.contains(&tile.foreground_item_id) {
+                if let gtworld_r::TileType::Lock { access_uids, .. } = &tile.tile_type {
+                    return access_uids.contains(&bot_uid);
+                }
+            }
+        }
+
+        false
     }
 
     pub fn collect(&self) -> usize {
