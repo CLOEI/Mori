@@ -7,11 +7,12 @@ use crate::types::flags::PacketFlag;
 use crate::types::login_info::LoginInfo;
 use crate::types::net_game_packet::{NetGamePacket, NetGamePacketData};
 use crate::types::net_message::NetMessage;
+use crate::types::status::{ENetStatus, PeerStatus};
 use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::str::FromStr;
-use std::sync::mpsc::{self, Sender};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -65,6 +66,8 @@ pub struct Bot {
     pub temporary_data: TemporaryData,
     pub proxy_url: Option<String>,
     pub events: EventBroadcaster,
+    pub enet_status: Mutex<ENetStatus>,
+    pub peer_status: Mutex<PeerStatus>,
 }
 
 impl Bot {
@@ -107,6 +110,8 @@ impl Bot {
                 temporary_data: TemporaryData::default(),
                 proxy_url,
                 events: event_broadcaster,
+                enet_status: Mutex::new(ENetStatus::Disconnected),
+                peer_status: Mutex::new(PeerStatus::FetchingServerData),
             }),
             event_receiver,
         )
@@ -127,6 +132,11 @@ impl Bot {
     }
 
     pub fn connect_to_server(&self) {
+        {
+            let mut peer_status = self.peer_status.lock().unwrap();
+            *peer_status = PeerStatus::FetchingServerData;
+        }
+
         if !self.runtime.is_redirecting() {
             {
                 let mut login_info = self.auth.login_info();
@@ -153,6 +163,16 @@ impl Bot {
                 }
             }
             self.get_token();
+        }
+
+        {
+            let mut peer_status = self.peer_status.lock().unwrap();
+            *peer_status = PeerStatus::ConnectingToServer;
+        }
+
+        {
+            let mut enet_status = self.enet_status.lock().unwrap();
+            *enet_status = ENetStatus::Connecting;
         }
 
         let server_address = {
@@ -288,6 +308,16 @@ impl Bot {
     }
 
     fn disconnect(&self) {
+        // Update enet status based on auto_reconnect setting
+        {
+            let mut enet_status = self.enet_status.lock().unwrap();
+            if self.config.auto_reconnect() {
+                *enet_status = ENetStatus::Reconnecting;
+            } else {
+                *enet_status = ENetStatus::Disconnected;
+            }
+        }
+
         self.network.disconnect();
     }
 
@@ -309,6 +339,14 @@ impl Bot {
 
     pub fn set_place_delay(&self, delay: u32) {
         self.config.set_place_delay(delay);
+    }
+
+    pub fn enet_status(&self) -> ENetStatus {
+        *self.enet_status.lock().unwrap()
+    }
+
+    pub fn peer_status(&self) -> PeerStatus {
+        *self.peer_status.lock().unwrap()
     }
 
     fn spawn_polling(self: &Arc<Self>) {
@@ -360,6 +398,12 @@ impl Bot {
                             println!("Connected to server");
                             self.network.set_peer_id(Some(peer));
 
+                            // Update enet status to Connected
+                            {
+                                let mut enet_status = self.enet_status.lock().unwrap();
+                                *enet_status = ENetStatus::Connected;
+                            }
+
                             // Emit Connected event
                             let (server, port) = {
                                 let server_data = self.auth.server_data();
@@ -386,6 +430,11 @@ impl Bot {
                         rusty_enet::EventNoRef::Disconnect { peer: _, data: _ } => {
                             println!("Disconnected from server");
                             self.network.set_peer_id(None);
+
+                            {
+                                let mut enet_status = self.enet_status.lock().unwrap();
+                                *enet_status = ENetStatus::Disconnected;
+                            }
 
                             // Emit Disconnected event
                             self.events

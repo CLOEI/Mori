@@ -1,5 +1,6 @@
 use crate::types::net_message::NetMessage;
 use crate::types::player::Player;
+use crate::types::status::PeerStatus;
 use crate::utils::proton::HashMode;
 use crate::utils::variant::VariantList;
 use crate::{Bot, utils};
@@ -66,6 +67,13 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                             .expect("Failed to load items.dat");
                         let mut item_database_lock = bot.world.item_database.write().unwrap();
                         *item_database_lock = item_database;
+
+                        // Update peer status to InGame
+                        {
+                            let mut peer_status = bot.peer_status.lock().unwrap();
+                            *peer_status = PeerStatus::InGame;
+                        }
+
                         return;
                     }
                 }
