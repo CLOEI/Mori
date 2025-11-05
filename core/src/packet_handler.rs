@@ -504,7 +504,7 @@ fn handle_send_tile_update_data(bot: &Bot, tank_packet: &NetGamePacketData, data
         }
     };
 
-    let tile_data = &data[56..];
+    let tile_data = &data[60..];
     let mut cursor = Cursor::new(tile_data);
 
     let new_collision_type = {

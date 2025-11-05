@@ -19,14 +19,14 @@ fn main() {
         gt_core::types::bot::LoginVia::LEGACY(["".into(), "".into()]),
         None,
         item_database.clone(),
-None,
+        None,
     );
     let bot_clone = bot.clone();
     thread::spawn(move || {
         bot_clone.logon(None);
     });
 
-    while bot.peer_status() != PeerStatus::InWorld {};
+    while bot.peer_status() != PeerStatus::InWorld {}
     println!("Bot is now in world!");
     bot.say("Hmm");
     thread::sleep(Duration::from_secs(5));
@@ -58,13 +58,8 @@ None,
             continue 'main_loop;
         }
 
-        if bot.inventory.get_item_count(8640) == 0 {
-            println!("No more items (8640) in inventory. Exiting...");
-            break 'main_loop;
-        }
-
         let current_pos = bot.movement.position();
-        let target_tile = (19, 52);
+        let target_tile = (18, 52);
         let current_tile = ((current_pos.0 / 32.0) as u32, (current_pos.1 / 32.0) as u32);
 
         if current_tile != target_tile {
@@ -75,5 +70,10 @@ None,
             continue 'main_loop;
         }
         place(&bot);
+
+        if bot.inventory.get_item_count(8640) == 0 {
+            println!("No more items (8640) in inventory. Exiting...");
+            break 'main_loop;
+        }
     }
 }
