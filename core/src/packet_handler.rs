@@ -512,6 +512,7 @@ fn handle_send_tile_update_data(bot: &Bot, tank_packet: &NetGamePacketData, data
         let mut world = bot.world.data.lock().unwrap();
         if let Some(tile) = world.get_tile(tile_x, tile_y) {
             let tile_clone = tile.clone();
+            println!("Tile : {:?}", tile_clone);
             let _ = world.update_tile(tile_clone, &mut cursor, true, &item_database);
 
             if let Some(updated_tile) = world.get_tile(tile_x, tile_y) {

@@ -214,6 +214,10 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                     },
                 };
 
+                if player.m_state == 1 || player.invisible {
+                    bot.leave();
+                }
+
                 let mut players = bot.world.players.lock().unwrap();
                 players.insert(player.net_id, player);
             }

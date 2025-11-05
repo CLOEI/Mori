@@ -486,6 +486,17 @@ impl Bot {
         );
     }
 
+    pub fn leave(&self) {
+        if self.peer_status() == PeerStatus::InWorld {
+            self.send_packet(
+                NetMessage::GameMessage,
+                "action|quit_to_exit\n".as_bytes(),
+                None,
+                true,
+            );
+        }
+    }
+
     pub fn place(&self, offset_x: i32, offset_y: i32, item_id: u32, is_punch: bool) {
         if !is_punch && !self.inventory.has_item(item_id as u16, 1) {
             return;
@@ -585,7 +596,7 @@ impl Bot {
             pkt.int_y = -1;
             pkt.flags = PacketFlag::WALK | PacketFlag::STANDING;
 
-            let face_left = position.0 >= x as f32 * 32.0;
+            let face_left = position.0 > x as f32 * 32.0;
             pkt.flags.set(PacketFlag::FACING_LEFT, face_left);
         }
 
@@ -595,6 +606,8 @@ impl Bot {
             None,
             false,
         );
+        let delay = self.config.findpath_delay();
+        thread::sleep(Duration::from_millis(delay as u64));
     }
 
     pub fn find_path(&self, x: u32, y: u32) {
@@ -606,13 +619,11 @@ impl Bot {
             astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y, has_access)
         };
 
-        let delay = self.config.findpath_delay();
         if let Some(paths) = &paths {
             for node in paths {
                 self.movement
                     .set_position(node.x as f32 * 32.0, node.y as f32 * 32.0);
                 self.walk(node.x as i32, node.y as i32, true);
-                thread::sleep(Duration::from_millis(delay as u64));
             }
         }
     }

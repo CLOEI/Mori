@@ -19,7 +19,7 @@ fn main() {
         gt_core::types::bot::LoginVia::LEGACY(["".into(), "".into()]),
         None,
         item_database.clone(),
-        None,
+None,
     );
     let bot_clone = bot.clone();
     thread::spawn(move || {
@@ -36,7 +36,6 @@ fn main() {
         for (offset_x, offset_y) in offsets.iter() {
             if check_tile(bot, (*offset_x, *offset_y)) {
                 bot.place(*offset_x, *offset_y, 8640, false);
-                return;
             }
         }
     }
@@ -46,7 +45,7 @@ fn main() {
         let target_x = pos.0 as i32 + offset.0 * 32;
         let target_y = pos.1 as i32 + offset.1 * 32;
         let binding = bot.world.data.lock().unwrap();
-        let tile = binding.get_tile(target_x as u32, target_y as u32);
+        let tile = binding.get_tile(target_x as u32 / 32, target_y as u32 / 32);
         if let Some(tile) = tile {
             tile.foreground_item_id == 0
         } else {
@@ -58,7 +57,19 @@ fn main() {
         if bot.peer_status() != PeerStatus::InWorld {
             continue 'main_loop;
         }
-        bot.find_path(19, 52);
+
+        if bot.inventory.get_item_count(8640) == 0 {
+            println!("No more items (8640) in inventory. Exiting...");
+            break 'main_loop;
+        }
+
+        let current_pos = bot.movement.position();
+        let target_tile = (19, 52);
+        let current_tile = ((current_pos.0 / 32.0) as u32, (current_pos.1 / 32.0) as u32);
+
+        if current_tile != target_tile {
+            bot.find_path(target_tile.0, target_tile.1);
+        }
 
         if bot.peer_status() != PeerStatus::InWorld {
             continue 'main_loop;
