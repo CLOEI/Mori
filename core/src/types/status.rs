@@ -22,6 +22,7 @@ pub enum PeerStatus {
     FetchingServerData,
     ConnectingToServer,
     InGame,
+    InWorld,
 }
 
 impl std::fmt::Display for PeerStatus {
@@ -30,6 +31,7 @@ impl std::fmt::Display for PeerStatus {
             PeerStatus::FetchingServerData => write!(f, "Fetching Server Data"),
             PeerStatus::ConnectingToServer => write!(f, "Connecting to Server"),
             PeerStatus::InGame => write!(f, "In Game"),
+            PeerStatus::InWorld => write!(f, "In World"),
         }
     }
 }

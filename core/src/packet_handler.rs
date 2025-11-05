@@ -74,7 +74,8 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
             println!("GameMessage: {}", message);
 
             if message.contains("logon_fail") {
-                bot.disconnect()
+                bot.disconnect();
+                bot.sleep_with_timeout(15);
             }
         }
         NetMessage::GamePacket => {
@@ -106,6 +107,12 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
                         width: world_lock.width,
                         height: world_lock.height,
                     }));
+
+                    // Update peer status to InWorld
+                    {
+                        let mut peer_status = bot.peer_status.lock().unwrap();
+                        *peer_status = crate::types::status::PeerStatus::InWorld;
+                    }
 
                     if !world_lock.tiles.is_empty() {
                         let width = world_lock.width;

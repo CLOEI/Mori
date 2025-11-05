@@ -7,7 +7,7 @@ pub struct AStar {
     pub width: u32,
     pub height: u32,
     pub grid: Vec<u8>, // Store only collision types, not full nodes
-    pub path_cache: HashMap<(u32, u32, u32, u32), Option<Vec<(u32, u32)>>>, // Cache for paths
+    pub path_cache: HashMap<(u32, u32, u32, u32, bool), Option<Vec<(u32, u32)>>>, // Cache for paths (includes has_access)
     pub cache_hits: u32,
     pub cache_misses: u32,
 }
@@ -138,8 +138,9 @@ impl AStar {
         from_y: u32,
         to_x: u32,
         to_y: u32,
+        has_access: bool,
     ) -> Option<Vec<Node>> {
-        let cache_key = (from_x, from_y, to_x, to_y);
+        let cache_key = (from_x, from_y, to_x, to_y, has_access);
         if let Some(cached_path) = self.path_cache.get(&cache_key) {
             self.cache_hits += 1;
             return cached_path.as_ref().map(|path| {
@@ -167,7 +168,7 @@ impl AStar {
         let start_index = (from_y * self.width + from_x) as usize;
         let end_index = (to_y * self.width + to_x) as usize;
 
-        if self.is_blocked(start_index) || self.is_blocked(end_index) {
+        if self.is_blocked(start_index, has_access) || self.is_blocked(end_index, has_access) {
             self.path_cache.insert(cache_key, None);
             return None;
         }
@@ -229,6 +230,7 @@ impl AStar {
                 &mut came_from,
                 &mut g_scores,
                 &closed_set,
+                has_access,
             );
         }
 
@@ -256,9 +258,17 @@ impl AStar {
     }
 
     #[inline]
-    fn is_blocked(&self, index: usize) -> bool {
+    fn is_blocked(&self, index: usize, has_access: bool) -> bool {
         self.grid.get(index).map_or(true, |&collision_type| {
-            collision_type == 1 || collision_type == 6
+            // collision_type 1 and 6 are always blocked
+            // collision_type 3 (entrance/door) is only blocked if has_access is false
+            if collision_type == 1 || collision_type == 6 {
+                true
+            } else if collision_type == 3 {
+                !has_access
+            } else {
+                false
+            }
         })
     }
 
@@ -276,6 +286,7 @@ impl AStar {
         came_from: &mut HashMap<(u32, u32), (u32, u32)>,
         g_scores: &mut HashMap<(u32, u32), u32>,
         closed_set: &HashSet<(u32, u32)>,
+        has_access: bool,
     ) {
         const DIRECTIONS: [(i32, i32); 8] = [
             (-1, 0),
@@ -306,7 +317,7 @@ impl AStar {
 
             let index = (new_y * self.width + new_x) as usize;
 
-            if self.is_blocked(index) {
+            if self.is_blocked(index, has_access) {
                 continue;
             }
 
@@ -327,7 +338,7 @@ impl AStar {
                 let adj1_index = (adj1_y as u32 * self.width + adj1_x as u32) as usize;
                 let adj2_index = (adj2_y as u32 * self.width + adj2_x as u32) as usize;
 
-                if self.is_blocked(adj1_index) || self.is_blocked(adj2_index) {
+                if self.is_blocked(adj1_index, has_access) || self.is_blocked(adj2_index, has_access) {
                     continue;
                 }
             }
@@ -394,7 +405,7 @@ impl AStar {
             let index = (y * self.width + x) as usize;
             if index < self.grid.len() {
                 self.grid[index] = collision_type;
-                self.path_cache.retain(|&(from_x, from_y, to_x, to_y), _| {
+                self.path_cache.retain(|&(from_x, from_y, to_x, to_y, _has_access), _| {
                     !((from_x <= x + 1 && from_x + 1 >= x && from_y <= y + 1 && from_y + 1 >= y)
                         || (to_x <= x + 1 && to_x + 1 >= x && to_y <= y + 1 && to_y + 1 >= y))
                 });

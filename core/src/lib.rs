@@ -12,9 +12,10 @@ use gtitem_r::structs::ItemDatabase;
 use rusty_enet::Packet;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::str::FromStr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
-use std::thread;
+use std::thread::{self, sleep};
 use std::time::{Duration, Instant};
 
 mod astar;
@@ -58,6 +59,7 @@ pub struct Bot {
     pub auth: AuthenticationContext,
     pub movement: MovementController,
     pub duration: Mutex<Instant>,
+    pub timeout: AtomicU64,
     pub world: GameWorld,
     pub inventory: BotInventory,
     pub runtime: RuntimeContext,
@@ -102,6 +104,7 @@ impl Bot {
                 auth: AuthenticationContext::new(login_via, token_fetcher),
                 movement: MovementController::new(),
                 duration: Mutex::new(Instant::now()),
+                timeout: AtomicU64::new(0),
                 world: GameWorld::new(item_database),
                 inventory: BotInventory::new(),
                 runtime: RuntimeContext::new(),
@@ -349,6 +352,21 @@ impl Bot {
         *self.peer_status.lock().unwrap()
     }
 
+    pub fn sleep_with_timeout(&self, seconds: u64) {
+        self.timeout.store(seconds, Ordering::Relaxed);
+
+        for remaining in (1..=seconds).rev() {
+            self.timeout.store(remaining, Ordering::Relaxed);
+            thread::sleep(Duration::from_secs(1));
+        }
+
+        self.timeout.store(0, Ordering::Relaxed);
+    }
+
+    pub fn timeout(&self) -> u64 {
+        self.timeout.load(Ordering::Relaxed)
+    }
+
     fn spawn_polling(self: &Arc<Self>) {
         let bot_arc = Arc::clone(self);
         thread::spawn(move || {
@@ -468,55 +486,57 @@ impl Bot {
         );
     }
 
-    pub fn place(self: &Arc<Self>, offset_x: i32, offset_y: i32, item_id: u32, is_punch: bool) {
-        let bot = Arc::clone(self);
-        thread::spawn(move || {
-            let mut pkt = NetGamePacketData::default();
-            pkt._type = NetGamePacket::TileChangeRequest;
-            let position = bot.movement.position();
-            pkt.vector_x = position.0;
-            pkt.vector_y = position.1;
-            let base_x = (position.0 / 32.0).floor() as i32;
-            let base_y = (position.1 / 32.0).floor() as i32;
-            pkt.int_x = base_x + offset_x;
-            pkt.int_y = base_y + offset_y;
-            pkt.value = item_id;
+    pub fn place(&self, offset_x: i32, offset_y: i32, item_id: u32, is_punch: bool) {
+        if !is_punch && !self.inventory.has_item(item_id as u16, 1) {
+            return;
+        }
 
-            if pkt.int_x <= base_x + 4
-                && pkt.int_x >= base_x - 4
-                && pkt.int_y <= base_y + 4
-                && pkt.int_y >= base_y - 4
-            {
-                bot.send_packet(
-                    NetMessage::GamePacket,
-                    pkt.to_bytes().as_slice(),
-                    None,
-                    true,
-                );
-                pkt.flags = if is_punch {
-                    PacketFlag::PUNCH
-                } else {
-                    PacketFlag::PLACE
-                } | PacketFlag::STANDING;
-                if base_x > pkt.int_x {
-                    pkt.flags |= PacketFlag::FACING_LEFT;
-                }
-                pkt._type = NetGamePacket::State;
-                bot.send_packet(
-                    NetMessage::GamePacket,
-                    pkt.to_bytes().as_slice(),
-                    None,
-                    true,
-                );
+        let mut pkt = NetGamePacketData::default();
+        pkt._type = NetGamePacket::TileChangeRequest;
+        let position = self.movement.position();
+        pkt.vector_x = position.0;
+        pkt.vector_y = position.1;
+        let base_x = (position.0 / 32.0).floor() as i32;
+        let base_y = (position.1 / 32.0).floor() as i32;
+        pkt.int_x = base_x + offset_x;
+        pkt.int_y = base_y + offset_y;
+        pkt.value = item_id;
+
+        if pkt.int_x <= base_x + 4
+            && pkt.int_x >= base_x - 4
+            && pkt.int_y <= base_y + 4
+            && pkt.int_y >= base_y - 4
+        {
+            self.send_packet(
+                NetMessage::GamePacket,
+                pkt.to_bytes().as_slice(),
+                None,
+                true,
+            );
+            pkt.flags = if is_punch {
+                PacketFlag::PUNCH
+            } else {
+                PacketFlag::PLACE
+            } | PacketFlag::STANDING;
+            if base_x > pkt.int_x {
+                pkt.flags |= PacketFlag::FACING_LEFT;
             }
-        });
+            pkt._type = NetGamePacket::State;
+            self.send_packet(
+                NetMessage::GamePacket,
+                pkt.to_bytes().as_slice(),
+                None,
+                true,
+            );
+            thread::sleep(Duration::from_millis(250));
+        }
     }
 
-    pub fn punch(self: &Arc<Self>, offset_x: i32, offset_y: i32) {
+    pub fn punch(&self, offset_x: i32, offset_y: i32) {
         self.place(offset_x, offset_y, 18, true);
     }
 
-    pub fn wrench(self: &Arc<Self>, offset_x: i32, offset_y: i32) {
+    pub fn wrench(&self, offset_x: i32, offset_y: i32) {
         self.place(offset_x, offset_y, 32, false);
     }
 
@@ -577,26 +597,24 @@ impl Bot {
         );
     }
 
-    pub fn find_path(self: &Arc<Self>, x: u32, y: u32) {
-        let bot = Arc::clone(self);
-        thread::spawn(move || {
-            let position = bot.movement.position();
+    pub fn find_path(&self, x: u32, y: u32) {
+        let position = self.movement.position();
+        let has_access = self.has_access();
 
-            let paths = {
-                let mut astar = bot.movement.astar();
-                astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y)
-            };
+        let paths = {
+            let mut astar = self.movement.astar();
+            astar.find_path((position.0 as u32) / 32, (position.1 as u32) / 32, x, y, has_access)
+        };
 
-            let delay = bot.config.findpath_delay();
-            if let Some(paths) = &paths {
-                for node in paths {
-                    bot.movement
-                        .set_position(node.x as f32 * 32.0, node.y as f32 * 32.0);
-                    bot.walk(node.x as i32, node.y as i32, true);
-                    thread::sleep(Duration::from_millis(delay as u64));
-                }
+        let delay = self.config.findpath_delay();
+        if let Some(paths) = &paths {
+            for node in paths {
+                self.movement
+                    .set_position(node.x as f32 * 32.0, node.y as f32 * 32.0);
+                self.walk(node.x as i32, node.y as i32, true);
+                thread::sleep(Duration::from_millis(delay as u64));
             }
-        });
+        }
     }
 
     pub fn drop_item(&self, item_id: u32, amount: u32) {
@@ -725,8 +743,8 @@ impl Bot {
             None => return 0,
         };
 
-        let bot_tile_x = bot_position.0 / 32.0;
-        let bot_tile_y = bot_position.1 / 32.0;
+        let bot_tile_x = bot_position.0;
+        let bot_tile_y = bot_position.1;
 
         let inventory_snapshot = match self.inventory.try_get_snapshot() {
             Some(snapshot) => snapshot,
@@ -748,7 +766,7 @@ impl Bot {
                         let dy = bot_tile_y - item.y;
                         let distance_squared = dx * dx + dy * dy;
 
-                        if distance_squared <= 25.0 {
+                        if distance_squared <= 9216.0 { // 3 tile radius (32*3)^2 = 96^2
                             nearby_items.push((item.clone(), distance_squared));
                         }
                     }

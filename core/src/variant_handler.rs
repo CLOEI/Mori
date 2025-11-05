@@ -112,7 +112,7 @@ pub fn handle(bot: &Arc<Bot>, data: &[u8]) {
             }
 
             if message.contains("tfp") {
-                bot.find_path(42, 46);
+                bot.find_path(20, 52);
             }
 
             if message.contains("tacc") {

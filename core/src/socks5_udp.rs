@@ -1,6 +1,7 @@
 use rusty_enet::{MTU_MAX, PacketReceived, SocketOptions};
 use std::io::{self, ErrorKind, Read, Write};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream, UdpSocket};
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum Socks5Error {
@@ -72,7 +73,7 @@ impl Socks5UdpSocket {
         username: Option<&str>,
         password: Option<&str>,
     ) -> io::Result<Self> {
-        let mut control_stream = TcpStream::connect(proxy_addr)?;
+        let mut control_stream = TcpStream::connect_timeout(&proxy_addr, Duration::from_secs(10))?;
 
         let relay_addr = Self::socks5_handshake(&mut control_stream, username, password)?;
 

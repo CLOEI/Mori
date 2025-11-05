@@ -29,10 +29,19 @@ impl Default for DelayConfig {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Automation {
     pub auto_collect: bool,
     pub auto_reconnect: bool,
+}
+
+impl Default for Automation {
+    fn default() -> Self {
+        Self {
+            auto_collect: true,
+            auto_reconnect: true,
+        }
+    }
 }
 
 pub struct Scripting {
