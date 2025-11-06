@@ -19,4 +19,8 @@ futures-util = "0.3"
 
 askama = "0.14"
 askama_web = { version = "0.14", features = ["axum-0.8"] }
+egui = "0.33.0"
+eframe = "0.33.0"
+egui_extras = { version = "0.33.0", features = ["svg"] }
+egui_material_icons = "0.5.0"
 

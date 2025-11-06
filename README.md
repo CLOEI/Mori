@@ -1,4 +1,4 @@
-![Alt text](assets/hero.png "Mori")
+![Alt text](stuff/hero.png "Mori")
 
 <br/>
 <div align="center">
@@ -53,6 +53,10 @@ Any contribution would help alot.
 - [x] Auto Punch and Break
 - [x] Spam
 - [x] Socks5 support
+
+## Special thanks
+[Badewen](https://github.com/badewen) - Help alot with debugging and reversing.
+
 
 ## Note
 
