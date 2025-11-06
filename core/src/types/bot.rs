@@ -1,5 +1,5 @@
 use crate::Bot;
-use mlua::{Lua, UserData, UserDataMethods};
+use mlua::{Lua, UserData, UserDataMethods, UserDataFields};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
@@ -93,6 +93,105 @@ impl UserData for Position {
     }
 }
 
+// Lua-exposed World data snapshot
+#[derive(Clone)]
+pub struct WorldData {
+    pub name: String,
+    pub width: u32,
+    pub height: u32,
+    pub tiles: Vec<TileData>,
+    pub floating: Vec<DroppedItemData>,
+}
+
+#[derive(Clone)]
+pub struct TileData {
+    pub fg: u16,
+    pub bg: u16,
+}
+
+#[derive(Clone)]
+pub struct DroppedItemData {
+    pub id: u16,
+    pub x: f32,
+    pub y: f32,
+    pub count: u8,
+    pub uid: u32,
+}
+
+impl UserData for WorldData {
+    fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("name", |_, this| Ok(this.name.clone()));
+        fields.add_field_method_get("width", |_, this| Ok(this.width));
+        fields.add_field_method_get("height", |_, this| Ok(this.height));
+        fields.add_field_method_get("tiles", |lua, this| {
+            let table = lua.create_table()?;
+            for (i, tile) in this.tiles.iter().enumerate() {
+                table.set(i + 1, tile.clone())?;
+            }
+            Ok(table)
+        });
+        fields.add_field_method_get("floating", |lua, this| {
+            let table = lua.create_table()?;
+            for (i, item) in this.floating.iter().enumerate() {
+                table.set(i + 1, item.clone())?;
+            }
+            Ok(table)
+        });
+    }
+}
+
+impl UserData for TileData {
+    fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("fg", |_, this| Ok(this.fg));
+        fields.add_field_method_get("bg", |_, this| Ok(this.bg));
+    }
+}
+
+impl UserData for DroppedItemData {
+    fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("id", |_, this| Ok(this.id));
+        fields.add_field_method_get("x", |_, this| Ok(this.x));
+        fields.add_field_method_get("y", |_, this| Ok(this.y));
+        fields.add_field_method_get("count", |_, this| Ok(this.count));
+        fields.add_field_method_get("uid", |_, this| Ok(this.uid));
+    }
+}
+
+// Lua-exposed Inventory data snapshot
+#[derive(Clone)]
+pub struct InventoryData {
+    pub size: u32,
+    pub items: Vec<ItemData>,
+    pub gems: i32,
+}
+
+#[derive(Clone)]
+pub struct ItemData {
+    pub id: u16,
+    pub amount: u8,
+}
+
+impl UserData for InventoryData {
+    fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("size", |_, this| Ok(this.size));
+        fields.add_field_method_get("gems", |_, this| Ok(this.gems));
+        fields.add_field_method_get("items", |lua, this| {
+            let table = lua.create_table()?;
+            for (i, item) in this.items.iter().enumerate() {
+                table.set(i + 1, item.clone())?;
+            }
+            Ok(table)
+        });
+    }
+}
+
+impl UserData for ItemData {
+    fn add_fields<F: UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("id", |_, this| Ok(this.id));
+        fields.add_field_method_get("amount", |_, this| Ok(this.amount));
+    }
+}
+
 impl UserData for BotArc {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method(
@@ -177,6 +276,68 @@ impl UserData for BotArc {
         methods.add_method("collect", |_, this, ()| {
             let collected = this.0.collect();
             Ok(collected)
+        });
+        methods.add_method("world", |_, this, ()| {
+            // Lock the world and create a snapshot
+            let world_lock = match this.0.world.data.try_lock() {
+                Ok(w) => w,
+                Err(_) => return Err(mlua::Error::runtime("Failed to lock world data")),
+            };
+
+            // Create tile data snapshot
+            let tiles: Vec<TileData> = world_lock
+                .tiles
+                .iter()
+                .map(|tile| TileData {
+                    fg: tile.foreground_item_id,
+                    bg: tile.background_item_id,
+                })
+                .collect();
+
+            // Create dropped item data snapshot
+            let floating: Vec<DroppedItemData> = world_lock
+                .dropped
+                .items
+                .iter()
+                .map(|item| DroppedItemData {
+                    id: item.id,
+                    x: item.x,
+                    y: item.y,
+                    count: item.count,
+                    uid: item.uid,
+                })
+                .collect();
+
+            Ok(WorldData {
+                name: world_lock.name.clone(),
+                width: world_lock.width,
+                height: world_lock.height,
+                tiles,
+                floating,
+            })
+        });
+        methods.add_method("inventory", |_, this, ()| {
+            // Get inventory snapshot
+            let inv_snapshot = match this.0.inventory.try_get_snapshot() {
+                Some(snapshot) => snapshot,
+                None => return Err(mlua::Error::runtime("Failed to lock inventory data")),
+            };
+
+            // Create items vector from snapshot
+            let items: Vec<ItemData> = inv_snapshot
+                .item_amounts
+                .iter()
+                .map(|(id, amount)| ItemData {
+                    id: *id,
+                    amount: *amount,
+                })
+                .collect();
+
+            Ok(InventoryData {
+                size: inv_snapshot.size,
+                items,
+                gems: this.0.inventory.gems(),
+            })
         });
     }
 
