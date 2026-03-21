@@ -101,6 +101,9 @@ name = "bitflags"
 version = "2.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2261d10cca569e4643e526d8dc2e62e433cc8aba21ab764233731f8d369bf394"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bitstream-io"
@@ -159,9 +162,9 @@ checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 
 [[package]]
 name = "bytes"
-version = "1.10.1"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
+checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "cc"
@@ -190,6 +193,33 @@ name = "cfg-if"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
+
+[[package]]
+name = "ciborium"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42e69ffd6f0917f5c029256a24d0161db17cea3997d185db0d35926308770f0e"
+dependencies = [
+ "ciborium-io",
+ "ciborium-ll",
+ "serde",
+]
+
+[[package]]
+name = "ciborium-io"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05afea1e0a06c9be33d539b876f1ce3692f4afea2cb41f740e7743225ed1c757"
+
+[[package]]
+name = "ciborium-ll"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
+dependencies = [
+ "ciborium-io",
+ "half",
+]
 
 [[package]]
 name = "color_quant"
@@ -586,7 +616,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "flate2",
- "gtitem-r",
+ "gtitem-r 0.1.0",
  "gtworld-r",
  "hex",
  "image",
@@ -606,7 +636,14 @@ dependencies = [
 [[package]]
 name = "gtitem-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtitem-r.git#82f9a9641f92072ece124f33fd8c40fd65c8eab5"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
+name = "gtitem-r"
+version = "0.1.0"
+source = "git+https://github.com/cloei/gtitem-r#82f9a9641f92072ece124f33fd8c40fd65c8eab5"
 dependencies = [
  "byteorder",
 ]
@@ -614,12 +651,13 @@ dependencies = [
 [[package]]
 name = "gtworld-r"
 version = "0.1.0"
-source = "git+https://github.com/CLOEI/gtworld-r.git#8b347a7091a426a314d325118c422ac319026630"
 dependencies = [
  "anyhow",
  "bitflags",
  "byteorder",
- "gtitem-r",
+ "ciborium",
+ "gtitem-r 0.1.0 (git+https://github.com/cloei/gtitem-r)",
+ "serde",
 ]
 
 [[package]]
@@ -1899,11 +1937,12 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83bde6f1ec10e72d583d91623c939f623002284ef622b87de38cfd546cbf2031"
+checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
 dependencies = [
  "deranged",
+ "itoa",
  "num-conv",
  "powerfmt",
  "serde",
