@@ -1,0 +1,67 @@
+# Thanks for reference https://github.com/StileDevs/growtopia.js/blob/main/.github/workflows/CI.yml :D
+
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    tags-ignore: "*"
+    paths-ignore:
+      - "**/*.md"
+      - LICENSE
+      - "**/*.gitignore"
+      - ".idea"
+      - "frida"
+      - "stuff"
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    strategy:
+      fail-fast: true
+      matrix:
+        settings:
+          - host: windows-latest
+            target: "x86_64-pc-windows-msvc" 
+            install: |
+              xcopy assets dist\assets\ /E
+              xcopy target\release\Mori.exe dist\
+              xcopy items.dat dist\
+          
+          - host: ubuntu-latest
+            target: "x86_64-unknown-linux-gnu"
+            install: |
+              cp -r assets dist/
+              cp target/release/Mori items.dat dist/
+          
+    name: Release - ${{ matrix.settings.target }}
+    runs-on: ${{ matrix.settings.host }}
+    steps:
+    - name: Cache Build
+      uses: Swatinem/rust-cache@v2
+      with:
+        # The prefix cache key, this can be changed to start a new cache manually.
+        # default: "v0-rust"
+        prefix-key: "${{ matrix.settings.target }}-build"
+    
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - name: Build 
+      run: |
+        cargo build --release
+
+        mkdir dist
+        
+        ${{ matrix.settings.install }}
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: '${{ matrix.settings.target }}'
+        path: dist
