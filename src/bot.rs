@@ -178,6 +178,11 @@ pub struct Bot {
     /// Set when an `action|log` with "Too many people logging in" is received,
     /// so the subsequent `action|logon_fail` knows to apply the 5 s cooldown.
     pending_too_many_logins: bool,
+    /// Set when an `action|log` with "UPDATE REQUIRED" is received,
+    /// so the subsequent `action|logon_fail` stops the bot entirely.
+    pending_update_required: bool,
+    /// Set to true to make the `run` loop exit on the next iteration.
+    stop_requested: bool,
     /// This bot's ID in the BotManager (used to tag WS events).
     pub bot_id: u32,
     /// Broadcast sender for real-time WebSocket events (None when running standalone).
@@ -302,6 +307,8 @@ impl Bot {
             pending_relogon:         false,
             pending_server_overload: false,
             pending_too_many_logins: false,
+            pending_update_required: false,
+            stop_requested:          false,
             bot_id,
             ws_tx,
             last_ping:       0,
@@ -425,6 +432,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 println!("[Bot] Stop flag set, exiting.");
                 break;
             }
+            if self.stop_requested {
+                println!("[Bot] Stop requested internally, exiting.");
+                break;
+            }
             // Check if a delayed reconnect (e.g. 2FA cooldown) is ready.
             if let Some(at) = self.reconnect_after {
                 if std::time::Instant::now() >= at {
@@ -509,6 +520,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                 self.redirect = None;
                                 self.pending_relogon = true;
                             }
+                            if s.contains("action|log") && s.contains("UPDATE REQUIRED") {
+                                self.pending_update_required = true;
+                            }
                             if s.contains("action|logon_fail") {
                                 if self.pending_2fa {
                                     self.pending_2fa = false;
@@ -531,6 +545,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                 } else if self.pending_relogon {
                                     self.pending_relogon = false;
                                     println!("[Bot] Logon failed — server requested re-logon. Reconnecting.");
+                                } else if self.pending_update_required {
+                                    self.pending_update_required = false;
+                                    println!("[Bot] Logon failed — client update required. Stopping bot.");
+                                    self.state.write().unwrap().status = BotStatus::UpdateRequired;
+                                    self.emit(WsEvent::BotStatus { bot_id: self.bot_id, status: "update_required".into() });
+                                    self.stop_requested = true;
                                 } else {
                                     println!("[Bot] Logon failed — disconnecting to re-fetch token");
                                 }

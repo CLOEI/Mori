@@ -15,6 +15,8 @@ pub enum BotStatus {
     ServerOverloaded,
     /// Too many logins at once. Retrying after 5 s.
     TooManyLogins,
+    /// Client is outdated — server requires an update. Bot stopped.
+    UpdateRequired,
 }
 
 impl fmt::Display for BotStatus {
@@ -26,6 +28,7 @@ impl fmt::Display for BotStatus {
             BotStatus::TwoFactorAuth    => write!(f, "two_factor_auth"),
             BotStatus::ServerOverloaded => write!(f, "server_overloaded"),
             BotStatus::TooManyLogins    => write!(f, "too_many_logins"),
+            BotStatus::UpdateRequired   => write!(f, "update_required"),
         }
     }
 }
