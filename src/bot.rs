@@ -913,6 +913,18 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     cb(self);
                 }
             }
+            "OnRequestWorldSelectMenu" => {
+                self.world = None;
+                {
+                    let mut s = self.state.write().unwrap();
+                    s.world_name = "EXIT".to_string();
+                    s.status = BotStatus::Connected;
+                }
+                self.emit(WsEvent::BotStatus  { bot_id: self.bot_id, status: "connected".into() });
+                self.emit(WsEvent::BotWorld   { bot_id: self.bot_id, world_name: "EXIT".to_string() });
+                self.emit(WsEvent::WorldLoaded { bot_id: self.bot_id, name: "EXIT".to_string(), width: 0, height: 0, tiles: vec![] });
+                println!("[Bot] OnRequestWorldSelectMenu → cleared world");
+            }
             _ => {}
         }
     }
