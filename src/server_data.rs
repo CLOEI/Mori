@@ -1,3 +1,5 @@
+use ureq::tls::TlsConfig;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 pub struct LoginInfo {
@@ -92,11 +94,27 @@ pub fn get_server_data_proxied(
     println!("[server_data] proxy_url={:?}", proxy_url);
     let agent = if let Some(p) = proxy_url {
         let proxy = ureq::Proxy::new(p)?;
-        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).build())
+        ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .proxy(Some(proxy))
+                .tls_config(
+                    TlsConfig::builder()
+                        .disable_verification(true)
+                        .build()
+                )
+                .build()
+        )
     } else {
-        ureq::Agent::new_with_defaults()
+        ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .tls_config(
+                    TlsConfig::builder()
+                        .disable_verification(true)
+                        .build()
+                )
+                .build()
+        )
     };
-
     let body = agent
         .post(url)
         .header("User-Agent", "UbiServices_SDK_2022.Release.9_PC64_ansi_static")
