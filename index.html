@@ -721,6 +721,10 @@
         .join('');
     }
 
+    // ── Item names ────────────────────────────────────────────────────────────
+    let itemNames = {}; // id → name
+    fetch('/items/names').then(r => r.json()).then(d => { itemNames = d; }).catch(() => {});
+
     // ── Minimap ───────────────────────────────────────────────────────────────
     let minimapState = null;
     let minimapTarget = null;
@@ -728,6 +732,58 @@
     const PPT_MIN = 2, PPT_MAX = 20;
     let followBot = true;
     let unfollowTimer = null;
+
+    const TILE_FLAGS = [
+      [0x0001, 'extra_data'], [0x0002, 'has_parent'], [0x0004, 'spliced'],
+      [0x0008, 'spawns_seeds'], [0x0010, 'seedling'], [0x0020, 'flipped_x'],
+      [0x0040, 'on'], [0x0080, 'public'], [0x0100, 'bg_on'],
+      [0x0200, 'alt_mode'], [0x0400, 'wet'], [0x0800, 'glued'],
+      [0x1000, 'on_fire'], [0x2000, 'painted_red'], [0x4000, 'painted_green'], [0x8000, 'painted_blue'],
+    ];
+
+    function buildTileTooltip(x, y, tile) {
+      if (!tile) return `(${x}, ${y})`;
+      const fgName = itemNames[tile.fg_item_id] ?? `ID:${tile.fg_item_id}`;
+      const bgName = itemNames[tile.bg_item_id] ?? `ID:${tile.bg_item_id}`;
+      const lines = [`<b>(${x}, ${y})</b>`];
+      if (tile.fg_item_id !== 0) lines.push(`FG: ${fgName}`);
+      if (tile.bg_item_id !== 0) lines.push(`BG: ${bgName}`);
+      // Active flags (skip HAS_EXTRA_DATA as it's implied by tile_type)
+      const activeFlags = TILE_FLAGS
+        .filter(([bit, _]) => bit !== 0x0001 && (tile.flags & bit))
+        .map(([_, name]) => name);
+      if (activeFlags.length) lines.push(`Flags: ${activeFlags.join(', ')}`);
+      // Tile type extra data
+      if (tile.tile_type && tile.tile_type.type !== 'Basic') {
+        const tt = tile.tile_type;
+        switch (tt.type) {
+          case 'Sign':     lines.push(`Sign: "${tt.text}"`); break;
+          case 'Door':     lines.push(`Door: "${tt.text}"${tt.owner_uid ? ` owner:${tt.owner_uid}` : ''}`); break;
+          case 'Lock':     lines.push(`Lock owner:${tt.owner_uid} access:${tt.access_count}${tt.minimum_level ? ` minlvl:${tt.minimum_level}` : ''}`); break;
+          case 'Seed':     { const mins = Math.floor(tt.time_passed / 60); lines.push(`Seed: ${mins}m grown`); break; }
+          case 'VendingMachine': lines.push(`Vend item:${itemNames[tt.item_id] ?? tt.item_id} price:${tt.price}`); break;
+          case 'DisplayBlock':   lines.push(`Displays: ${itemNames[tt.item_id] ?? tt.item_id}`); break;
+          case 'Mannequin': lines.push(`Mannequin: "${tt.text}"`); break;
+          case 'HearthMonitor': lines.push(`Hearth: ${tt.player_name}`); break;
+          case 'SilkWorm': lines.push(`Silkworm: ${tt.name} age:${tt.age}`); break;
+          case 'CountryFlag': lines.push(`Flag: ${tt.country}`); break;
+          case 'AudioRack': lines.push(`Audio: ${tt.note} vol:${tt.volume}`); break;
+          case 'TesseractManipulator': lines.push(`Tesseract: item:${itemNames[tt.item_id] ?? tt.item_id} gems:${tt.gems} ${tt.enabled ? 'enabled' : 'disabled'}`); break;
+          case 'Dice': lines.push(`Dice: ${tt.symbol}`); break;
+          case 'Forge': lines.push(`Forge: ${tt.temperature}°`); break;
+          case 'CookingOven': lines.push(`Oven: ${tt.temperature_level}°`); break;
+          case 'StorageBlock': lines.push(`Storage: ${tt.items?.length ?? 0} types`); break;
+          case 'WeatherMachine': lines.push(`Weather settings:${tt.settings}`); break;
+          case 'Mailbox':
+          case 'Bulletin':
+          case 'DonationBox':
+          case 'BigLock':
+            if (tt.s1) lines.push(`"${tt.s1}"`); break;
+          default: lines.push(`Type: ${tt.type}`); break;
+        }
+      }
+      return lines.join('<br>');
+    }
 
     function tileColor(fg, bg) {
       if (fg === 0) return bg === 0 ? '#0f172a' : '#1e293b';
@@ -884,7 +940,8 @@
         if (!minimapState || drag?.moved) return;
         const t = canvasToTile(canvas, e);
         if (!t) { tooltip.style.display = 'none'; return; }
-        tooltip.textContent = `(${t.x}, ${t.y})`;
+        const tile = minimapState.tiles?.[t.y * minimapState.world_width + t.x];
+        tooltip.innerHTML = buildTileTooltip(t.x, t.y, tile);
         tooltip.style.display = 'block';
         tooltip.style.left = (e.clientX + 14) + 'px';
         tooltip.style.top  = (e.clientY - 10) + 'px';
@@ -896,7 +953,7 @@
         if (!t) return;
         minimapTarget = t;
         renderMinimap(minimapState);
-        tooltip.textContent = `Walking to (${t.x}, ${t.y})…`;
+        tooltip.innerHTML = `Walking to (${t.x}, ${t.y})…`;
         await fetch(`/bots/${selectedBotId}/cmd`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1108,7 +1165,7 @@
             minimapState.world_name   = data.name;
             minimapState.world_width  = data.width;
             minimapState.world_height = data.height;
-            minimapState.tiles        = data.tiles.map(([fg, bg]) => ({ fg_item_id: fg, bg_item_id: bg }));
+            minimapState.tiles        = data.tiles.map(t => ({ fg_item_id: t.fg, bg_item_id: t.bg, flags: t.flags, tile_type: t.tile_type }));
             minimapState.players      = [];
             document.getElementById('detail-world').textContent = data.name;
             renderMinimap(minimapState);

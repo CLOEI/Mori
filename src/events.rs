@@ -1,4 +1,13 @@
 use serde::Serialize;
+use crate::world::TileType;
+
+#[derive(Serialize, Clone, Debug)]
+pub struct WsTile {
+    pub fg:        u16,
+    pub bg:        u16,
+    pub flags:     u16,
+    pub tile_type: TileType,
+}
 
 #[derive(Serialize, Clone, Debug)]
 pub struct WsObject {
@@ -41,7 +50,7 @@ pub enum WsEvent {
     /// A player left the bot's world.
     PlayerLeave { bot_id: u32, net_id: u32 },
     /// Full world data (sent once on world load).
-    WorldLoaded { bot_id: u32, name: String, width: u32, height: u32, tiles: Vec<[u16; 2]> },
+    WorldLoaded { bot_id: u32, name: String, width: u32, height: u32, tiles: Vec<WsTile> },
     /// A single tile was updated.
     TileUpdate { bot_id: u32, x: u32, y: u32, fg: u16, bg: u16 },
     /// The full set of dropped world objects changed.

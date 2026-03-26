@@ -16,7 +16,7 @@ use crate::items::ItemsDat;
 use crate::player::{LocalPlayer, Player, parse_pipe_map};
 use crate::world::{World, TileType, WorldObject};
 use crate::bot_state::{BotState, BotStatus, BotCommand, BotDelays, CmdReceiver, InvSlot, PlayerInfo, TileInfo};
-use crate::events::{WsEvent, WsInvItem, WsObject, WsTx};
+use crate::events::{WsEvent, WsInvItem, WsObject, WsTile, WsTx};
 
 #[derive(Clone, Debug)]
 pub struct Socks5Config {
@@ -609,8 +609,13 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                             s.players      = Vec::new();
                                             s.status       = BotStatus::InWorld;
                                             // Emit world-loaded event with full tile data.
-                                            let ws_tiles: Vec<[u16; 2]> = world.tile_map.tiles.iter()
-                                                .map(|t| [t.fg_item_id, t.bg_item_id])
+                                            let ws_tiles: Vec<WsTile> = world.tile_map.tiles.iter()
+                                                .map(|t| WsTile {
+                                                    fg:        t.fg_item_id,
+                                                    bg:        t.bg_item_id,
+                                                    flags:     t.flags_raw,
+                                                    tile_type: t.tile_type.clone(),
+                                                })
                                                 .collect();
                                             drop(s);
                                             self.emit(WsEvent::BotStatus  { bot_id: self.bot_id, status: "in_world".into() });

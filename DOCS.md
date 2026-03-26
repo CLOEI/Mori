@@ -193,6 +193,23 @@ Configure action delays in milliseconds.
 
 ---
 
+### GET `/items/names`
+
+Returns a flat map of all item IDs to their names. Useful for quick lookups without pagination.
+
+**Response**
+```json
+{
+  "0": "x",
+  "2": "y",
+  "8": "z"
+}
+```
+
+Keys are item IDs as strings (standard JSON object key behaviour). No query parameters.
+
+---
+
 ### GET `/items`
 
 Paginated search through the item database.
@@ -404,14 +421,70 @@ Full world data sent once when the bot enters a world.
     "width": 100,
     "height": 60,
     "tiles": [
-      [2, 8],
-      [0, 0]
+      {
+        "fg": 2,
+        "bg": 8,
+        "flags": 64,
+        "tile_type": { "type": "Basic" }
+      }
     ]
   }
 }
 ```
 
-`tiles` is a flat array of `[fg_item_id, bg_item_id]` pairs, row-major.
+`tiles` is a flat array of tile objects in row-major order. Each tile has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fg` | u16 | Foreground item ID |
+| `bg` | u16 | Background item ID |
+| `flags` | u16 | Raw `TileFlags` bitmask (see below) |
+| `tile_type` | object | Tagged extra data (see below) |
+
+**TileFlags bitmask**
+
+| Bit | Value | Name |
+|-----|-------|------|
+| 0 | `0x0001` | `HAS_EXTRA_DATA` |
+| 1 | `0x0002` | `HAS_PARENT` |
+| 2 | `0x0004` | `WAS_SPLICED` |
+| 3 | `0x0008` | `WILL_SPAWN_SEEDS_TOO` |
+| 4 | `0x0010` | `IS_SEEDLING` |
+| 5 | `0x0020` | `FLIPPED_X` |
+| 6 | `0x0040` | `IS_ON` |
+| 7 | `0x0080` | `IS_OPEN_TO_PUBLIC` |
+| 8 | `0x0100` | `BG_IS_ON` |
+| 9 | `0x0200` | `FG_ALT_MODE` |
+| 10 | `0x0400` | `IS_WET` |
+| 11 | `0x0800` | `GLUED` |
+| 12 | `0x1000` | `ON_FIRE` |
+| 13 | `0x2000` | `PAINTED_RED` |
+| 14 | `0x4000` | `PAINTED_GREEN` |
+| 15 | `0x8000` | `PAINTED_BLUE` |
+
+**`tile_type` variants** (discriminated by `"type"` field)
+
+| Type | Extra fields |
+|------|-------------|
+| `Basic` | — |
+| `Sign` | `text: string`, `flags: u8` |
+| `Door` | `text: string`, `owner_uid: u32` |
+| `Lock` | `settings: u8`, `owner_uid: u32`, `access_count: u32`, `access_uids: u32[]`, `minimum_level: u8` |
+| `Seed` | `time_passed: u32`, `item_on_tree: u8` |
+| `VendingMachine` | `item_id: u32`, `price: i32` |
+| `DisplayBlock` | `item_id: u32` |
+| `Mannequin` | `text: string`, `clothing_1..10: u16/u32` |
+| `Dice` | `symbol: u8` |
+| `Forge` | `temperature: u32` |
+| `CookingOven` | `temperature_level: u32`, `ingredients: [u32,u32][]` |
+| `StorageBlock` | `items: [u32,u32][]` |
+| `WeatherMachine` | `settings: u32` |
+| `HearthMonitor` | `data: u32`, `player_name: string` |
+| `SilkWorm` | `name: string`, `age: u32`, `color: u32`, … |
+| `CountryFlag` | `country: string` |
+| `AudioRack` | `note: string`, `volume: u32` |
+| `TesseractManipulator` | `gems: u32`, `next_update_ms: u32`, `item_id: u32`, `enabled: u32` |
+| *(others)* | See source `TileType` enum in `src/world.rs` |
 
 #### `TileUpdate`
 A single tile was modified.

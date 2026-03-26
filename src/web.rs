@@ -155,6 +155,14 @@ async fn list_items(
     Json(ItemsResponse { items, total, page, page_size: ITEMS_PAGE_SIZE })
 }
 
+async fn item_names(State(s): State<AppState>) -> Json<std::collections::HashMap<u32, String>> {
+    let mgr = s.manager.lock().unwrap();
+    let map = mgr.items_dat.items.iter()
+        .map(|i| (i.id, i.name.clone()))
+        .collect();
+    Json(map)
+}
+
 async fn bot_cmd(
     State(s): State<AppState>,
     Path(id): Path<u32>,
@@ -218,6 +226,7 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/bots/{id}/state", get(bot_state))
         .route("/bots/{id}/cmd", post(bot_cmd))
         .route("/items", get(list_items))
+        .route("/items/names", get(item_names))
         .route("/ws", get(ws_handler))
         .with_state(state);
 

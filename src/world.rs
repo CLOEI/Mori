@@ -194,7 +194,8 @@ impl Tile {
 
 // ── TileType ──────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "type")]
 pub enum TileType {
     Basic,
     Sign {
@@ -500,9 +501,9 @@ pub enum TileType {
     },
     TesseractManipulator {
         gems:      u32,
-        unknown_2: u32,
+        next_update_ms: u32,
         item_id:   u32,
-        unknown_4: u32,
+        enabled: u32,
     },
     Spotlight,
     BigLock {
@@ -993,10 +994,10 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         69 => {
             // TesseractManipulator (item 6952)
             let gems      = cur.u32()?;
-            let unknown_2 = cur.u32()?;
+            let next_update_ms = cur.u32()?;
             let item_id   = cur.u32()?;
-            let unknown_4 = cur.u32()?;
-            Ok(TileType::TesseractManipulator { gems, unknown_2, item_id, unknown_4 })
+            let enabled = cur.u32()?;
+            Ok(TileType::TesseractManipulator { gems, next_update_ms, item_id, enabled })
         }
         72 => {
             // StormyCloud
