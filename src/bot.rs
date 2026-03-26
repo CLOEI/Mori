@@ -1147,13 +1147,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
     fn on_item_change_object(&mut self, pkt: &GameUpdatePacket) {
         if self.world.is_none() { return; }
 
-        println!("Packet : {:?}", pkt);
-
         match pkt.net_id {
             u32::MAX => {
                 // New item dropped into the world
                 let world = self.world.as_mut().unwrap();
-                let next_uid = world.objects.last().map(|o| o.uid + 1).unwrap_or(1);
+                let next_uid = world.next_object_uid;
+                world.next_object_uid += 1;
                 let obj = WorldObject {
                     item_id: pkt.value as u16,
                     x: pkt.vector_x.ceil(),
@@ -1191,7 +1190,6 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 self.emit(WsEvent::ObjectsUpdate { bot_id: self.bot_id, objects: ws_objs });
             }
             net_id if net_id > 0 => {
-                println!("Hello");
                 // Item collected — remove from world by uid; release borrow before updating inventory
                 let collected = {
                     let world = self.world.as_mut().unwrap();
@@ -1199,7 +1197,6 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         .map(|idx| world.objects.remove(idx))
                 };
                 if let Some(item) = collected {
-                    println!("Hello2");
                     let ws_objs: Vec<WsObject> = self.world.as_ref().unwrap().objects.iter()
                         .map(|o| WsObject { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
                         .collect();
