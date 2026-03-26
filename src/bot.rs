@@ -949,6 +949,27 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     let mut s = self.state.write().unwrap();
                     s.world_name = "EXIT".to_string();
                     s.status = BotStatus::Connected;
+                    if self.inventory.remove_temp_items() {
+                        // something is removed
+                        let slots: Vec<InvSlot> = self.inventory.items.values()
+                            .map(|i| InvSlot {
+                                item_id:     i.id,
+                                amount:      i.amount,
+                                is_active:   i.flag & 1 != 0,
+                                action_type: self.items_dat.find_by_id(i.id as u32).map(|info| info.action_type).unwrap_or(0),
+                            })
+                            .collect();
+                        self.state.write().unwrap().inventory = slots;
+                        let ws_items: Vec<WsInvItem> = self.inventory.items.values()
+                            .map(|i| WsInvItem {
+                                item_id:     i.id,
+                                amount:      i.amount,
+                                is_active:   i.flag & 1 != 0,
+                                action_type: self.items_dat.find_by_id(i.id as u32).map(|info| info.action_type).unwrap_or(0),
+                            })
+                            .collect();
+                        self.emit(WsEvent::InventoryUpdate { bot_id: self.bot_id, gems: self.inventory.gems, items: ws_items });
+                    }
                 }
                 self.emit(WsEvent::BotStatus  { bot_id: self.bot_id, status: "connected".into() });
                 self.emit(WsEvent::BotWorld   { bot_id: self.bot_id, world_name: "EXIT".to_string() });
@@ -1121,9 +1142,16 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
     fn on_modify_item_inventory(&mut self, pkt: &GameUpdatePacket) {
         let item_id = pkt.value as u16;
-        let amount  = pkt.jump_count;
-        self.inventory.remove_item(item_id, amount);
-        println!("[Bot] ModifyItemInventory item={item_id} -{amount}");
+        if pkt.jump_count != 0 {
+            let amount  = pkt.jump_count;
+            self.inventory.sub_item(item_id, amount);
+            println!("[Bot] ModifyItemInventory item={item_id} -{amount}");
+        } else { // animation_type != 0
+            let amount  = pkt.jump_count;
+            self.inventory.add_item(item_id, amount);
+            println!("[Bot] ModifyItemInventory item={item_id} +{amount}");
+
+        }
         let slots: Vec<InvSlot> = self.inventory.items.values()
             .map(|i| InvSlot {
                 item_id:     i.id,
