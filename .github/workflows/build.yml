@@ -11,7 +11,6 @@ on:
       - "**/*.md"
       - LICENSE
       - "**/*.gitignore"
-      - ".idea"
       - "frida"
       - "stuff"
   pull_request:
@@ -30,15 +29,14 @@ jobs:
           - host: windows-latest
             target: "x86_64-pc-windows-msvc" 
             install: |
-              xcopy assets dist\assets\ /E
+              xcopy index.html dist\
               xcopy target\release\Mori.exe dist\
               xcopy items.dat dist\
           
           - host: ubuntu-latest
             target: "x86_64-unknown-linux-gnu"
             install: |
-              cp -r assets dist/
-              cp target/release/Mori items.dat dist/
+              cp index.html target/release/Mori items.dat dist/
           
     name: Release - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
