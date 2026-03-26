@@ -633,6 +633,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                 GamePacketType::SendTileTreeState => self.on_send_tile_tree_state(&pkt),
                                 GamePacketType::ModifyItemInventory => self.on_modify_item_inventory(&pkt),
                                 GamePacketType::ItemChangeObject => self.on_item_change_object(&pkt),
+                                GamePacketType::SendLock => self.on_send_lock(&pkt),
                                 _ => println!("[Bot] {pkt}"),
                             }
                         }
@@ -1190,6 +1191,37 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             }
             _ => {}
         }
+    }
+
+    fn on_send_lock(&mut self, pkt: &GameUpdatePacket) {
+        let x   = pkt.int_x as u32;
+        let y   = pkt.int_y as u32;
+        let fg  = pkt.value as u16;
+
+        let world = match self.world.as_mut() {
+            Some(w) => w,
+            None => return,
+        };
+        let width = world.tile_map.width;
+
+        let bg = match world.get_tile_mut(x, y) {
+            Some(t) => {
+                t.fg_item_id = fg;
+                t.bg_item_id
+            }
+            None => return,
+        };
+
+        {
+            let mut s = self.state.write().unwrap();
+            let idx = (y * width + x) as usize;
+            if let Some(ti) = s.tiles.get_mut(idx) {
+                ti.fg_item_id = fg;
+            }
+        }
+
+        self.emit(WsEvent::TileUpdate { bot_id: self.bot_id, x, y, fg, bg });
+        println!("[Bot] SendLock tile=({x},{y}) item={fg}");
     }
 
     pub fn walk(&mut self, tile_x: i32, tile_y: i32) {
