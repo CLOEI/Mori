@@ -1529,8 +1529,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             BotCommand::Say { text } => { self.say(&text); }
             BotCommand::Warp { name, id } => { self.warp(&name, &id); }
             BotCommand::Disconnect => { self.disconnect(); }
-            BotCommand::Place { x, y, item } => { self.place_at(x, y, item); }
-            BotCommand::Hit { x, y } => { self.hit_at(x, y); }
+            BotCommand::Place { x, y, item } => { self.place(x, y, item); }
+            BotCommand::Hit { x, y } => { self.hit(x, y); }
             BotCommand::Wrench { x, y } => { self.wrench_at(x, y); }
             BotCommand::Wear { item_id } => { self.wear(item_id); }
             BotCommand::Unwear { item_id } => { self.unwear(item_id); }
@@ -1593,18 +1593,6 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             ..Default::default()
         };
         self.send_game_packet(&pkt, true);
-    }
-
-    pub fn place_at(&mut self, tile_x: i32, tile_y: i32, item_id: u32) {
-        let base_x = (self.pos_x / 32.0).floor() as i32;
-        let base_y = (self.pos_y / 32.0).floor() as i32;
-        self.place(tile_x - base_x, tile_y - base_y, item_id, false);
-    }
-
-    pub fn hit_at(&mut self, tile_x: i32, tile_y: i32) {
-        let base_x = (self.pos_x / 32.0).floor() as i32;
-        let base_y = (self.pos_y / 32.0).floor() as i32;
-        self.punch(tile_x - base_x, tile_y - base_y);
     }
 
     pub fn wrench_at(&mut self, tile_x: i32, tile_y: i32) {
