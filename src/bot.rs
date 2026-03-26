@@ -967,7 +967,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         let result = {
             let world = self.world.as_mut().unwrap();
             if let Some(tile) = world.get_tile_mut(x, y) {
-                if item_id == 0 {
+                if item_id == 18 {
                     if tile.fg_item_id != 0 {
                         tile.fg_item_id = 0;
                         tile.tile_type = TileType::Basic;
@@ -1039,10 +1039,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             // Each entry: i32 x (4), i32 y (4), u16 fg (2), u16 bg (2) = 12 bytes minimum
             if offset + 12 > data.len() { break; }
 
-            let x = i32::from_le_bytes([data[offset], data[offset+1], data[offset+2], data[offset+3]]) as u32;
-            let y = i32::from_le_bytes([data[offset+4], data[offset+5], data[offset+6], data[offset+7]]) as u32;
+            let x = u32::from_le_bytes([data[offset], data[offset+1], data[offset+2], data[offset+3]]);
+            let y = u32::from_le_bytes([data[offset+4], data[offset+5], data[offset+6], data[offset+7]]);
             let tile_data = &data[offset + 8..];
-            let idx = (y * width + x) as usize;
+            let idx = (y as u64 * width as u64 + x as u64) as usize;
 
             let result = self.world.as_mut().unwrap()
                 .update_tile_from_bytes(x, y, tile_data);
