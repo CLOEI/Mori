@@ -15,7 +15,7 @@ use crate::inventory::Inventory;
 use crate::items::ItemsDat;
 use crate::player::{LocalPlayer, Player, parse_pipe_map};
 use crate::world::{World, TileType, WorldObject};
-use crate::bot_state::{BotState, BotStatus, BotCommand, BotDelays, CmdReceiver, InvSlot, PlayerInfo, TileInfo};
+use crate::bot_state::{BotState, BotStatus, BotCommand, BotDelays, CmdReceiver, InvSlot, PlayerInfo, TileInfo, WorldObjectInfo};
 use crate::events::{WsEvent, WsInvItem, WsObject, WsTile, WsTx};
 
 #[derive(Clone, Debug)]
@@ -625,7 +625,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                             s.world_name   = world.tile_map.world_name.clone();
                                             s.world_width  = world.tile_map.width;
                                             s.world_height = world.tile_map.height;
+                                            let objects: Vec<WorldObjectInfo> = world.objects.iter()
+                                                .map(|o| WorldObjectInfo { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
+                                                .collect();
                                             s.tiles        = tiles;
+                                            s.objects      = objects;
                                             s.players      = Vec::new();
                                             s.status       = BotStatus::InWorld;
                                             // Emit world-loaded event with full tile data.
@@ -965,9 +969,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 s.pos_y = pkt.vector_y / 32.0;
             }
             self.emit(WsEvent::BotMove { bot_id: self.bot_id, x: pkt.vector_x / 32.0, y: pkt.vector_y / 32.0 });
-        } else if let Some(player) = self.players.get_mut(&pkt.net_id) {
+        } else if let Some(player) = self.players.get_mut(&(pkt.net_id as u32)) {
             player.position = (pkt.vector_x, pkt.vector_y);
-            let net_id = pkt.net_id;
+            let net_id = pkt.net_id as u32;
             {
                 let mut s = self.state.write().unwrap();
                 if let Some(pi) = s.players.iter_mut().find(|p| p.net_id == net_id) {
@@ -1147,7 +1151,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             u32::MAX => {
                 // New item dropped into the world
                 let world = self.world.as_mut().unwrap();
-                let next_uid = world.objects.last().map(|o| o.uid + 1).unwrap_or(1);
+                let next_uid = world.next_object_uid;
+                world.next_object_uid += 1;
                 let obj = WorldObject {
                     item_id: pkt.value as u16,
                     x: pkt.vector_x.ceil(),
@@ -1161,9 +1166,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 let ws_objs: Vec<WsObject> = world.objects.iter()
                     .map(|o| WsObject { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
                     .collect();
+                self.state.write().unwrap().objects = world.objects.iter()
+                    .map(|o| WorldObjectInfo { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
+                    .collect();
                 self.emit(WsEvent::ObjectsUpdate { bot_id: self.bot_id, objects: ws_objs });
             }
-            net_id if net_id == u32::MAX - 3 => {
+            net_id if net_id == u32::MAX - 2 => {
                 // Update count for an existing dropped item
                 let world = self.world.as_mut().unwrap();
                 if let Some(obj) = world.objects.iter_mut().find(|o| {
@@ -1171,10 +1179,13 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         && o.x == pkt.vector_x.ceil()
                         && o.y == pkt.vector_y.ceil()
                 }) {
-                    obj.count = pkt.jump_count;
+                    obj.count += pkt.float_variable as u8;
                 }
                 let ws_objs: Vec<WsObject> = world.objects.iter()
                     .map(|o| WsObject { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
+                    .collect();
+                self.state.write().unwrap().objects = world.objects.iter()
+                    .map(|o| WorldObjectInfo { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
                     .collect();
                 self.emit(WsEvent::ObjectsUpdate { bot_id: self.bot_id, objects: ws_objs });
             }
@@ -1188,6 +1199,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 if let Some(item) = collected {
                     let ws_objs: Vec<WsObject> = self.world.as_ref().unwrap().objects.iter()
                         .map(|o| WsObject { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
+                        .collect();
+                    self.state.write().unwrap().objects = self.world.as_ref().unwrap().objects.iter()
+                        .map(|o| WorldObjectInfo { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
                         .collect();
                     self.emit(WsEvent::ObjectsUpdate { bot_id: self.bot_id, objects: ws_objs });
                     if pkt.net_id == self.local.net_id {
@@ -1529,8 +1543,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             BotCommand::Say { text } => { self.say(&text); }
             BotCommand::Warp { name, id } => { self.warp(&name, &id); }
             BotCommand::Disconnect => { self.disconnect(); }
-            BotCommand::Place { x, y, item } => { self.place_at(x, y, item); }
-            BotCommand::Hit { x, y } => { self.hit_at(x, y); }
+            BotCommand::Place { x, y, item } => { self.place(x, y, item, false); }
+            BotCommand::Hit { x, y } => { self.punch(x, y); }
             BotCommand::Wrench { x, y } => { self.wrench_at(x, y); }
             BotCommand::Wear { item_id } => { self.wear(item_id); }
             BotCommand::Unwear { item_id } => { self.unwear(item_id); }
@@ -1593,18 +1607,6 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             ..Default::default()
         };
         self.send_game_packet(&pkt, true);
-    }
-
-    pub fn place_at(&mut self, tile_x: i32, tile_y: i32, item_id: u32) {
-        let base_x = (self.pos_x / 32.0).floor() as i32;
-        let base_y = (self.pos_y / 32.0).floor() as i32;
-        self.place(tile_x - base_x, tile_y - base_y, item_id, false);
-    }
-
-    pub fn hit_at(&mut self, tile_x: i32, tile_y: i32) {
-        let base_x = (self.pos_x / 32.0).floor() as i32;
-        let base_y = (self.pos_y / 32.0).floor() as i32;
-        self.punch(tile_x - base_x, tile_y - base_y);
     }
 
     pub fn wrench_at(&mut self, tile_x: i32, tile_y: i32) {

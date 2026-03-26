@@ -21,12 +21,13 @@ const CBOR_TILE_IDS: &[u16] = &[
 
 #[derive(Debug, Clone)]
 pub struct World {
-    pub version:         u16,
-    pub flags:           u32,
-    pub tile_map:        WorldTileMap,
-    pub objects:         Vec<WorldObject>,
-    pub base_weather:    u16,
-    pub current_weather: u16,
+    pub version:          u16,
+    pub flags:            u32,
+    pub tile_map:         WorldTileMap,
+    pub objects:          Vec<WorldObject>,
+    pub next_object_uid:  u32,
+    pub base_weather:     u16,
+    pub current_weather:  u16,
 }
 
 impl World {
@@ -63,13 +64,15 @@ impl World {
 
         let flags    = cur.u32()?;
         let tile_map = WorldTileMap::parse(&mut cur, version)?;
-        let objects  = parse_world_objects(&mut cur)?;
+        let (objects, last_dropped_uid) = parse_world_objects(&mut cur)?;
 
         let base_weather = cur.u16()?;
         cur.skip(2)?;
         let current_weather = cur.u16()?;
 
-        Ok(World { version, flags, tile_map, objects, base_weather, current_weather })
+        let next_object_uid = last_dropped_uid + 1;
+
+        Ok(World { version, flags, tile_map, objects, next_object_uid, base_weather, current_weather })
     }
 }
 
@@ -1066,9 +1069,9 @@ pub struct WorldObject {
     pub uid:     u32,
 }
 
-fn parse_world_objects(cur: &mut Cursor) -> Result<Vec<WorldObject>> {
-    let count     = cur.u32()?;
-    let _list_fld = cur.u32()?;
+fn parse_world_objects(cur: &mut Cursor) -> Result<(Vec<WorldObject>, u32)> {
+    let count            = cur.u32()?;
+    let last_dropped_uid = cur.u32()?;
 
     if count >= MAX_WORLD_OBJECTS {
         bail!("world object count {count} >= limit {MAX_WORLD_OBJECTS}");
@@ -1087,7 +1090,7 @@ fn parse_world_objects(cur: &mut Cursor) -> Result<Vec<WorldObject>> {
         objects.push(WorldObject { item_id, x, y, count: count_, flags, uid });
     }
 
-    Ok(objects)
+    Ok((objects, last_dropped_uid))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

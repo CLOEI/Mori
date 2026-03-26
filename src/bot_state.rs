@@ -56,6 +56,15 @@ pub struct InvSlot {
     pub action_type: u8,
 }
 
+#[derive(Clone, Serialize)]
+pub struct WorldObjectInfo {
+    pub uid:     u32,
+    pub item_id: u16,
+    pub x:       f32,
+    pub y:       f32,
+    pub count:   u8,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BotDelays {
     pub place_ms: u64,
@@ -78,6 +87,7 @@ pub struct BotState {
     pub world_width:     u32,
     pub world_height:    u32,
     pub tiles:           Vec<TileInfo>,
+    pub objects:         Vec<WorldObjectInfo>,
     pub players:         Vec<PlayerInfo>,
     pub inventory:       Vec<InvSlot>,
     pub gems:            i32,
