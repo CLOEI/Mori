@@ -11,6 +11,8 @@ on:
       - "**/*.md"
       - LICENSE
       - "**/*.gitignore"
+      - "frida"
+      - "stuff"
   pull_request:
     branches: [ "main" ]
 
