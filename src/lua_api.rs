@@ -194,7 +194,7 @@ impl LuaUserData for BotProxy {
         });
 
         methods.add_method("place", |_, p, (x, y, item): (i32, i32, u32)| {
-            unsafe { (*p.bot).place(x, y, item) };
+            unsafe { (*p.bot).place(x, y, item, false) };
             Ok(())
         });
 

@@ -140,6 +140,20 @@
                   <tbody id="player-list"></tbody>
                 </table>
               </div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-2">Floating Objects</p>
+              <div class="overflow-y-auto rounded border border-slate-800 max-h-40">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500 sticky top-0">
+                      <th class="px-3 py-1.5 text-left font-semibold">Item</th>
+                      <th class="px-3 py-1.5 text-left font-semibold">Amt</th>
+                      <th class="px-3 py-1.5 text-left font-semibold">Pos</th>
+                      <th class="px-3 py-1.5 text-left font-semibold">UID</th>
+                    </tr>
+                  </thead>
+                  <tbody id="objects-list"></tbody>
+                </table>
+              </div>
             </div>
             <div class="flex flex-col gap-4">
               <div class="flex flex-col gap-2">
@@ -594,6 +608,7 @@
 
       renderMinimap(state);
       renderInventory(state);
+      renderWorldObjects(state);
       renderConsole(state);
       renderDelays(state);
     }
@@ -716,6 +731,25 @@
                   class="px-1.5 py-0.5 rounded text-[10px] bg-red-900/60 hover:bg-red-900 text-red-400 transition-colors">Trash</button>
               </div>
             </td>
+          </tr>`;
+        })
+        .join('');
+    }
+
+    function renderWorldObjects(state) {
+      const tbody = document.getElementById('objects-list');
+      if (!state.objects || state.objects.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-3 py-2 text-slate-600 text-xs">No objects.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = state.objects
+        .map(o => {
+          const name = itemNames[o.item_id] ?? `ID:${o.item_id}`;
+          return `<tr class="border-b border-slate-800/60">
+            <td class="px-3 py-1 text-slate-300">${name}</td>
+            <td class="px-3 py-1 text-slate-400">${o.count}</td>
+            <td class="px-3 py-1 text-slate-500 font-mono">(${Math.round(o.x / 32)},${Math.round(o.y / 32)})</td>
+            <td class="px-3 py-1 text-slate-600 font-mono">${o.uid}</td>
           </tr>`;
         })
         .join('');
@@ -1185,7 +1219,10 @@
           break;
 
         case 'ObjectsUpdate':
-          // Objects are not rendered on the minimap currently; reserved for future use.
+          if (selectedBotId === data.bot_id && minimapState) {
+            minimapState.objects = data.objects;
+            renderWorldObjects(minimapState);
+          }
           break;
 
         case 'InventoryUpdate':

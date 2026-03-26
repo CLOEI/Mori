@@ -101,6 +101,15 @@ Returns the full state of a bot.
       "country": "us"
     }
   ],
+  "objects": [
+    {
+      "uid": 0,
+      "item_id": 0,
+      "x": 0.0,
+      "y": 0.0,
+      "count": 1
+    }
+  ],
   "inventory": [
     {
       "item_id": 0,
