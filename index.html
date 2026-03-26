@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mori Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 flex flex-col overflow-hidden antialiased text-sm">
+
+  <div id="map-tooltip"
+    class="fixed z-50 pointer-events-none hidden bg-slate-900 text-slate-200 text-[11px] px-2 py-0.5 rounded border border-slate-700 whitespace-nowrap"></div>
+
+  <!-- Top nav -->
+  <header class="shrink-0 h-10 flex items-center justify-between px-4 bg-slate-900 border-b border-slate-800">
+    <span class="font-bold tracking-wide text-slate-200 text-xs">Mori<span class="text-cyan-400">.</span></span>
+    <div class="flex gap-0.5">
+      <button onclick="switchPage('bots')" id="nav-bots"
+        class="px-3 py-1 text-xs rounded font-medium text-cyan-400 bg-slate-800">Bots</button>
+      <button onclick="switchPage('items')" id="nav-items"
+        class="px-3 py-1 text-xs rounded font-medium text-slate-400 hover:text-slate-200 transition-colors">Items</button>
+      <button onclick="switchPage('docs')" id="nav-docs"
+        class="px-3 py-1 text-xs rounded font-medium text-slate-400 hover:text-slate-200 transition-colors">Docs</button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════ BOTS PAGE ═══════════════════════ -->
+  <div id="page-bots" class="flex flex-1 overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-52 shrink-0 flex flex-col bg-slate-900 border-r border-slate-800">
+
+      <!-- Add bot button -->
+      <div class="shrink-0 p-2 border-b border-slate-800">
+        <button onclick="toggleAddForm()"
+          class="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
+          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+          </svg>
+          Add Bot
+        </button>
+      </div>
+
+      <!-- Collapsible add form -->
+      <div id="add-form-panel" class="hidden shrink-0 border-b border-slate-800 p-2">
+        <form id="add-form" class="flex flex-col gap-1.5">
+          <input id="username" type="text" placeholder="Username" required
+            class="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs placeholder-slate-500 outline-none focus:border-blue-500 transition-colors"/>
+          <input id="password" type="password" placeholder="Password" required
+            class="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs placeholder-slate-500 outline-none focus:border-blue-500 transition-colors"/>
+          <button type="button" onclick="toggleProxy()"
+            class="text-[10px] text-slate-500 hover:text-slate-300 text-left flex items-center gap-1 transition-colors">
+            <span id="proxy-arrow" class="text-[8px]">▶</span> Proxy
+          </button>
+          <div id="proxy-fields" class="hidden flex-col gap-1.5">
+            <input id="proxy-string" type="text" placeholder="host:port:user:pass"
+              class="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs placeholder-slate-500 outline-none focus:border-blue-500 transition-colors font-mono"/>
+          </div>
+          <button type="submit"
+            class="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors">
+            Spawn
+          </button>
+          <p id="spawn-status" class="text-[10px] text-slate-400 text-center min-h-[14px]"></p>
+        </form>
+      </div>
+
+      <!-- Bot list -->
+      <div id="bot-list" class="flex-1 overflow-y-auto p-1.5 space-y-1">
+        <p class="text-xs text-slate-600 text-center py-6">No bots running.</p>
+      </div>
+    </aside>
+
+    <!-- Main detail area -->
+    <main class="flex-1 overflow-hidden flex flex-col">
+
+      <!-- Empty state -->
+      <div id="detail-empty" class="flex-1 flex flex-col items-center justify-center gap-3 text-slate-700 select-none">
+        <svg class="w-10 h-10 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+        <p class="text-xs">Select a bot to view details</p>
+      </div>
+
+      <!-- Bot detail -->
+      <div id="detail" class="hidden flex-1 flex flex-col overflow-hidden">
+
+        <!-- Bot header bar -->
+        <div class="shrink-0 flex items-center gap-2 px-4 h-10 bg-slate-900 border-b border-slate-800">
+          <div id="detail-dot" class="w-2 h-2 rounded-full shrink-0"></div>
+          <span id="detail-title" class="font-semibold text-xs"></span>
+          <span class="text-slate-700 text-xs">|</span>
+          <span id="detail-world" class="text-xs text-slate-400"></span>
+          <span id="detail-pos" class="text-xs text-slate-600"></span>
+          <div class="flex-1"></div>
+          <span id="detail-gems" class="text-xs text-emerald-500 font-medium"></span>
+          <span id="detail-ping" class="text-xs text-slate-500"></span>
+          <button onclick="closeDetail()"
+            class="ml-1 w-5 h-5 flex items-center justify-center rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300 text-xs transition-colors">✕</button>
+        </div>
+
+        <!-- Inner tabs -->
+        <div class="shrink-0 flex border-b border-slate-800 bg-slate-900/40 px-2">
+          <button onclick="switchDetailTab('overview')" id="dtab-btn-overview"
+            class="px-4 py-2 text-xs font-medium border-b-2 border-cyan-400 text-cyan-400 -mb-px transition-colors">Overview</button>
+          <button onclick="switchDetailTab('console')" id="dtab-btn-console"
+            class="px-4 py-2 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors">Console</button>
+          <button onclick="switchDetailTab('script')" id="dtab-btn-script"
+            class="px-4 py-2 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors">Script</button>
+          <button onclick="switchDetailTab('config')" id="dtab-btn-config"
+            class="px-4 py-2 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors">Config</button>
+        </div>
+
+        <!-- Overview panel: minimap + inventory -->
+        <div id="dtab-overview" class="flex-1 overflow-auto p-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-2">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Minimap
+                <span class="font-normal normal-case tracking-normal text-slate-600"> — click to walk, scroll to zoom</span>
+              </p>
+              <canvas id="minimap" width="400" height="240"
+                class="rounded border border-slate-800 bg-slate-950 cursor-crosshair w-full block"></canvas>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-2">Players in World</p>
+              <div class="overflow-y-auto rounded border border-slate-800 max-h-40">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500 sticky top-0">
+                      <th class="px-3 py-1.5 text-left font-semibold">Name</th>
+                      <th class="px-3 py-1.5 text-left font-semibold">Net ID</th>
+                      <th class="px-3 py-1.5 text-left font-semibold">Country</th>
+                    </tr>
+                  </thead>
+                  <tbody id="player-list"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="flex flex-col gap-4">
+              <div class="flex flex-col gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Account</p>
+                <div id="track-info" class="rounded border border-slate-800 bg-slate-950 p-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  <span class="text-slate-500">Level</span>     <span id="track-level"    class="text-slate-200">—</span>
+                  <span class="text-slate-500">Grow ID</span>   <span id="track-growid"   class="text-slate-200">—</span>
+                  <span class="text-slate-500">Install</span>   <span id="track-install"  class="text-slate-200">—</span>
+                  <span class="text-slate-500">Playtime</span>  <span id="track-playtime"     class="text-slate-200">—</span>
+                  <span class="text-slate-500">Awesomeness</span> <span id="track-awesomeness" class="text-slate-200">—</span>
+                </div>
+              </div>
+              <div class="flex flex-col gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Inventory</p>
+                <div class="overflow-y-auto rounded border border-slate-800 max-h-56">
+                  <table class="w-full text-xs">
+                    <thead>
+                      <tr class="bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500 sticky top-0">
+                        <th class="px-3 py-1.5 text-left font-semibold">Item ID</th>
+                        <th class="px-3 py-1.5 text-left font-semibold">Amt</th>
+                        <th class="px-3 py-1.5 text-left font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="inv-list"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Console panel -->
+        <div id="dtab-console" class="hidden flex-1 overflow-hidden p-4 flex flex-col">
+          <div id="console-log"
+            class="flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded p-3 font-mono text-[12px] leading-relaxed text-slate-200 whitespace-pre-wrap break-all"></div>
+        </div>
+
+        <!-- Script panel -->
+        <div id="dtab-script" class="hidden flex-1 overflow-hidden p-4 flex flex-col gap-3">
+          <textarea id="script-editor" spellcheck="false"
+            class="flex-1 font-mono text-[13px] bg-slate-950 border border-slate-800 rounded p-3 text-slate-200 resize-none outline-none leading-relaxed focus:border-blue-500 transition-colors"
+            placeholder="-- script runs on this bot&#10;bot:warp(&quot;START&quot;)&#10;sleep(500)&#10;local w = getWorld()&#10;print(w.name)"></textarea>
+          <div class="shrink-0 flex items-center gap-2">
+            <button onclick="runBotScript()"
+              class="px-4 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded transition-colors">Run</button>
+            <button onclick="stopBotScript()"
+              class="px-4 py-1.5 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded transition-colors">Stop</button>
+            <button onclick="clearBotScriptOutput()"
+              class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded transition-colors">Clear</button>
+            <span id="script-status" class="text-xs text-slate-500"></span>
+          </div>
+        </div>
+
+        <!-- Config panel -->
+        <div id="dtab-config" class="hidden flex-1 overflow-auto p-4">
+          <div class="max-w-xs flex flex-col gap-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Action Delays (ms)</p>
+            <div class="flex flex-col gap-3">
+              <label class="flex flex-col gap-1">
+                <span class="text-xs text-slate-400">Place / Punch delay (ms)</span>
+                <input id="delay-place" type="number" min="0" step="50"
+                  class="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-200 outline-none focus:border-blue-500 transition-colors"/>
+              </label>
+              <label class="flex flex-col gap-1">
+                <span class="text-xs text-slate-400">Walk / Find path delay (ms)</span>
+                <input id="delay-walk" type="number" min="0" step="50"
+                  class="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-200 outline-none focus:border-blue-500 transition-colors"/>
+              </label>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="saveDelays()"
+                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded transition-colors">Save</button>
+              <span id="delay-status" class="text-xs text-slate-500"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ═══════════════════════ ITEMS PAGE ══════════════════════ -->
+  <div id="page-items" class="hidden flex-1 overflow-auto">
+    <div class="max-w-5xl mx-auto px-6 py-6">
+      <div class="flex items-center gap-3 mb-4">
+        <input id="items-search" type="search" placeholder="Search by ID or name…"
+          oninput="itemsSearchChanged()"
+          class="flex-1 px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg outline-none focus:border-blue-500 text-slate-100 placeholder-slate-500 transition-colors"/>
+        <span id="items-count" class="text-xs text-slate-500 shrink-0"></span>
+      </div>
+      <div class="overflow-x-auto rounded-lg border border-slate-800">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="bg-slate-900 text-slate-400 text-left">
+              <th class="px-3 py-2 font-medium w-16">ID</th>
+              <th class="px-3 py-2 font-medium">Name</th>
+              <th class="px-3 py-2 font-medium w-24">Action</th>
+              <th class="px-3 py-2 font-medium w-16">Rarity</th>
+              <th class="px-3 py-2 font-medium w-20">Collision</th>
+              <th class="px-3 py-2 font-medium w-24">Grow Time</th>
+            </tr>
+          </thead>
+          <tbody id="items-tbody"></tbody>
+        </table>
+      </div>
+      <div class="flex items-center justify-between mt-3">
+        <button onclick="itemsChangePage(-1)" id="items-prev"
+          class="px-3 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
+        <span id="items-page-info" class="text-xs text-slate-500"></span>
+        <button onclick="itemsChangePage(1)" id="items-next"
+          class="px-3 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ DOCS PAGE ═══════════════════════ -->
+  <div id="page-docs" class="hidden flex-1 overflow-auto">
+    <div class="max-w-3xl mx-auto px-6 py-6">
+      <input id="docs-search" type="search" placeholder="Search API…" oninput="filterDocs(this.value)"
+        class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg mb-6 outline-none focus:border-blue-500 text-slate-100 placeholder-slate-500 transition-colors"/>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Globals</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot</span><span class="doc-desc text-slate-400">The current bot (BotProxy). Scripts may only control their own bot.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">sleep(ms)</span><span class="doc-desc text-slate-400">Pause script execution for the given number of milliseconds.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getInfo(id|name)</span><span class="doc-desc text-slate-400">Get ItemInfo by numeric ID or name string.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ ItemInfo?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getInfos()</span><span class="doc-desc text-slate-400">Get all items from items.dat.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ ItemInfo[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getUsername()</span><span class="doc-desc text-slate-400">Return the current bot's username.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ string</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">read(path)</span><span class="doc-desc text-slate-400">Read a file from disk and return its contents as a string.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">write(path, content)</span><span class="doc-desc text-slate-400">Write a string to a file (overwrite).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">append(path, content)</span><span class="doc-desc text-slate-400">Append a string to a file (creates if missing).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">removeColor(text)</span><span class="doc-desc text-slate-400">Strip Growtopia `&#96;`-prefixed color codes from a string.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">clearConsole()</span><span class="doc-desc text-slate-400">Clear the current bot's console output.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">runThread(fn, ...)</span><span class="doc-desc text-slate-400">Call a function immediately with the given args (synchronous).</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Shortcut Globals</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getWorld()</span><span class="doc-desc text-slate-400">Shortcut for <code class="text-slate-300">bot:getWorld()</code>.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ World?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getInventory()</span><span class="doc-desc text-slate-400">Shortcut for <code class="text-slate-300">bot:getInventory()</code>.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Inventory</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getLocal()</span><span class="doc-desc text-slate-400">Shortcut for <code class="text-slate-300">bot:getLocal()</code>.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Player</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getPlayer(key)</span><span class="doc-desc text-slate-400">Get a player by net_id or name from the current world.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Player?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getPlayers()</span><span class="doc-desc text-slate-400">Get all players in the current world.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Player[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getTile(x, y)</span><span class="doc-desc text-slate-400">Get a tile at position.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Tile?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getTiles()</span><span class="doc-desc text-slate-400">Get all tiles in the current world.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Tile[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getObject(oid)</span><span class="doc-desc text-slate-400">Get a dropped world object by UID.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ NetObject?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">getObjects()</span><span class="doc-desc text-slate-400">Get all dropped objects in the current world.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ NetObject[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">hasAccess(x, y)</span><span class="doc-desc text-slate-400">Returns false (stub).</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Events</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">Event.variantlist</span><span class="doc-desc text-slate-400">= 1. Handler receives <code class="text-slate-300">(VariantList, net_id)</code>.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">Event.gameupdate</span><span class="doc-desc text-slate-400">= 2. Handler receives <code class="text-slate-300">(GameUpdatePacket)</code>.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">Event.gamemessage</span><span class="doc-desc text-slate-400">= 3. Handler receives <code class="text-slate-300">(text: string)</code>.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">addEvent(etype, fn)</span><span class="doc-desc text-slate-400">Register a callback for an event type.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">removeEvent(etype)</span><span class="doc-desc text-slate-400">Remove the callback for an event type.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">removeEvents()</span><span class="doc-desc text-slate-400">Clear all event callbacks.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">listenEvents([secs])</span><span class="doc-desc text-slate-400">Pump ENet and fire registered callbacks. Loops until <code class="text-slate-300">unlistenEvents()</code> if no duration given.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">unlistenEvents()</span><span class="doc-desc text-slate-400">Request the current <code class="text-slate-300">listenEvents</code> loop to exit early.</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Bot — Fields</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot.name</span><span class="doc-desc text-slate-400">Username string.<span class="font-mono text-violet-400 ml-1 text-[10px]">string</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot.status</span><span class="doc-desc text-slate-400">Current status string.<span class="font-mono text-violet-400 ml-1 text-[10px]">string</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot.gem_count</span><span class="doc-desc text-slate-400">Gem count from inventory.<span class="font-mono text-violet-400 ml-1 text-[10px]">int</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot.auto_collect</span><span class="doc-desc text-slate-400">Auto-collect toggle (read/write).<span class="font-mono text-violet-400 ml-1 text-[10px]">bool</span></span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Bot — Info / State</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:getWorld()</span><span class="doc-desc text-slate-400">Get the current world snapshot.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ World?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:getInventory()</span><span class="doc-desc text-slate-400">Get the current inventory snapshot.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Inventory</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:getLocal()</span><span class="doc-desc text-slate-400">Get a Player object representing this bot.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Player</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:getConsole()</span><span class="doc-desc text-slate-400">Get the console object.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Console</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:getLogin()</span><span class="doc-desc text-slate-400">Get login data (MAC address).<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Login</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:getPing()</span><span class="doc-desc text-slate-400">Current round-trip ping in ms.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ uint</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:isInWorld([name])</span><span class="doc-desc text-slate-400">True if in any world, or a specific world if name given.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ bool</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:isInTile(x, y)</span><span class="doc-desc text-slate-400">True if the bot is currently standing on tile (x, y).<span class="font-mono text-violet-400 ml-1 text-[10px]">→ bool</span></span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Bot — Movement</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:moveTo(dx, dy)</span><span class="doc-desc text-slate-400">Move relative to current tile position by (dx, dy) tiles.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:moveTile(x, y)</span><span class="doc-desc text-slate-400">Walk to absolute tile (x, y).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:moveLeft([n])</span><span class="doc-desc text-slate-400">Move left n tiles (default 1).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:moveRight([n])</span><span class="doc-desc text-slate-400">Move right n tiles (default 1).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:moveUp([n])</span><span class="doc-desc text-slate-400">Move up n tiles (default 1).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:moveDown([n])</span><span class="doc-desc text-slate-400">Move down n tiles (default 1).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:setDirection(facing_left)</span><span class="doc-desc text-slate-400">Set bot facing direction.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:findPath(x, y)</span><span class="doc-desc text-slate-400">Pathfind to tile (x, y) using A*.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:getPath(x, y)</span><span class="doc-desc text-slate-400">Compute and return A* path without walking.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ table[]</span></span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Bot — World Actions</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:warp(name, [id])</span><span class="doc-desc text-slate-400">Warp to a world by name, with optional door ID.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:say(text)</span><span class="doc-desc text-slate-400">Send a chat message.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:leaveWorld()</span><span class="doc-desc text-slate-400">Leave the current world.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:respawn()</span><span class="doc-desc text-slate-400">Respawn the bot.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:place(x, y, item)</span><span class="doc-desc text-slate-400">Place item ID at tile (x, y).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:hit(x, y)</span><span class="doc-desc text-slate-400">Punch tile at (x, y).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:wrench(x, y)</span><span class="doc-desc text-slate-400">Wrench tile at (x, y).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:wrenchPlayer(net_id)</span><span class="doc-desc text-slate-400">Wrench a player by net ID.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:active(x, y)</span><span class="doc-desc text-slate-400">Activate/enter tile at (x, y).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:enter([pass])</span><span class="doc-desc text-slate-400">Activate the tile under the bot, optionally with a password.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:collectObject(oid, range)</span><span class="doc-desc text-slate-400">Collect a specific dropped object by UID within range tiles.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:collect(range, interval)</span><span class="doc-desc text-slate-400">Collect all nearby objects within range tiles.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ int count</span></span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Bot — Inventory Actions</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:wear(item_id)</span><span class="doc-desc text-slate-400">Wear / equip an item.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:unwear(item_id)</span><span class="doc-desc text-slate-400">Unequip an item.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:use(item_id)</span><span class="doc-desc text-slate-400">Alias for <code class="text-slate-300">wear</code>.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:drop(item_id, count)</span><span class="doc-desc text-slate-400">Drop count of item from inventory.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:trash(item_id, count)</span><span class="doc-desc text-slate-400">Trash count of item from inventory.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:fastDrop(item_id, count)</span><span class="doc-desc text-slate-400">Fast-drop (no animation).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:fastTrash(item_id, count)</span><span class="doc-desc text-slate-400">Fast-trash (no animation).</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Bot — Network / Misc</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:connect()</span><span class="doc-desc text-slate-400">Reconnect the bot.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:disconnect()</span><span class="doc-desc text-slate-400">Disconnect from the server.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:sendRaw(pkt)</span><span class="doc-desc text-slate-400">Send a raw GameUpdatePacket.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:sendPacket(type, text)</span><span class="doc-desc text-slate-400">Send a text packet (type 2 or 3).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:runScript(content)</span><span class="doc-desc text-slate-400">Run a nested Lua script on this bot.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:setMac(mac)</span><span class="doc-desc text-slate-400">Override the bot's MAC address string.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">bot:setAutoCollect(enabled)</span><span class="doc-desc text-slate-400">Enable or disable auto-collect.</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Remote Bot</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">rb.name / .status / .gem_count</span><span class="doc-desc text-slate-400">Read-only fields mirroring the remote bot's state.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">rb:getWorld()</span><span class="doc-desc text-slate-400">Snapshot of remote bot's world (via shared Arc).<span class="font-mono text-violet-400 ml-1 text-[10px]">→ World?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">rb:getInventory()</span><span class="doc-desc text-slate-400">Snapshot of remote bot's inventory.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Inventory</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">rb:say / warp / moveTo / findPath / place / hit / ...</span><span class="doc-desc text-slate-400">Commands queued and executed on the remote bot's thread.</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">World</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.name</span><span class="doc-desc text-slate-400">World name string.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.x / .y</span><span class="doc-desc text-slate-400">Width / height in tiles.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.tile_count / .version / .public</span><span class="doc-desc text-slate-400">Tile count, version number, public flag.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.tiles / .objects / .players</span><span class="doc-desc text-slate-400">Arrays of Tile, NetObject, Player.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getTile(x, y)</span><span class="doc-desc text-slate-400">Get Tile at position.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Tile?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getTiles() / :getTilesSafe()</span><span class="doc-desc text-slate-400">Get all tiles as array.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Tile[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getObject(oid)</span><span class="doc-desc text-slate-400">Get dropped object by UID.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ NetObject?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getObjects()</span><span class="doc-desc text-slate-400">All dropped objects.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ NetObject[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getPlayer(net_id|name)</span><span class="doc-desc text-slate-400">Find player by net ID or name.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Player?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getPlayers()</span><span class="doc-desc text-slate-400">All players in world.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Player[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getLocal()</span><span class="doc-desc text-slate-400">Bot's own Player representation.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Player</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:isValidPosition(x, y)</span><span class="doc-desc text-slate-400">True if tile coords are in bounds.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ bool</span></span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Inventory</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.itemcount / .slotcount</span><span class="doc-desc text-slate-400">Item count and max slot count.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.items</span><span class="doc-desc text-slate-400">Array of InventoryItem.<span class="font-mono text-violet-400 ml-1 text-[10px]">InventoryItem[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getItem(id)</span><span class="doc-desc text-slate-400">Get item by ID.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ InventoryItem?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getItems()</span><span class="doc-desc text-slate-400">All items in inventory.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ InventoryItem[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:findItem(id) / :getItemCount(id)</span><span class="doc-desc text-slate-400">Return count of item ID (0 if not present).<span class="font-mono text-violet-400 ml-1 text-[10px]">→ uint</span></span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Player</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.name / .country</span><span class="doc-desc text-slate-400">Display name and country code.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.netid / .userid</span><span class="doc-desc text-slate-400">Network ID and user ID.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.posx / .posy</span><span class="doc-desc text-slate-400">Pixel-space position (divide by 32 for tile).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.avatarFlags</span><span class="doc-desc text-slate-400">Raw avatar state flags.<span class="font-mono text-violet-400 ml-1 text-[10px]">uint</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.roleicon</span><span class="doc-desc text-slate-400">Role icon string.</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Tile</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.fg / .foreground</span><span class="doc-desc text-slate-400">Foreground item ID.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.bg / .background</span><span class="doc-desc text-slate-400">Background item ID.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.x / .y</span><span class="doc-desc text-slate-400">Tile coordinates.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.flags</span><span class="doc-desc text-slate-400">Raw tile flags bitmask.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:hasExtra()</span><span class="doc-desc text-slate-400">True if tile has extra data.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ bool</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:getExtra()</span><span class="doc-desc text-slate-400">Returns extra data table.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ table?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:canHarvest()</span><span class="doc-desc text-slate-400">True if tile is a ready-to-harvest seed.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ bool</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:hasFlag(flag)</span><span class="doc-desc text-slate-400">Test a specific flag bit.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ bool</span></span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">NetObject (dropped item)</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.id</span><span class="doc-desc text-slate-400">Item ID.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.x / .y</span><span class="doc-desc text-slate-400">Pixel-space position.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.count</span><span class="doc-desc text-slate-400">Stack count.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.flags</span><span class="doc-desc text-slate-400">Object flags.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.oid</span><span class="doc-desc text-slate-400">Unique object UID used with <code class="text-slate-300">collectObject</code>.</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">ItemInfo</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.id / .name</span><span class="doc-desc text-slate-400">Item ID and display name.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.action_type / .collision_type / .clothing_type</span><span class="doc-desc text-slate-400">Type enumerations.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.rarity / .grow_time / .drop_chance</span><span class="doc-desc text-slate-400">Economy stats.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.texture / .texture_hash / .texture_x / .texture_y</span><span class="doc-desc text-slate-400">Sprite sheet info.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.strength</span><span class="doc-desc text-slate-400">Block health / punch count.</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Console</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.contents</span><span class="doc-desc text-slate-400">Table of log lines (max 100).<span class="font-mono text-violet-400 ml-1 text-[10px]">string[]</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">:append(text)</span><span class="doc-desc text-slate-400">Push a line to the console (visible in the dashboard).</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">GameUpdatePacket</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">GameUpdatePacket.new()</span><span class="doc-desc text-slate-400">Create a new blank packet.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ GameUpdatePacket</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.type / .object_type / .count1 / .count2</span><span class="doc-desc text-slate-400">Packet type and counters (read/write).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.netid / .item / .flags</span><span class="doc-desc text-slate-400">Net ID, item target, flags bitmask (read/write).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.vec_x/.pos_x / .vec_y/.pos_y</span><span class="doc-desc text-slate-400">Primary position vector (read/write, aliased).</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.vec2_x/.pos2_x / .vec2_y/.pos2_y</span><span class="doc-desc text-slate-400">Secondary position vector (read/write, aliased).</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Variant / VariantList</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">variant:getType()</span><span class="doc-desc text-slate-400">1=float, 2=string, 3=vec2, 4=vec3, 5=uint, 9=int, 0=unknown.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ uint</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">variant:getString() / :getInt() / :getFloat()</span><span class="doc-desc text-slate-400">Extract typed value.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">variant:getVector2()</span><span class="doc-desc text-slate-400">Returns <code class="text-slate-300">{x, y}</code>.</span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs border-b border-slate-800/60"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">variantlist:get(idx)</span><span class="doc-desc text-slate-400">Get variant at 0-based index.<span class="font-mono text-violet-400 ml-1 text-[10px]">→ Variant?</span></span></div>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">variantlist:print()</span><span class="doc-desc text-slate-400">Comma-separated string of all variants.</span></div>
+      </div>
+
+      <div class="doc-section mb-7">
+        <p class="doc-section-title text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 pb-2 border-b border-slate-800">Login</p>
+        <div class="doc-entry flex gap-3 items-baseline py-1.5 text-xs"><span class="doc-sig font-mono text-blue-400 whitespace-nowrap shrink-0">.mac</span><span class="doc-desc text-slate-400">The bot's MAC address string.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Page / nav switching ──────────────────────────────────────────────────
+    function switchPage(name) {
+      document.getElementById('page-bots').classList.toggle('hidden', name !== 'bots');
+      document.getElementById('page-bots').classList.toggle('flex', name === 'bots');
+      document.getElementById('page-items').classList.toggle('hidden', name !== 'items');
+      document.getElementById('page-docs').classList.toggle('hidden', name !== 'docs');
+
+      const active   = 'px-3 py-1 text-xs rounded font-medium text-cyan-400 bg-slate-800';
+      const inactive = 'px-3 py-1 text-xs rounded font-medium text-slate-400 hover:text-slate-200 transition-colors';
+      document.getElementById('nav-bots').className   = name === 'bots'   ? active : inactive;
+      document.getElementById('nav-items').className  = name === 'items'  ? active : inactive;
+      document.getElementById('nav-docs').className   = name === 'docs'   ? active : inactive;
+
+      if (name === 'items') loadItemsPage();
+    }
+
+    // ── Add-form toggle ───────────────────────────────────────────────────────
+    let addFormOpen = false;
+    function toggleAddForm() {
+      addFormOpen = !addFormOpen;
+      document.getElementById('add-form-panel').classList.toggle('hidden', !addFormOpen);
+    }
+
+    let proxyOpen = false;
+    function toggleProxy() {
+      proxyOpen = !proxyOpen;
+      document.getElementById('proxy-fields').classList.toggle('hidden', !proxyOpen);
+      document.getElementById('proxy-fields').classList.toggle('flex', proxyOpen);
+      document.getElementById('proxy-arrow').textContent = proxyOpen ? '▼' : '▶';
+    }
+
+    // ── Status helpers ────────────────────────────────────────────────────────
+    function statusColor(s) {
+      if (s === 'in_world')     return '#22c55e';
+      if (s === 'connected')    return '#3b82f6';
+      if (s === 'connecting')   return '#eab308';
+      if (s === 'disconnected') return '#ef4444';
+      return '#6b7280';
+    }
+
+    // ── Bot list rendering — replaced by WS-enhanced version below ───────────
+
+    document.getElementById('add-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const username    = document.getElementById('username').value.trim();
+      const password    = document.getElementById('password').value;
+      const proxyRaw = document.getElementById('proxy-string').value.trim();
+      const [proxyHost, proxyPortStr, proxyUser, proxyPass] = proxyRaw.split(':');
+      const proxyPort = proxyPortStr ? parseInt(proxyPortStr) : null;
+      const body = { username, password };
+      if (proxyHost && proxyPort) {
+        body.proxy_host = proxyHost; body.proxy_port = proxyPort;
+        if (proxyUser) body.proxy_username = proxyUser;
+        if (proxyPass) body.proxy_password = proxyPass;
+      }
+      const res = await fetch('/bots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      const st = document.getElementById('spawn-status');
+      st.textContent = `Bot #${data.id} spawned.`;
+      setTimeout(() => { st.textContent = ''; }, 3000);
+      document.getElementById('add-form').reset();
+      loadBots();
+    });
+
+    async function stopBot(id) {
+      await fetch(`/bots/${id}`, { method: 'DELETE' });
+      if (selectedBotId === id) closeDetail();
+      loadBots();
+    }
+
+    // ── Detail panel ──────────────────────────────────────────────────────────
+    let selectedBotId = null;
+
+    function openDetail(id, username) {
+      selectedBotId = id;
+      consoleMsgCount = 0;
+      document.getElementById('console-log').innerHTML = '';
+      document.getElementById('detail-empty').classList.add('hidden');
+      document.getElementById('detail').classList.remove('hidden');
+      document.getElementById('detail').classList.add('flex');
+      document.getElementById('detail-title').textContent = `${username}`;
+      // Populate track info from cached botInfoMap data if already received
+      const b = botInfoMap[id];
+      if (b && b.grow_id) renderTrackInfo(b);
+      fetchDetail(); // hydrate once; WS events keep it live after that
+      loadBots();    // refresh cards to update selection highlight
+    }
+
+    function closeDetail() {
+      selectedBotId = null;
+      minimapState = null;
+      document.getElementById('detail').classList.add('hidden');
+      document.getElementById('detail').classList.remove('flex');
+      document.getElementById('detail-empty').classList.remove('hidden');
+    }
+
+    async function fetchDetail() {
+      if (selectedBotId === null) return;
+      const res = await fetch(`/bots/${selectedBotId}/state`);
+      if (!res.ok) { closeDetail(); return; }
+      const state = await res.json();
+
+      // Update header bar
+      const dot = document.getElementById('detail-dot');
+      dot.style.background = statusColor(state.status);
+      document.getElementById('detail-world').textContent = state.world_name || '';
+      document.getElementById('detail-pos').textContent =
+        state.world_name ? ` (${Math.round(state.pos_x)}, ${Math.round(state.pos_y)})` : '';
+      document.getElementById('detail-ping').textContent = state.ping_ms > 0 ? `${state.ping_ms}ms` : '';
+      document.getElementById('detail-gems').textContent = state.gems > 0 ? `💎 ${state.gems.toLocaleString()}` : '';
+
+      renderMinimap(state);
+      renderInventory(state);
+      renderConsole(state);
+      renderDelays(state);
+    }
+
+    function renderDelays(state) {
+      if (!state.delays) return;
+      document.getElementById('delay-place').value = state.delays.place_ms;
+      document.getElementById('delay-walk').value  = state.delays.walk_ms;
+    }
+
+    async function saveDelays() {
+      if (selectedBotId === null) return;
+      const place_ms = parseInt(document.getElementById('delay-place').value) || 0;
+      const walk_ms  = parseInt(document.getElementById('delay-walk').value)  || 0;
+      await fetch(`/bots/${selectedBotId}/cmd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'set_delays', place_ms, walk_ms }),
+      });
+      const st = document.getElementById('delay-status');
+      st.textContent = 'Saved.';
+      setTimeout(() => { st.textContent = ''; }, 2000);
+    }
+
+    // ── Detail inner tabs ─────────────────────────────────────────────────────
+    const DETAIL_TABS = ['overview', 'console', 'script', 'config'];
+    function switchDetailTab(name) {
+      DETAIL_TABS.forEach(t => {
+        const panel = document.getElementById(`dtab-${t}`);
+        const btn   = document.getElementById(`dtab-btn-${t}`);
+        const active = t === name;
+        panel.classList.toggle('hidden', !active);
+        panel.classList.toggle('flex', active);
+        if (active) {
+          btn.className = 'px-4 py-2 text-xs font-medium border-b-2 border-cyan-400 text-cyan-400 -mb-px transition-colors';
+        } else {
+          btn.className = 'px-4 py-2 text-xs font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors';
+        }
+      });
+    }
+
+    // ── GT color parser ───────────────────────────────────────────────────────
+    const GT_COLORS = {
+      '0':'#ffffff','1':'#adf4ff','2':'#49fc00','3':'#bfdaff','4':'#ff271d',
+      '5':'#ebb7ff','6':'#ffca6f','7':'#e6e6e6','8':'#ff9445','9':'#ffee7d',
+      '!':'#d1fff9','@':'#ffcdc9','#':'#ff8ff3','$':'#fffcc5','^':'#b5ff97',
+      '&':'#feeeff','w':'#ffffff','o':'#fce6ba','p':'#ffdff1','b':'#1a1a1a',
+      'q':'#0c60a4','e':'#19b9ff','r':'#6fd357','t':'#2f830d','a':'#515151',
+      's':'#9e9e9e','c':'#50ffff',
+    };
+    function escapeHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function parseGTColors(text) {
+      let html = '', open = false, i = 0;
+      while (i < text.length) {
+        if (text[i] === '`' && i + 1 < text.length) {
+          const code = text[i + 1];
+          if (open) { html += '</span>'; open = false; }
+          if (code !== '`') {
+            const color = GT_COLORS[code];
+            if (color) { html += `<span style="color:${color}">`; open = true; }
+          }
+          i += 2;
+        } else {
+          html += escapeHtml(text[i]); i++;
+        }
+      }
+      if (open) html += '</span>';
+      return html;
+    }
+
+    let consoleMsgCount = 0;
+    function renderConsole(state) {
+      if (!state.console || state.console.length === consoleMsgCount) return;
+      consoleMsgCount = state.console.length;
+      const el = document.getElementById('console-log');
+      const atBottom = el.scrollHeight - el.clientHeight <= el.scrollTop + 4;
+      el.innerHTML = state.console.map(msg => `<div>${parseGTColors(msg)}</div>`).join('');
+      if (atBottom) el.scrollTop = el.scrollHeight;
+    }
+
+    async function invCmd(type, item_id, count) {
+      if (selectedBotId === null) return;
+      await fetch(`/bots/${selectedBotId}/cmd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(count !== undefined ? { type, item_id, count } : { type, item_id }),
+      });
+    }
+
+    function renderInventory(state) {
+      const tbody = document.getElementById('inv-list');
+      if (state.inventory.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-2 text-slate-600 text-xs">Empty.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = state.inventory
+        .sort((a, b) => b.amount - a.amount)
+        .map(s => {
+          const wearable = s.action_type === 20;
+          const wearBtn = wearable
+            ? s.is_active
+              ? `<button onclick="invCmd('unwear',${s.item_id})"
+                   class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-900 hover:bg-cyan-800 text-cyan-300 transition-colors">Unwear</button>`
+              : `<button onclick="invCmd('wear',${s.item_id})"
+                   class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Wear</button>`
+            : '';
+          return `<tr class="border-b border-slate-800/60">
+            <td class="px-3 py-1 text-slate-300 font-mono">${s.item_id}${s.is_active ? ' <span class="text-cyan-500 text-[10px]">●</span>' : ''}</td>
+            <td class="px-3 py-1 text-slate-400">${s.amount}</td>
+            <td class="px-2 py-1">
+              <div class="flex gap-1 flex-wrap">
+                ${wearBtn}
+                <button onclick="invCmd('drop',${s.item_id},1)"
+                  class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Drop</button>
+                <button onclick="invCmd('drop',${s.item_id},${s.amount})"
+                  class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Drop All</button>
+                <button onclick="invCmd('trash',${s.item_id},1)"
+                  class="px-1.5 py-0.5 rounded text-[10px] bg-red-900/60 hover:bg-red-900 text-red-400 transition-colors">Trash</button>
+              </div>
+            </td>
+          </tr>`;
+        })
+        .join('');
+    }
+
+    // ── Minimap ───────────────────────────────────────────────────────────────
+    let minimapState = null;
+    let minimapTarget = null;
+    const cam = { x: 0, y: 0, ppt: 6 };
+    const PPT_MIN = 2, PPT_MAX = 20;
+    let followBot = true;
+    let unfollowTimer = null;
+
+    function tileColor(fg, bg) {
+      if (fg === 0) return bg === 0 ? '#0f172a' : '#1e293b';
+      const hue = (fg * 37) % 360;
+      return `hsl(${hue},25%,38%)`;
+    }
+
+    function clampCam(W, H, cw, ch) {
+      const visW = cw / cam.ppt, visH = ch / cam.ppt;
+      cam.x = Math.max(0, Math.min(cam.x, Math.max(0, W - visW)));
+      cam.y = Math.max(0, Math.min(cam.y, Math.max(0, H - visH)));
+    }
+
+    function centerOnBot(state, cw, ch) {
+      cam.x = state.pos_x - (cw / cam.ppt) / 2;
+      cam.y = state.pos_y - (ch / cam.ppt) / 2;
+      clampCam(state.world_width, state.world_height, cw, ch);
+    }
+
+    function renderTrackInfo(data) {
+      document.getElementById('track-level').textContent    = data.level || '—';
+      document.getElementById('track-growid').textContent   = data.grow_id || '—';
+      const d = data.install_date ? new Date(data.install_date * 1000).toLocaleDateString() : '—';
+      document.getElementById('track-install').textContent  = d;
+      const pt = data.global_playtime ? formatPlaytime(data.global_playtime) : '—';
+      document.getElementById('track-playtime').textContent    = pt;
+      document.getElementById('track-awesomeness').textContent = data.awesomeness ?? '—';
+    }
+
+    function formatPlaytime(secs) {
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    }
+
+    function renderMinimap(state) {
+      minimapState = state;
+      const canvas = document.getElementById('minimap');
+      const ctx = canvas.getContext('2d');
+      const W = state.world_width, H = state.world_height;
+      if (!W || !H) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+      const cw = canvas.width, ch = canvas.height;
+      if (followBot) centerOnBot(state, cw, ch);
+      const startX = Math.max(0, Math.floor(cam.x));
+      const startY = Math.max(0, Math.floor(cam.y));
+      const endX   = Math.min(W, Math.ceil(cam.x + cw / cam.ppt));
+      const endY   = Math.min(H, Math.ceil(cam.y + ch / cam.ppt));
+      ctx.clearRect(0, 0, cw, ch);
+      for (let ty = startY; ty < endY; ty++) {
+        for (let tx = startX; tx < endX; tx++) {
+          const tile = state.tiles[ty * W + tx];
+          if (!tile) continue;
+          ctx.fillStyle = tileColor(tile.fg_item_id, tile.bg_item_id);
+          ctx.fillRect(Math.round((tx - cam.x) * cam.ppt), Math.round((ty - cam.y) * cam.ppt), cam.ppt, cam.ppt);
+        }
+      }
+      if (minimapTarget) {
+        const mx = Math.round((minimapTarget.x - cam.x) * cam.ppt);
+        const my = Math.round((minimapTarget.y - cam.y) * cam.ppt);
+        ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1;
+        ctx.strokeRect(mx + 0.5, my + 0.5, cam.ppt, cam.ppt);
+      }
+      ctx.fillStyle = '#facc15';
+      state.players.forEach(p => {
+        const px = Math.round((p.pos_x + 0.5 - cam.x) * cam.ppt);
+        const py = Math.round((p.pos_y + 0.5 - cam.y) * cam.ppt);
+        ctx.fillRect(px - 1, py - 1, 3, 3);
+      });
+      ctx.fillStyle = '#22d3ee';
+      const bx = Math.round((state.pos_x - cam.x) * cam.ppt);
+      const by = Math.round((state.pos_y - cam.y) * cam.ppt);
+      ctx.fillRect(bx, by, cam.ppt, cam.ppt);
+      ctx.fillStyle = followBot ? '#22d3ee' : '#64748b';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(followBot ? '⊙ follow' : '⊙ free', 4, ch - 4);
+    }
+
+    function renderPlayerList(state) {
+      const tbody = document.getElementById('player-list');
+      if (!tbody) return;
+      if (!state.players || state.players.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-center text-slate-600 text-[11px]">No players</td></tr>';
+        return;
+      }
+      tbody.innerHTML = state.players.map(p => `
+        <tr class="border-b border-slate-800/50 hover:bg-slate-800/30">
+          <td class="px-3 py-1 text-slate-300">${p.name || '—'}</td>
+          <td class="px-3 py-1 text-slate-500 font-mono">${p.net_id}</td>
+          <td class="px-3 py-1 text-slate-500 uppercase text-[10px]">${p.country || ''}</td>
+        </tr>`).join('');
+    }
+
+    function canvasToTile(canvas, e) {
+      const rect = canvas.getBoundingClientRect();
+      const cx = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const cy = (e.clientY - rect.top)  * (canvas.height / rect.height);
+      const tx = Math.floor(cx / cam.ppt + cam.x);
+      const ty = Math.floor(cy / cam.ppt + cam.y);
+      if (!minimapState) return null;
+      const W = minimapState.world_width, H = minimapState.world_height;
+      if (tx < 0 || ty < 0 || tx >= W || ty >= H) return null;
+      return { x: tx, y: ty };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const canvas  = document.getElementById('minimap');
+      const tooltip = document.getElementById('map-tooltip');
+      let drag = null;
+
+      canvas.addEventListener('mousedown', e => {
+        drag = { startX: e.clientX, startY: e.clientY, camX0: cam.x, camY0: cam.y, moved: false };
+      });
+      window.addEventListener('mousemove', e => {
+        if (!drag) return;
+        const rect  = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const dx = (e.clientX - drag.startX) * scaleX / cam.ppt;
+        const dy = (e.clientY - drag.startY) * scaleY / cam.ppt;
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) drag.moved = true;
+        cam.x = drag.camX0 - dx;
+        cam.y = drag.camY0 - dy;
+        if (minimapState) clampCam(minimapState.world_width, minimapState.world_height, canvas.width, canvas.height);
+        if (minimapState) renderMinimap(minimapState);
+        if (drag.moved) { followBot = false; if (unfollowTimer) clearTimeout(unfollowTimer); }
+      });
+      window.addEventListener('mouseup', () => {
+        if (!drag) return;
+        const wasDrag = drag.moved; drag = null;
+        if (wasDrag) {
+          if (unfollowTimer) clearTimeout(unfollowTimer);
+          unfollowTimer = setTimeout(() => { followBot = true; }, 3000);
+        }
+      });
+      canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        if (!minimapState) return;
+        const rect   = canvas.getBoundingClientRect();
+        const cx     = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const cy     = (e.clientY - rect.top)  * (canvas.height / rect.height);
+        const tileX  = cx / cam.ppt + cam.x;
+        const tileY  = cy / cam.ppt + cam.y;
+        const factor = e.deltaY < 0 ? 1.25 : 0.8;
+        cam.ppt = Math.max(PPT_MIN, Math.min(PPT_MAX, cam.ppt * factor));
+        cam.x = tileX - cx / cam.ppt;
+        cam.y = tileY - cy / cam.ppt;
+        clampCam(minimapState.world_width, minimapState.world_height, canvas.width, canvas.height);
+        renderMinimap(minimapState);
+        followBot = false;
+        if (unfollowTimer) clearTimeout(unfollowTimer);
+        unfollowTimer = setTimeout(() => { followBot = true; }, 3000);
+      }, { passive: false });
+      canvas.addEventListener('mousemove', e => {
+        if (!minimapState || drag?.moved) return;
+        const t = canvasToTile(canvas, e);
+        if (!t) { tooltip.style.display = 'none'; return; }
+        tooltip.textContent = `(${t.x}, ${t.y})`;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top  = (e.clientY - 10) + 'px';
+      });
+      canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+      canvas.addEventListener('click', async e => {
+        if (selectedBotId === null || !minimapState || drag?.moved) return;
+        const t = canvasToTile(canvas, e);
+        if (!t) return;
+        minimapTarget = t;
+        renderMinimap(minimapState);
+        tooltip.textContent = `Walking to (${t.x}, ${t.y})…`;
+        await fetch(`/bots/${selectedBotId}/cmd`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'walk_to', x: t.x, y: t.y }),
+        });
+      });
+    });
+
+    // ── Script ────────────────────────────────────────────────────────────────
+    async function runBotScript() {
+      if (selectedBotId === null) { document.getElementById('script-status').textContent = 'Open a bot first.'; return; }
+      const content = document.getElementById('script-editor').value.trim();
+      if (!content) return;
+      document.getElementById('script-status').textContent = 'Sent.';
+      await fetch(`/bots/${selectedBotId}/cmd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'run_script', content }),
+      });
+      setTimeout(() => { document.getElementById('script-status').textContent = ''; }, 2000);
+    }
+
+    async function stopBotScript() {
+      if (selectedBotId === null) return;
+      document.getElementById('script-status').textContent = 'Stopped.';
+      await fetch(`/bots/${selectedBotId}/cmd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'stop_script' }),
+      });
+      setTimeout(() => { document.getElementById('script-status').textContent = ''; }, 2000);
+    }
+
+    function clearBotScriptOutput() {
+      document.getElementById('script-status').textContent = '';
+    }
+
+    // ── Docs search ───────────────────────────────────────────────────────────
+    function filterDocs(query) {
+      const q = query.toLowerCase().trim();
+      document.querySelectorAll('#page-docs .doc-entry').forEach(el => {
+        el.classList.toggle('hidden', q.length > 0 && !el.textContent.toLowerCase().includes(q));
+      });
+      document.querySelectorAll('#page-docs .doc-section').forEach(sec => {
+        const visible = [...sec.querySelectorAll('.doc-entry')].some(e => !e.classList.contains('hidden'));
+        sec.style.display = visible ? '' : 'none';
+      });
+    }
+
+    // ── Items DB ──────────────────────────────────────────────────────────────
+    let itemsPage = 1;
+    let itemsQuery = '';
+    let itemsSearchTimer = null;
+
+    function itemsSearchChanged() {
+      clearTimeout(itemsSearchTimer);
+      itemsSearchTimer = setTimeout(() => {
+        itemsPage = 1;
+        itemsQuery = document.getElementById('items-search').value.trim();
+        loadItemsPage();
+      }, 250);
+    }
+
+    function itemsChangePage(delta) {
+      itemsPage = Math.max(1, itemsPage + delta);
+      loadItemsPage();
+    }
+
+    async function loadItemsPage() {
+      const params = new URLSearchParams({ page: itemsPage });
+      if (itemsQuery) params.set('q', itemsQuery);
+      const res = await fetch(`/items?${params}`);
+      const data = await res.json();
+
+      const tbody = document.getElementById('items-tbody');
+      tbody.innerHTML = '';
+      for (const it of data.items) {
+        const tr = document.createElement('tr');
+        tr.className = 'border-t border-slate-800 hover:bg-slate-900/50';
+        tr.innerHTML = `
+          <td class="px-3 py-1.5 text-slate-500 font-mono">${it.id}</td>
+          <td class="px-3 py-1.5 text-slate-200">${it.name || '<em class="text-slate-600">—</em>'}</td>
+          <td class="px-3 py-1.5 text-slate-400">${it.action_type}</td>
+          <td class="px-3 py-1.5 text-slate-400">${it.rarity}</td>
+          <td class="px-3 py-1.5 text-slate-400">${it.collision_type}</td>
+          <td class="px-3 py-1.5 text-slate-400">${it.grow_time}s</td>`;
+        tbody.appendChild(tr);
+      }
+
+      const totalPages = Math.max(1, Math.ceil(data.total / data.page_size));
+      document.getElementById('items-page-info').textContent = `Page ${data.page} / ${totalPages}`;
+      document.getElementById('items-count').textContent = `${data.total} items`;
+      document.getElementById('items-prev').disabled = data.page <= 1;
+      document.getElementById('items-next').disabled = data.page >= totalPages;
+    }
+
+    // ── WebSocket ─────────────────────────────────────────────────────────────
+    // botInfoMap stores live summary data per bot_id for card rendering.
+    const botInfoMap = {};
+
+    function connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+      ws.onmessage = e => {
+        try { const msg = JSON.parse(e.data); handleWsEvent(msg.event, msg.data); }
+        catch (_) {}
+      };
+
+      ws.onclose = () => setTimeout(connectWs, 2000);
+    }
+
+    function handleWsEvent(event, data) {
+      switch (event) {
+
+        case 'BotAdded':
+          botInfoMap[data.bot_id] = { id: data.bot_id, username: data.username,
+            status: 'connecting', world: '', pos_x: 0, pos_y: 0, gems: 0, ping_ms: 0,
+            level: 0, grow_id: 0, install_date: 0, global_playtime: 0, awesomeness: 0 };
+          loadBots();
+          break;
+
+        case 'BotRemoved':
+          delete botInfoMap[data.bot_id];
+          if (selectedBotId === data.bot_id) closeDetail();
+          loadBots();
+          break;
+
+        case 'BotStatus':
+          if (botInfoMap[data.bot_id]) botInfoMap[data.bot_id].status = data.status;
+          patchBotCard(data.bot_id);
+          if (selectedBotId === data.bot_id) {
+            document.getElementById('detail-dot').style.background = statusColor(data.status);
+          }
+          break;
+
+        case 'BotWorld':
+          if (botInfoMap[data.bot_id]) botInfoMap[data.bot_id].world = data.world_name;
+          patchBotCard(data.bot_id);
+          if (selectedBotId === data.bot_id) {
+            document.getElementById('detail-world').textContent = data.world_name;
+          }
+          break;
+
+        case 'BotMove':
+          if (botInfoMap[data.bot_id]) { botInfoMap[data.bot_id].pos_x = data.x; botInfoMap[data.bot_id].pos_y = data.y; }
+          patchBotCard(data.bot_id);
+          if (selectedBotId === data.bot_id && minimapState) {
+            minimapState.pos_x = data.x;
+            minimapState.pos_y = data.y;
+            const wn = minimapState.world_name || '';
+            document.getElementById('detail-pos').textContent = wn ? ` (${Math.round(data.x)}, ${Math.round(data.y)})` : '';
+            renderMinimap(minimapState);
+          }
+          break;
+
+        case 'BotGems':
+          if (botInfoMap[data.bot_id]) botInfoMap[data.bot_id].gems = data.gems;
+          patchBotCard(data.bot_id);
+          if (selectedBotId === data.bot_id) {
+            document.getElementById('detail-gems').textContent = data.gems > 0 ? `💎 ${data.gems.toLocaleString()}` : '';
+          }
+          break;
+
+        case 'BotPing':
+          if (botInfoMap[data.bot_id]) botInfoMap[data.bot_id].ping_ms = data.ping_ms;
+          patchBotCard(data.bot_id);
+          if (selectedBotId === data.bot_id) {
+            document.getElementById('detail-ping').textContent = data.ping_ms > 0 ? `${data.ping_ms}ms` : '';
+          }
+          break;
+
+        case 'BotTrackInfo': {
+          const b = botInfoMap[data.bot_id];
+          if (b) { b.level = data.level; b.grow_id = data.grow_id; b.install_date = data.install_date; b.global_playtime = data.global_playtime; b.awesomeness = data.awesomeness; }
+          patchBotCard(data.bot_id);
+          if (selectedBotId === data.bot_id) renderTrackInfo(data);
+          break;
+        }
+
+        case 'PlayerSpawn':
+          if (selectedBotId === data.bot_id && minimapState) {
+            minimapState.players = minimapState.players.filter(p => p.net_id !== data.net_id);
+            minimapState.players.push({ net_id: data.net_id, name: data.name, country: data.country, pos_x: data.x, pos_y: data.y });
+            renderMinimap(minimapState);
+            renderPlayerList(minimapState);
+          }
+          break;
+
+        case 'PlayerMove':
+          if (selectedBotId === data.bot_id && minimapState) {
+            const p = minimapState.players.find(p => p.net_id === data.net_id);
+            if (p) { p.pos_x = data.x; p.pos_y = data.y; }
+            renderMinimap(minimapState);
+          }
+          break;
+
+        case 'PlayerLeave':
+          if (selectedBotId === data.bot_id && minimapState) {
+            minimapState.players = minimapState.players.filter(p => p.net_id !== data.net_id);
+            renderMinimap(minimapState);
+            renderPlayerList(minimapState);
+          }
+          break;
+
+        case 'WorldLoaded':
+          if (selectedBotId === data.bot_id) {
+            if (!minimapState) minimapState = { players: [], inventory: [], console: [], gems: 0, delays: {}, pos_x: 0, pos_y: 0 };
+            minimapState.world_name   = data.name;
+            minimapState.world_width  = data.width;
+            minimapState.world_height = data.height;
+            minimapState.tiles        = data.tiles.map(([fg, bg]) => ({ fg_item_id: fg, bg_item_id: bg }));
+            minimapState.players      = [];
+            document.getElementById('detail-world').textContent = data.name;
+            renderMinimap(minimapState);
+            renderPlayerList(minimapState);
+          }
+          break;
+
+        case 'TileUpdate':
+          if (selectedBotId === data.bot_id && minimapState && minimapState.tiles) {
+            const idx = data.y * minimapState.world_width + data.x;
+            if (minimapState.tiles[idx]) {
+              minimapState.tiles[idx].fg_item_id = data.fg;
+              minimapState.tiles[idx].bg_item_id = data.bg;
+              renderMinimap(minimapState);
+            }
+          }
+          break;
+
+        case 'ObjectsUpdate':
+          // Objects are not rendered on the minimap currently; reserved for future use.
+          break;
+
+        case 'InventoryUpdate':
+          if (selectedBotId === data.bot_id && minimapState) {
+            minimapState.gems      = data.gems;
+            minimapState.inventory = data.items;
+            renderInventory(minimapState);
+            document.getElementById('detail-gems').textContent = data.gems > 0 ? `💎 ${data.gems.toLocaleString()}` : '';
+            if (botInfoMap[data.bot_id]) botInfoMap[data.bot_id].gems = data.gems;
+            patchBotCard(data.bot_id);
+          }
+          break;
+
+        case 'Console':
+          if (selectedBotId === data.bot_id) {
+            const el = document.getElementById('console-log');
+            const atBottom = el.scrollHeight - el.clientHeight <= el.scrollTop + 4;
+            const div = document.createElement('div');
+            div.innerHTML = parseGTColors(data.message);
+            el.appendChild(div);
+            // keep at most 100 lines in DOM
+            while (el.children.length > 100) el.removeChild(el.firstChild);
+            if (atBottom) el.scrollTop = el.scrollHeight;
+            consoleMsgCount++;
+          }
+          break;
+      }
+    }
+
+    // Rebuild a single bot card in place using botInfoMap data.
+    function patchBotCard(botId) {
+      const b = botInfoMap[botId];
+      if (!b) return;
+      const card = document.querySelector(`.bot-card[data-bid="${botId}"]`);
+      if (!card) return;
+      const color = statusColor(b.status);
+      card.querySelector('.bot-dot').style.background = color;
+      card.querySelector('.bot-status-text').textContent =
+        b.status + (b.world ? ' · ' + b.world : '');
+      const metaEl = card.querySelector('.bot-meta');
+      metaEl.innerHTML =
+        (b.gems > 0 ? `<span class="text-emerald-600">💎 ${b.gems.toLocaleString()}</span>` : '') +
+        (b.ping_ms > 0 ? `<span>${b.ping_ms}ms</span>` : '');
+    }
+
+    // ── Bot list renderer (populates botInfoMap, adds data-bid for patching) ──
+    async function loadBots() {
+      const res = await fetch('/bots');
+      const bots = await res.json();
+      // Sync botInfoMap with server state
+      bots.forEach(b => {
+        botInfoMap[b.id] = { id: b.id, username: b.username,
+          status: b.status, world: b.world, pos_x: b.pos_x, pos_y: b.pos_y,
+          gems: b.gems, ping_ms: b.ping_ms };
+      });
+      const el = document.getElementById('bot-list');
+      if (bots.length === 0) {
+        el.innerHTML = '<p class="text-xs text-slate-600 text-center py-6">No bots running.</p>';
+        return;
+      }
+      el.innerHTML = bots.map(b => {
+        const color = statusColor(b.status);
+        const sel = selectedBotId === b.id ? 'bg-slate-800 ring-1 ring-slate-600' : 'hover:bg-slate-800/60';
+        const world = b.world || '';
+        return `<div class="bot-card rounded-lg p-2.5 cursor-pointer transition-colors ${sel}"
+            data-bid="${b.id}"
+            onclick="openDetail(${b.id}, '${b.username.replace(/'/g,"\\'")}')">
+          <div class="flex items-center gap-2 mb-0.5">
+            <div class="bot-dot w-2 h-2 rounded-full shrink-0" style="background:${color}"></div>
+            <span class="font-semibold text-xs text-slate-100 truncate flex-1">${b.username}</span>
+            <button onclick="event.stopPropagation();stopBot(${b.id})"
+              class="shrink-0 text-[10px] text-red-500 hover:text-red-400 transition-colors">✕</button>
+          </div>
+          <div class="bot-status-text pl-4 text-[10px] text-slate-500 truncate">${b.status}${world ? ' · ' + world : ''}</div>
+          <div class="bot-meta pl-4 text-[10px] text-slate-600 flex gap-2 mt-0.5">
+            ${b.gems > 0 ? `<span class="text-emerald-600">💎 ${b.gems.toLocaleString()}</span>` : ''}
+            ${b.ping_ms > 0 ? `<span>${b.ping_ms}ms</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    connectWs();
+    loadBots();
+  </script>
+</body>
+</html>

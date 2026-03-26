@@ -1,0 +1,1134 @@
+use anyhow::{bail, Result};
+use crate::cursor::Cursor;
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+pub const MAP_VERSION_MIN: u16 = 0x19;     // 25: minimum accepted
+const MAX_TILE_COUNT: u32      = 65026;    // fatal reject if >= this
+const MAX_WORLD_OBJECTS: u32   = 0x493E1; // 300_001: fatal reject
+
+const CBOR_TILE_IDS: &[u16] = &[
+    15376, // Party Projector      (PartyProjectorData,       IsEmpty → 0)
+    15546, // Auction Block        (AuctionBlockData,         IsEmpty → 0)
+    3548,  // Battle Pet Cage      (BattleCageData,           IsEmpty → 0)
+    14662, // Operating Table      (OperatingTableData,       IsEmpty → 0)
+    14666, // Auto Surgeon Station (AutoSurgeonStationData,   IsEmpty → 0)
+    8624, 8630, 8636, 8642, 8648, 8654, 8660, 8666, // Bountiful roots (RootsData, IsEmpty → 0)
+    8672, 8678, 8684, 8690, 8696, 8702, 8708, 8714, // Bountiful roots (RootsData, IsEmpty → 0)
+];
+
+// ── World ─────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct World {
+    pub version:         u16,
+    pub flags:           u32,
+    pub tile_map:        WorldTileMap,
+    pub objects:         Vec<WorldObject>,
+    pub base_weather:    u16,
+    pub current_weather: u16,
+}
+
+impl World {
+    pub fn get_tile(&self, x: u32, y: u32) -> Option<&Tile> {
+        let idx = (y * self.tile_map.width + x) as usize;
+        self.tile_map.tiles.get(idx)
+    }
+
+    pub fn get_tile_mut(&mut self, x: u32, y: u32) -> Option<&mut Tile> {
+        let idx = (y * self.tile_map.width + x) as usize;
+        self.tile_map.tiles.get_mut(idx)
+    }
+
+    /// Update a tile's fg/bg from a raw extra-data blob (first 4 bytes: u16 fg, u16 bg).
+    /// Returns the new (fg, bg) on success.
+    pub fn update_tile_from_bytes(&mut self, x: u32, y: u32, data: &[u8]) -> Option<(u16, u16)> {
+        if data.len() < 4 { return None; }
+        let fg = u16::from_le_bytes([data[0], data[1]]);
+        let bg = u16::from_le_bytes([data[2], data[3]]);
+        let tile = self.get_tile_mut(x, y)?;
+        tile.fg_item_id = fg;
+        tile.bg_item_id = bg;
+        if fg == 0 { tile.tile_type = TileType::Basic; }
+        Some((fg, bg))
+    }
+
+    pub fn parse(data: &[u8]) -> Result<Self> {
+        let mut cur = Cursor::new(data, "world map blob");
+
+        let version = cur.u16()?;
+        if version < MAP_VERSION_MIN {
+            bail!("map version {version:#x} < minimum {MAP_VERSION_MIN:#x}");
+        }
+
+        let flags    = cur.u32()?;
+        let tile_map = WorldTileMap::parse(&mut cur, version)?;
+        let objects  = parse_world_objects(&mut cur)?;
+
+        let base_weather = cur.u16()?;
+        cur.skip(2)?;
+        let current_weather = cur.u16()?;
+
+        Ok(World { version, flags, tile_map, objects, base_weather, current_weather })
+    }
+}
+
+// ── WorldTileMap ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct WorldTileMap {
+    pub world_name: String,
+    pub width:      u32,
+    pub height:     u32,
+    pub tiles:      Vec<Tile>,
+}
+
+impl WorldTileMap {
+    fn parse(cur: &mut Cursor, map_version: u16) -> Result<Self> {
+        let name_len   = cur.u16()? as usize;
+        let name_raw   = cur.bytes(name_len)?;
+        let world_name = String::from_utf8_lossy(&name_raw).into_owned();
+
+        let width      = cur.u32()?;
+        let height     = cur.u32()?;
+        let tile_count = cur.u32()?;
+
+        cur.skip(5)?;
+
+        if tile_count >= MAX_TILE_COUNT {
+            bail!("tile_count {tile_count} >= limit {MAX_TILE_COUNT}");
+        }
+
+        let mut tiles = Vec::with_capacity(tile_count as usize);
+        for idx in 0..tile_count {
+            let x = idx % width;
+            let y = idx / width;
+            let pos_before = cur.pos();
+            match Tile::parse(cur, map_version, x, y) {
+                Ok(t) => {
+                    let kind_name = format!("{:?}", std::mem::discriminant(&t.tile_type));
+                    if t.flags.contains(TileFlags::HAS_EXTRA_DATA) {
+                        eprintln!("[tile {idx}] pos={pos_before} fg={} extra={kind_name}", t.fg_item_id);
+                    }
+                    tiles.push(t);
+                }
+                Err(e) => {
+                    eprintln!("[world] tile {idx} ({x},{y}) failed at pos {pos_before}: {e}");
+                    return Err(e);
+                }
+            }
+        }
+
+        cur.skip(12)?;
+
+        Ok(WorldTileMap { world_name, width, height, tiles })
+    }
+}
+
+// ── TileFlags ─────────────────────────────────────────────────────────────────
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub struct TileFlags: u16 {
+        const HAS_EXTRA_DATA        = 0x0001;
+        const HAS_PARENT            = 0x0002;
+        const WAS_SPLICED           = 0x0004;
+        const WILL_SPAWN_SEEDS_TOO  = 0x0008;
+        const IS_SEEDLING           = 0x0010;
+        const FLIPPED_X             = 0x0020;
+        const IS_ON                 = 0x0040;
+        const IS_OPEN_TO_PUBLIC     = 0x0080;
+        const BG_IS_ON              = 0x0100;
+        const FG_ALT_MODE           = 0x0200;
+        const IS_WET                = 0x0400;
+        const GLUED                 = 0x0800;
+        const ON_FIRE               = 0x1000;
+        const PAINTED_RED           = 0x2000;
+        const PAINTED_GREEN         = 0x4000;
+        const PAINTED_BLUE          = 0x8000;
+    }
+}
+
+// ── Tile ──────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct Tile {
+    pub fg_item_id:   u16,
+    pub bg_item_id:   u16,
+    pub parent_block: u16,
+    pub flags:        TileFlags,
+    pub flags_raw:    u16,
+    pub x:            u32,
+    pub y:            u32,
+    pub tile_type:    TileType,
+}
+
+impl Tile {
+    fn parse(cur: &mut Cursor, _map_version: u16, x: u32, y: u32) -> Result<Self> {
+        let fg_item_id = cur.u16()?;
+        let bg_item_id = cur.u16()?;
+        let parent_block = cur.u16()?;
+        let flags_raw  = cur.u16()?;
+        let flags      = TileFlags::from_bits_retain(flags_raw);
+
+        if flags.contains(TileFlags::HAS_PARENT) {
+            cur.u16()?;
+        }
+
+        let mut tile_type = TileType::Basic;
+
+        if flags.contains(TileFlags::HAS_EXTRA_DATA) {
+            let kind = cur.u8()?;
+            tile_type = parse_tile_extra(cur, kind, fg_item_id)?;
+        }
+
+        // CBOR blob for specific tile types (after TileExtraData)
+        if CBOR_TILE_IDS.contains(&fg_item_id) {
+            let cbor_size = cur.u32()? as usize;
+            cur.skip(cbor_size)?; // skip raw CBOR bytes
+        }
+
+        Ok(Tile { fg_item_id, bg_item_id, parent_block, flags, flags_raw, x, y, tile_type })
+    }
+}
+
+// ── TileType ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub enum TileType {
+    Basic,
+    Sign {
+        text:  String,
+        flags: u8,
+    },
+    Door {
+        text:      String,
+        owner_uid: u32,
+    },
+    Lock {
+        settings:     u8,
+        owner_uid:    u32,
+        access_count: u32,
+        access_uids:  Vec<u32>,
+        minimum_level: u8,
+    },
+    Seed {
+        time_passed:  u32,
+        item_on_tree: u8,
+    },
+    Mailbox {
+        s1: String,
+        s2: String,
+        s3: String,
+        u4: u8,
+    },
+    Bulletin {
+        s1: String,
+        s2: String,
+        s3: String,
+        u4: u8,
+    },
+    Dice {
+        symbol: u8,
+    },
+    ChemicalSource {
+        time_passed: u32,
+    },
+    AchievementBlock {
+        data:      u32,
+        tile_type: u8,
+    },
+    HearthMonitor {
+        data:        u32,
+        player_name: String,
+    },
+    DonationBox {
+        s1: String,
+        s2: String,
+        s3: String,
+        u4: u8,
+    },
+    Mannequin {
+        text:       String,
+        unknown_1:  u8,
+        clothing_1: u32,
+        clothing_2: u16,
+        clothing_3: u16,
+        clothing_4: u16,
+        clothing_5: u16,
+        clothing_6: u16,
+        clothing_7: u16,
+        clothing_8: u16,
+        clothing_9: u16,
+        clothing_10: u16,
+    },
+    BunnyEgg {
+        egg_placed: u32,
+    },
+    GamePack {
+        team: u8,
+    },
+    GameGenerator,
+    XenoniteCrystal {
+        unknown_1: u8,
+        unknown_2: u32,
+    },
+    PhoneBooth {
+        clothing_1: u16,
+        clothing_2: u16,
+        clothing_3: u16,
+        clothing_4: u16,
+        clothing_5: u16,
+        clothing_6: u16,
+        clothing_7: u16,
+        clothing_8: u16,
+        clothing_9: u16,
+    },
+    Crystal {
+        data: String,
+    },
+    CrimeInProgress {
+        data:      String,
+        unknown_2: u32,
+        unknown_3: u8,
+    },
+    DisplayBlock {
+        item_id: u32,
+    },
+    VendingMachine {
+        item_id: u32,
+        price:   i32,
+    },
+    FishTankPort {
+        flags:  u8,
+        fishes: Vec<(u32, u32)>,
+    },
+    SolarCollector {
+        data: [u8; 5],
+    },
+    Forge {
+        temperature: u32,
+    },
+    GivingTree {
+        unknown_1: u16,
+        unknown_2: u32,
+    },
+    SteamOrgan {
+        instrument_type: u8,
+        note:            u32,
+    },
+    SilkWorm {
+        type_:           u8,
+        name:            String,
+        age:             u32,
+        unknown_1:       u32,
+        unknown_2:       u32,
+        can_be_fed:      u8,
+        food_saturation: u32,
+        water_saturation: u32,
+        color:           u32,
+        sick_duration:   u32,
+    },
+    SewingMachine {
+        bolt_ids: Vec<u32>,
+    },
+    CountryFlag {
+        country: String,
+    },
+    LobsterTrap,
+    PaintingEasel {
+        item_id: u32,
+        label:   String,
+    },
+    PetBattleCage {
+        label:     String,
+        unknown_1: u32,
+        unknown_2: u32,
+        unknown_3: u32,
+    },
+    PetTrainer {
+        name:            String,
+        pet_total_count: u32,
+        unknown_1:       u32,
+        pets_id:         Vec<u32>,
+    },
+    SteamEngine {
+        temperature: u32,
+    },
+    LockBot {
+        time_passed: u32,
+    },
+    WeatherMachine {
+        settings: u32,
+    },
+    SpiritStorageUnit {
+        ghost_jar_count: u32,
+    },
+    DataBedrock,
+    Shelf {
+        top_left_item_id:     u32,
+        top_right_item_id:    u32,
+        bottom_left_item_id:  u32,
+        bottom_right_item_id: u32,
+    },
+    VipEntrance {
+        unknown_1:   u8,
+        owner_uid:   u32,
+        access_uids: Vec<u32>,
+    },
+    ChallangeTimer,
+    FishWallMount {
+        label:   String,
+        item_id: u32,
+        lb:      u8,
+    },
+    Portrait {
+        label:     String,
+        unknown_1: u32,
+        unknown_2: u32,
+        unknown_3: u32,
+        unknown_4: u32,
+        face:      u32,
+        hat:       u32,
+        hair:      u32,
+        unknown_5: u16,
+        unknown_6: u16,
+    },
+    GuildWeatherMachine {
+        unknown_1: u32,
+        gravity:   u32,
+        flags:     u8,
+    },
+    FossilPrepStation {
+        unknown_1: u32,
+    },
+    DnaExtractor,
+    Howler,
+    ChemsynthTank {
+        current_chem: u32,
+        target_chem:  u32,
+    },
+    StorageBlock {
+        items: Vec<(u32, u32)>, // (id, amount)
+    },
+    CookingOven {
+        temperature_level: u32,
+        ingredients:       Vec<(u32, u32)>, // (item_id, time_added)
+        unknown_1:         u32,
+        unknown_2:         u32,
+        unknown_3:         u32,
+    },
+    AudioRack {
+        note:   String,
+        volume: u32,
+    },
+    GeigerCharger {
+        seconds_from_start:  u32,
+        seconds_to_complete: u32,
+        charging_percent:    u32,
+        minutes_from_start:  u32,
+        minutes_to_complete: u32,
+    },
+    AdventureBegins,
+    TombRobber,
+    BalloonOMatic {
+        total_rarity: u32,
+        team_type:    u8,
+    },
+    TrainingPort {
+        fish_lb:        u32,
+        fish_status:    u16,
+        fish_id:        u32,
+        fish_total_exp: u32,
+        fish_level:     u32,
+        unknown_2:      u32,
+    },
+    ItemSucker {
+        item_id_to_suck: u32,
+        item_amount:     u32,
+        flags:           u16,
+        limit:           u32,
+    },
+    CyBot {
+        sync_timer:    u32,
+        activated:     u32,
+        command_datas: Vec<(u32, u32)>, // (command_id, is_command_used)
+    },
+    GuildItem,
+    Growscan {
+        unknown_1: u8,
+    },
+    ContainmentFieldPowerNode {
+        ghost_jar_count: u32,
+        unknown_1:       Vec<u32>,
+    },
+    SpiritBoard {
+        unknown_1: u32,
+        unknown_2: u32,
+        unknown_3: u32,
+    },
+    StormyCloud {
+        sting_duration:    u32,
+        is_solid:          u32,
+        non_solid_duration: u32,
+    },
+    TemporaryPlatform {
+        unknown_1: u32,
+    },
+    SafeVault,
+    AngelicCountingCloud {
+        is_raffling: u32,
+        unknown_1:   u16,
+        ascii_code:  u8,
+    },
+    InfinityWeatherMachine {
+        interval_minutes:     u32,
+        weather_machine_list: Vec<u32>,
+    },
+    PineappleGuzzler,
+    KrakenGalaticBlock {
+        pattern_index: u8,
+        unknown_1:     u32,
+        r:             u8,
+        g:             u8,
+        b:             u8,
+    },
+    FriendsEntrance {
+        owner_user_id: u32,
+        unknown_1:     u16,
+        unknown_2:     u16,
+    },
+    TesseractManipulator {
+        gems:      u32,
+        unknown_2: u32,
+        item_id:   u32,
+        unknown_4: u32,
+    },
+    Spotlight,
+    BigLock {
+        s1: String,
+        s2: String,
+        s3: String,
+        u4: u8,
+    },
+    GuildBlock {
+        label: String,
+    },
+    Unknown {
+        kind: u8,
+    },
+}
+
+// ── TileExtraData dispatch ────────────────────────────────────────────────────
+
+fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileType> {
+    match kind {
+        1 => {
+            // Sign
+            let text  = cur.plain_string()?;
+            let flags = cur.u8()?;
+            Ok(TileType::Sign { text, flags })
+        }
+        2 => {
+            // Door
+            let text      = cur.plain_string()?;
+            let owner_uid = cur.u32()?;
+            Ok(TileType::Door { text, owner_uid })
+        }
+        3 => {
+            // Lock
+            let settings     = cur.u8()?;
+            let owner_uid    = cur.u32()?;
+            let access_count = cur.u32()?;
+            let mut access_uids = Vec::with_capacity(access_count as usize);
+            for _ in 0..access_count {
+                access_uids.push(cur.u32()?);
+            }
+            let minimum_level = cur.u8()?;
+            cur.skip(7)?; // unknown_1[7]
+            if fg_item_id == 5814 {
+                cur.skip(16)?;
+            }
+            Ok(TileType::Lock { settings, owner_uid, access_count, access_uids, minimum_level })
+        }
+        4 => {
+            // Seed
+            let time_passed  = cur.u32()?;
+            let item_on_tree = cur.u8()?;
+            Ok(TileType::Seed { time_passed, item_on_tree })
+        }
+        6 => {
+            // Mailbox
+            let s1 = cur.plain_string()?;
+            let s2 = cur.plain_string()?;
+            let s3 = cur.plain_string()?;
+            let u4 = cur.u8()?;
+            Ok(TileType::Mailbox { s1, s2, s3, u4 })
+        }
+        7 => {
+            // Bulletin
+            let s1 = cur.plain_string()?;
+            let s2 = cur.plain_string()?;
+            let s3 = cur.plain_string()?;
+            let u4 = cur.u8()?;
+            Ok(TileType::Bulletin { s1, s2, s3, u4 })
+        }
+        8 => {
+            // Dice
+            let symbol = cur.u8()?;
+            Ok(TileType::Dice { symbol })
+        }
+        9 => {
+            // ChemicalSource
+            let time_passed = cur.u32()?;
+            Ok(TileType::ChemicalSource { time_passed })
+        }
+        10 => {
+            // AchievementBlock
+            let data      = cur.u32()?;
+            let tile_type = cur.u8()?;
+            Ok(TileType::AchievementBlock { data, tile_type })
+        }
+        11 => {
+            // HearthMonitor
+            let data        = cur.u32()?;
+            let player_name = cur.plain_string()?;
+            Ok(TileType::HearthMonitor { data, player_name })
+        }
+        12 => {
+            // DonationBox
+            let s1 = cur.plain_string()?;
+            let s2 = cur.plain_string()?;
+            let s3 = cur.plain_string()?;
+            let u4 = cur.u8()?;
+            Ok(TileType::DonationBox { s1, s2, s3, u4 })
+        }
+        13 => {
+            // BigLock — same wire format as Mailbox / Bulletin / DonationBox
+            let s1 = cur.plain_string()?;
+            let s2 = cur.plain_string()?;
+            let s3 = cur.plain_string()?;
+            let u4 = cur.u8()?;
+            Ok(TileType::BigLock { s1, s2, s3, u4 })
+        }
+        14 => {
+            // Mannequin
+            let text        = cur.plain_string()?;
+            let unknown_1   = cur.u8()?;
+            let clothing_1  = cur.u32()?;
+            let clothing_2  = cur.u16()?;
+            let clothing_3  = cur.u16()?;
+            let clothing_4  = cur.u16()?;
+            let clothing_5  = cur.u16()?;
+            let clothing_6  = cur.u16()?;
+            let clothing_7  = cur.u16()?;
+            let clothing_8  = cur.u16()?;
+            let clothing_9  = cur.u16()?;
+            let clothing_10 = cur.u16()?;
+            Ok(TileType::Mannequin {
+                text, unknown_1, clothing_1, clothing_2, clothing_3,
+                clothing_4, clothing_5, clothing_6, clothing_7,
+                clothing_8, clothing_9, clothing_10,
+            })
+        }
+        15 => {
+            // BunnyEgg
+            let egg_placed = cur.u32()?;
+            Ok(TileType::BunnyEgg { egg_placed })
+        }
+        16 => {
+            // GamePack
+            let team = cur.u8()?;
+            Ok(TileType::GamePack { team })
+        }
+        17 => Ok(TileType::GameGenerator),
+        18 => {
+            // XenoniteCrystal
+            let unknown_1 = cur.u8()?;
+            let unknown_2 = cur.u32()?;
+            Ok(TileType::XenoniteCrystal { unknown_1, unknown_2 })
+        }
+        19 => {
+            // PhoneBooth
+            let clothing_1 = cur.u16()?;
+            let clothing_2 = cur.u16()?;
+            let clothing_3 = cur.u16()?;
+            let clothing_4 = cur.u16()?;
+            let clothing_5 = cur.u16()?;
+            let clothing_6 = cur.u16()?;
+            let clothing_7 = cur.u16()?;
+            let clothing_8 = cur.u16()?;
+            let clothing_9 = cur.u16()?;
+            Ok(TileType::PhoneBooth {
+                clothing_1, clothing_2, clothing_3, clothing_4, clothing_5,
+                clothing_6, clothing_7, clothing_8, clothing_9,
+            })
+        }
+        20 => {
+            // Crystal
+            let data = cur.plain_string()?;
+            Ok(TileType::Crystal { data })
+        }
+        21 => {
+            // CrimeInProgress
+            let data      = cur.plain_string()?;
+            let unknown_2 = cur.u32()?;
+            let unknown_3 = cur.u8()?;
+            Ok(TileType::CrimeInProgress { data, unknown_2, unknown_3 })
+        }
+        23 => {
+            // DisplayBlock
+            let item_id = cur.u32()?;
+            Ok(TileType::DisplayBlock { item_id })
+        }
+        24 => {
+            // VendingMachine
+            let item_id = cur.u32()?;
+            let price   = cur.i32()?;
+            Ok(TileType::VendingMachine { item_id, price })
+        }
+        25 => {
+            // FishTankPort
+            let flags      = cur.u8()?;
+            let fish_count = cur.u32()?;
+            let mut fishes = Vec::new();
+            for _ in 0..(fish_count / 2) {
+                let fish_item_id = cur.u32()?;
+                let lbs          = cur.u32()?;
+                fishes.push((fish_item_id, lbs));
+            }
+            Ok(TileType::FishTankPort { flags, fishes })
+        }
+        26 => {
+            // SolarCollector
+            let mut data = [0u8; 5];
+            for b in &mut data { *b = cur.u8()?; }
+            Ok(TileType::SolarCollector { data })
+        }
+        27 => {
+            // Forge
+            let temperature = cur.u32()?;
+            Ok(TileType::Forge { temperature })
+        }
+        28 => {
+            // GivingTree
+            let unknown_1 = cur.u16()?;
+            let unknown_2 = cur.u32()?;
+            Ok(TileType::GivingTree { unknown_1, unknown_2 })
+        }
+        30 => {
+            // SteamOrgan
+            let instrument_type = cur.u8()?;
+            let note            = cur.u32()?;
+            Ok(TileType::SteamOrgan { instrument_type, note })
+        }
+        31 => {
+            // SilkWorm
+            let type_            = cur.u8()?;
+            let name             = cur.plain_string()?;
+            let age              = cur.u32()?;
+            let unknown_1        = cur.u32()?;
+            let unknown_2        = cur.u32()?;
+            let can_be_fed       = cur.u8()?;
+            let food_saturation  = cur.u32()?;
+            let water_saturation = cur.u32()?;
+            let color            = cur.u32()?;
+            let sick_duration    = cur.u32()?;
+            Ok(TileType::SilkWorm {
+                type_, name, age, unknown_1, unknown_2,
+                can_be_fed, food_saturation, water_saturation,
+                color, sick_duration,
+            })
+        }
+        32 => {
+            // SewingMachine
+            let bolt_len = cur.u16()? as u32;
+            let mut bolt_ids = Vec::new();
+            for _ in 0..bolt_len {
+                bolt_ids.push(cur.u32()?);
+            }
+            Ok(TileType::SewingMachine { bolt_ids })
+        }
+        33 => {
+            // CountryFlag
+            let country = cur.plain_string()?;
+            Ok(TileType::CountryFlag { country })
+        }
+        34 => Ok(TileType::LobsterTrap),
+        35 => {
+            // PaintingEasel
+            let item_id = cur.u32()?;
+            let label   = cur.plain_string()?;
+            Ok(TileType::PaintingEasel { item_id, label })
+        }
+        36 => {
+            // PetBattleCage
+            let label     = cur.plain_string()?;
+            let unknown_1 = cur.u32()?;
+            let unknown_2 = cur.u32()?;
+            let unknown_3 = cur.u32()?;
+            Ok(TileType::PetBattleCage { label, unknown_1, unknown_2, unknown_3 })
+        }
+        37 => {
+            // PetTrainer
+            let name            = cur.plain_string()?;
+            let pet_total_count = cur.u32()?;
+            let unknown_1       = cur.u32()?;
+            let mut pets_id     = Vec::new();
+            for _ in 0..pet_total_count {
+                pets_id.push(cur.u32()?);
+            }
+            Ok(TileType::PetTrainer { name, pet_total_count, unknown_1, pets_id })
+        }
+        38 => {
+            // SteamEngine
+            let temperature = cur.u32()?;
+            Ok(TileType::SteamEngine { temperature })
+        }
+        39 => {
+            // LockBot
+            let time_passed = cur.u32()?;
+            Ok(TileType::LockBot { time_passed })
+        }
+        40 => {
+            // WeatherMachine
+            let settings = cur.u32()?;
+            Ok(TileType::WeatherMachine { settings })
+        }
+        41 => {
+            // SpiritStorageUnit
+            let ghost_jar_count = cur.u32()?;
+            Ok(TileType::SpiritStorageUnit { ghost_jar_count })
+        }
+        42 => {
+            // DataBedrock — skip 21 bytes
+            cur.skip(21)?;
+            Ok(TileType::DataBedrock)
+        }
+        43 => {
+            // Shelf
+            let top_left_item_id     = cur.u32()?;
+            let top_right_item_id    = cur.u32()?;
+            let bottom_left_item_id  = cur.u32()?;
+            let bottom_right_item_id = cur.u32()?;
+            Ok(TileType::Shelf {
+                top_left_item_id, top_right_item_id,
+                bottom_left_item_id, bottom_right_item_id,
+            })
+        }
+        44 => {
+            // VipEntrance
+            let unknown_1    = cur.u8()?;
+            let owner_uid    = cur.u32()?;
+            let access_count = cur.u32()?;
+            let mut access_uids = Vec::new();
+            for _ in 0..access_count {
+                access_uids.push(cur.u32()?);
+            }
+            Ok(TileType::VipEntrance { unknown_1, owner_uid, access_uids })
+        }
+        45 => Ok(TileType::ChallangeTimer),
+        46 => Ok(TileType::Spotlight),
+        47 => {
+            // FishWallMount
+            let label   = cur.plain_string()?;
+            let item_id = cur.u32()?;
+            let lb      = cur.u8()?;
+            Ok(TileType::FishWallMount { label, item_id, lb })
+        }
+        48 => {
+            // Portrait
+            let label     = cur.plain_string()?;
+            let unknown_1 = cur.u32()?;
+            let unknown_2 = cur.u32()?;
+            let unknown_3 = cur.u32()?;
+            let unknown_4 = cur.u32()?;
+            let face      = cur.u32()?;
+            let hat       = cur.u32()?;
+            let hair      = cur.u32()?;
+            let unknown_5 = cur.u16()?;
+            let unknown_6 = cur.u16()?;
+            Ok(TileType::Portrait {
+                label, unknown_1, unknown_2, unknown_3, unknown_4,
+                face, hat, hair, unknown_5, unknown_6,
+            })
+        }
+        49 => {
+            // GuildWeatherMachine
+            let unknown_1 = cur.u32()?;
+            let gravity   = cur.u32()?;
+            let flags     = cur.u8()?;
+            Ok(TileType::GuildWeatherMachine { unknown_1, gravity, flags })
+        }
+        50 => {
+            // FossilPrepStation
+            let unknown_1 = cur.u32()?;
+            Ok(TileType::FossilPrepStation { unknown_1 })
+        }
+        51 => Ok(TileType::DnaExtractor),
+        52 => Ok(TileType::Howler),
+        53 => {
+            // ChemsynthTank
+            let current_chem = cur.u32()?;
+            let target_chem  = cur.u32()?;
+            Ok(TileType::ChemsynthTank { current_chem, target_chem })
+        }
+        54 => {
+            // StorageBlock
+            let data_len = cur.u16()?;
+            let mut items = Vec::new();
+            for _ in 0..(data_len / 13) {
+                cur.skip(3)?;
+                let id     = cur.u32()?;
+                cur.skip(2)?;
+                let amount = cur.u32()?;
+                items.push((id, amount));
+            }
+            Ok(TileType::StorageBlock { items })
+        }
+        55 => {
+            // CookingOven
+            let temperature_level = cur.u32()?;
+            let ingredient_count  = cur.u32()?;
+            let mut ingredients   = Vec::new();
+            for _ in 0..ingredient_count {
+                let item_id    = cur.u32()?;
+                let time_added = cur.u32()?;
+                ingredients.push((item_id, time_added));
+            }
+            let unknown_1 = cur.u32()?;
+            let unknown_2 = cur.u32()?;
+            let unknown_3 = cur.u32()?;
+            Ok(TileType::CookingOven { temperature_level, ingredients, unknown_1, unknown_2, unknown_3 })
+        }
+        56 => {
+            // AudioRack
+            let note   = cur.plain_string()?;
+            let volume = cur.u32()?;
+            Ok(TileType::AudioRack { note, volume })
+        }
+        57 => {
+            // GeigerCharger
+            let seconds_from_start  = cur.u32()?;
+            let seconds_to_complete = cur.u32()?;
+            let charging_percent    = cur.u32()?;
+            let minutes_from_start  = cur.u32()?;
+            let minutes_to_complete = cur.u32()?;
+            Ok(TileType::GeigerCharger {
+                seconds_from_start, seconds_to_complete, charging_percent,
+                minutes_from_start, minutes_to_complete,
+            })
+        }
+        58 => Ok(TileType::AdventureBegins),
+        59 => Ok(TileType::TombRobber),
+        60 => {
+            // BalloonOMatic
+            let total_rarity = cur.u32()?;
+            let team_type    = cur.u8()?;
+            Ok(TileType::BalloonOMatic { total_rarity, team_type })
+        }
+        61 => {
+            // TrainingPort
+            let fish_lb        = cur.u32()?;
+            let fish_status    = cur.u16()?;
+            let fish_id        = cur.u32()?;
+            let fish_total_exp = cur.u32()?;
+            let fish_level     = cur.u32()?;
+            let unknown_2      = cur.u32()?;
+            Ok(TileType::TrainingPort { fish_lb, fish_status, fish_id, fish_total_exp, fish_level, unknown_2 })
+        }
+        62 => {
+            // ItemSucker
+            let item_id_to_suck = cur.u32()?;
+            let item_amount     = cur.u32()?;
+            let flags           = cur.u16()?;
+            let limit           = cur.u32()?;
+            Ok(TileType::ItemSucker { item_id_to_suck, item_amount, flags, limit })
+        }
+        63 => {
+            // CyBot
+            let sync_timer         = cur.u32()?;
+            let activated          = cur.u32()?;
+            let command_data_count = cur.u32()?;
+            let mut command_datas  = Vec::new();
+            for _ in 0..command_data_count {
+                let command_id      = cur.u32()?;
+                let is_command_used = cur.u32()?;
+                cur.skip(7)?;
+                command_datas.push((command_id, is_command_used));
+            }
+            Ok(TileType::CyBot { sync_timer, activated, command_datas })
+        }
+        64 => {
+            // GuildBlock (kind 0x40) — reads one string at tileextra+0x28
+            let label = cur.plain_string()?;
+            Ok(TileType::GuildBlock { label })
+        }
+        65 => {
+            // GuildItem (kind 0x41) — default case in game switch, no bytes in stream
+            Ok(TileType::GuildItem)
+        }
+        66 => {
+            // Growscan
+            let unknown_1 = cur.u8()?;
+            Ok(TileType::Growscan { unknown_1 })
+        }
+        67 => {
+            // ContainmentFieldPowerNode
+            let ghost_jar_count  = cur.u32()?;
+            let unknown_1_size   = cur.u32()?;
+            let mut unknown_1    = Vec::new();
+            for _ in 0..unknown_1_size {
+                unknown_1.push(cur.u32()?);
+            }
+            Ok(TileType::ContainmentFieldPowerNode { ghost_jar_count, unknown_1 })
+        }
+        68 => {
+            // SpiritBoard
+            let unknown_1 = cur.u32()?;
+            let unknown_2 = cur.u32()?;
+            let unknown_3 = cur.u32()?;
+            Ok(TileType::SpiritBoard { unknown_1, unknown_2, unknown_3 })
+        }
+        69 => {
+            // TesseractManipulator (item 6952)
+            let gems      = cur.u32()?;
+            let unknown_2 = cur.u32()?;
+            let item_id   = cur.u32()?;
+            let unknown_4 = cur.u32()?;
+            Ok(TileType::TesseractManipulator { gems, unknown_2, item_id, unknown_4 })
+        }
+        72 => {
+            // StormyCloud
+            let sting_duration     = cur.u32()?;
+            let is_solid           = cur.u32()?;
+            let non_solid_duration = cur.u32()?;
+            Ok(TileType::StormyCloud { sting_duration, is_solid, non_solid_duration })
+        }
+        73 => {
+            // TemporaryPlatform
+            let unknown_1 = cur.u32()?;
+            Ok(TileType::TemporaryPlatform { unknown_1 })
+        }
+        74 => Ok(TileType::SafeVault),
+        75 => {
+            // AngelicCountingCloud
+            let is_raffling = cur.u32()?;
+            let unknown_1   = cur.u16()?;
+            let ascii_code  = cur.u8()?;
+            Ok(TileType::AngelicCountingCloud { is_raffling, unknown_1, ascii_code })
+        }
+        77 => {
+            // InfinityWeatherMachine
+            let interval_minutes          = cur.u32()?;
+            let weather_machine_list_size = cur.u32()?;
+            let mut weather_machine_list  = Vec::new();
+            for _ in 0..weather_machine_list_size {
+                weather_machine_list.push(cur.u32()?);
+            }
+            Ok(TileType::InfinityWeatherMachine { interval_minutes, weather_machine_list })
+        }
+        79 => Ok(TileType::PineappleGuzzler),
+        80 => {
+            // KrakenGalaticBlock
+            let pattern_index = cur.u8()?;
+            let unknown_1     = cur.u32()?;
+            let r             = cur.u8()?;
+            let g             = cur.u8()?;
+            let b             = cur.u8()?;
+            Ok(TileType::KrakenGalaticBlock { pattern_index, unknown_1, r, g, b })
+        }
+        81 => {
+            // FriendsEntrance
+            let owner_user_id = cur.u32()?;
+            let unknown_1     = cur.u16()?;
+            let unknown_2     = cur.u16()?;
+            Ok(TileType::FriendsEntrance { owner_user_id, unknown_1, unknown_2 })
+        }
+        _ => {
+            // Unknown / unhandled kind — log and return marker (no bytes consumed beyond kind)
+            eprintln!("[world] WARNING: unknown TileExtraData kind {kind:#x} at fg_item={fg_item_id}");
+            Ok(TileType::Unknown { kind })
+        }
+    }
+}
+
+// ── WorldObject ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct WorldObject {
+    pub item_id: u16,
+    pub x:       f32,
+    pub y:       f32,
+    pub count:   u8,
+    pub flags:   u8,
+    pub uid:     u32,
+}
+
+fn parse_world_objects(cur: &mut Cursor) -> Result<Vec<WorldObject>> {
+    let count     = cur.u32()?;
+    let _list_fld = cur.u32()?;
+
+    if count >= MAX_WORLD_OBJECTS {
+        bail!("world object count {count} >= limit {MAX_WORLD_OBJECTS}");
+    }
+
+    let mut objects = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let item_id = cur.u16()?;
+        let x       = cur.f32()?;
+        let y       = cur.f32()?;
+        let count_  = cur.u8()?;
+        let flags   = cur.u8()?;
+        let uid     = cur.u32()?;
+
+        let item_id = if matches!(item_id, 5996 | 1626) { 0 } else { item_id };
+        objects.push(WorldObject { item_id, x, y, count: count_, flags, uid });
+    }
+
+    Ok(objects)
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_world_dat() {
+        let data = match std::fs::read("world.dat") {
+            Ok(d)  => d,
+            Err(_) => { println!("world.dat not found — skipping"); return; }
+        };
+
+        let world = World::parse(&data).expect("World::parse failed");
+
+        println!("version      : {:#x}", world.version);
+        println!("world_flags  : {:#x}", world.flags);
+        println!("world_name   : {:?}", world.tile_map.world_name);
+        println!("width        : {}", world.tile_map.width);
+        println!("height       : {}", world.tile_map.height);
+        println!("tiles        : {}", world.tile_map.tiles.len());
+        println!("objects      : {}", world.objects.len());
+        println!("base_weather : {}", world.base_weather);
+        println!("cur_weather  : {}", world.current_weather);
+
+        assert_eq!(world.version, 0x19);
+        assert_eq!(
+            world.tile_map.tiles.len() as u32,
+            world.tile_map.width * world.tile_map.height
+        );
+
+        // Verify the first 4 tiles match the known test pattern:
+        // tile 0: empty, tile 1: fg=2 (dirt), tile 2: empty, tile 3: fg=2 (dirt)
+        let t0 = &world.tile_map.tiles[0];
+        let t1 = &world.tile_map.tiles[1];
+        let t2 = &world.tile_map.tiles[2];
+        let t3 = &world.tile_map.tiles[3];
+        assert_eq!(t0.fg_item_id, 0, "tile 0 should be empty");
+        assert_eq!(t1.fg_item_id, 2, "tile 1 should have fg=2");
+        assert_eq!(t2.fg_item_id, 0, "tile 2 should be empty");
+        assert_eq!(t3.fg_item_id, 2, "tile 3 should have fg=2");
+    }
+}

@@ -2,7 +2,7 @@
 
 <br/>
 <div align="center">
-<h3 align="center">Mori</h3>
+<h3 align="center">Mori - V2</h3>
 <p align="center">
 Your Cross-Platform Growtopia Companion
 </p>
@@ -20,39 +20,117 @@ Any contribution would help alot.
 
 ## Features
 
-- [x] GUI (If you prefer to use a GUI)
-- [ ] Web GUI
-- [x] Auto update following the game client (version & items.dat)
+- [x] Web GUI
+- [ ] Auto update following the game client (version & items.dat)
 - [x] Adding multi bot
 - [x] Item database
 - [x] Inventory
 - [x] World map preview
-- [x] Growscan
+- [ ] Growscan
 - [x] Bot movement + findpath
 - [x] Drop, trash item
 - [x] Warp
 - [x] Punch, place
 - [x] Auto collect item
 - [x] Auto Reconnect
-- [x] Google login ( Currently using API [growtopia-token](https://github.com/CLOEI/growtopia-token))
+- [ ] Google login ( Currently using API [growtopia-token](https://github.com/CLOEI/growtopia-token))
 - [x] Session refresh
 - [x] Legacy login
 - [ ] Apple login
-- [x] Ubisoft-steam login - (Build steamtoken and place it in the project root directory)
-- [x] Auto link ubisoft account to steam account
-- [x] Configureable delay
-- [x] Embedded scripting
-- [x] Bot terminal view
-- [x] Better item database with item image preview
+- [ ] Configureable delay
+- [ ] Embedded scripting
+- [ ] Bot terminal view
+- [ ] Better item database with item image preview
 - [ ] Better world map preview with texture
-- [ ] NPC
-- [ ] Auto rotation
-- [ ] Auto dirt farm
-- [ ] Auto tutorial
-- [x] Auto clear world
-- [x] Auto Punch and Break
-- [x] Spam
 - [x] Socks5 support
+
+## Running the tests
+
+### All .dat tests at once
+
+```sh
+cargo test -- --nocapture
+```
+
+### Individual files
+
+```sh
+# items.dat
+cargo test --test-thread=1 parse_items_dat -- --nocapture
+
+# world.dat
+cargo test --test-thread=1 parse_world_dat -- --nocapture
+
+# save.dat (all save.dat tests)
+cargo test save_dat -- --nocapture
+```
+
+---
+
+## items.dat — `src/items.rs`
+
+| Test | What it checks |
+|---|---|
+| `parse_items_dat` | Parses the full file, prints version, item count, and a few known items (IDs 1, 2, 32, 100, 242). Asserts item list is non-empty and last item has a non-empty name. |
+
+**Expected output (example):**
+```
+version    : 24
+item count : 10871
+item[0]    : id=0 name="Blank" material=0 action=0 flags=0
+item[  1]  : name="Dirt" texture="tiles_page1.rttex" rarity=1 grow_time=60
+...
+```
+
+> `world.dat` is **not** required for `parse_items_dat`.
+
+---
+
+## world.dat — `src/world.rs`
+
+| Test | What it checks |
+|---|---|
+| `parse_world_dat` | Parses the full world blob. Prints version, flags, world name, dimensions, tile count, object count, and weather. Asserts version == `0x19` and tile count == width × height. Also spot-checks the first 4 tiles for the expected fg item IDs. |
+
+**Expected output (example):**
+```
+version      : 0x19
+world_flags  : 0x0
+world_name   : "START"
+width        : 100
+height       : 60
+tiles        : 6000
+objects      : 3
+base_weather : 0
+cur_weather  : 0
+```
+
+> If `world.dat` is missing the test prints `"world.dat not found — skipping"` and passes silently.
+
+---
+
+## save.dat — `src/save_dat.rs`
+
+| Test | What it checks |
+|---|---|
+| `parse_save_dat` | Parses the file and prints every key/value pair. Asserts entry list is non-empty. |
+| `roundtrip_save_dat` | Parses → serializes → re-parses and asserts all keys/values are identical. |
+| `serialize_set` | Builds a `SaveDat` in memory (no file needed), round-trips through serialize/parse, checks `Token`, `Client`, and `player_age`. |
+| `meta_xor_roundtrip` | Verifies the XOR-90210 codec on the `meta` field (no file needed). |
+| `meta_from_save_dat` | Reads `save.dat`, decodes the `meta` field, and prints it. |
+| `seed_diary_roundtrip` | Encodes/decodes a hand-crafted `SeedDiary` (no file needed). |
+| `seed_diary_from_save_dat` | Reads `save.dat`, parses `seed_diary_data`, and prints every item ID with its grown flag. |
+
+**Expected output for `parse_save_dat` (example):**
+```
+entries: 12
+  "Token" = String("eyJ...")
+  "LoginAccountType" = Int(1)
+  "tankid_name" = String("MyName")
+  ...
+```
+
+
 
 ## Special thanks
 [Badewen](https://github.com/badewen) - Help alot with debugging and reversing.

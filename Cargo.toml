@@ -1,29 +1,21 @@
 [package]
 name = "Mori"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2024"
 authors = ["Cendy"]
 
 [dependencies]
-gt-core = { path = "./core" }
-serde_json = "1.0.143"
-
-axum = { version = "0.8", features = ["ws"] }
-tokio = { version = "1", features = ["full"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["fs", "cors"] }
-serde = { version = "1.0", features = ["derive"] }
-uuid = { version = "1.11", features = ["v4", "serde"] }
-axum-extra = { version = "0.10", features = ["typed-header"] }
-futures-util = "0.3"
-
-askama = "0.14"
-askama_web = { version = "0.14", features = ["axum-0.8"] }
-egui = "0.33.0"
-eframe = "0.33.0"
-egui_extras = { version = "0.33.0", features = ["svg"] }
-egui_material_icons = "0.5.0"
-
-[patch."https://github.com/cloei/gtitem-r"]
-gtitem-r = { path = "core/gtitem-r" }
-
+bitflags = "2"
+rand = "0.9"
+axum = { version = "0.8.8", features = ["ws"] }
+rusty_enet = { git = "https://github.com/CLOEI/rusty_enet" }
+tokio = { version = "1.50.0", features = ["full"] }
+ureq = { version = "3.3.0", features = ["cookies", "socks-proxy"] }
+md5 = "0.7"
+regex = "1"
+scraper = "0.26"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+urlencoding = "2"
+anyhow = "1.0.102"
+mlua = { version = "0.11.6", features = ["lua55", "vendored", "anyhow"]}

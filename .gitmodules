@@ -1,9 +1,0 @@
-[submodule "assets"]
-	path = assets
-	url = https://github.com/CLOEI/gt-data.git
-[submodule "core/gtitem-r"]
-	path = core/gtitem-r
-	url = https://github.com/CLOEI/gtitem-r.git
-[submodule "core/gtworld-r"]
-	path = core/gtworld-r
-	url = https://github.com/CLOEI/gtworld-r.git
