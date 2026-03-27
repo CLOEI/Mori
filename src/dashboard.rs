@@ -1,3 +1,4 @@
+use std::time::Duration;
 use scraper::{Html, Selector};
 use crate::constants::FHASH;
 use crate::crypto::{compute_klv, hash_string, generate_rid};
@@ -60,9 +61,9 @@ pub fn get_dashboard_proxied(
 
     let agent = if let Some(p) = proxy_url {
         let proxy = ureq::Proxy::new(p)?;
-        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).build())
+        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).timeout_global(Some(Duration::from_secs(20))).build())
     } else {
-        ureq::Agent::new_with_defaults()
+        ureq::Agent::new_with_config(ureq::config::Config::builder().timeout_global(Some(Duration::from_secs(20))).build())
     };
 
     let html = agent

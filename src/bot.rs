@@ -206,11 +206,13 @@ fn fetch_credentials(username: &str, password: &str, proxy: Option<&Socks5Config
         game_version: GAME_VER.into(),
     };
 
+    let mut alternate = false;
     loop {
-        println!("[Bot] fetching server_data...");
-        let server_data = match get_server_data_proxied(false, &login_info, proxy_url) {
+        println!("[Bot] fetching server_data (alternate={alternate})...");
+        let server_data = match get_server_data_proxied(alternate, &login_info, proxy_url) {
             Ok(s)  => s,
             Err(e) => {
+                alternate = !alternate;
                 println!("[Bot] fetch: server_data failed: {e} — retrying in 5s");
                 std::thread::sleep(std::time::Duration::from_secs(5));
                 continue;
@@ -323,10 +325,12 @@ impl Bot {
 
         let login_info = LoginInfo { protocol: PROTOCOL, game_version: GAME_VER.into() };
         let proxy_url  = self.proxy.as_ref().map(|p| p.to_url());
+        let mut alternate = false;
         let server_data = loop {
-            match get_server_data_proxied(false, &login_info, proxy_url.as_deref()) {
+            match get_server_data_proxied(alternate, &login_info, proxy_url.as_deref()) {
                 Ok(s)  => break s,
                 Err(e) => {
+                    alternate = !alternate;
                     println!("[Bot] reconnect: server_data failed: {e} — retrying in 5s");
                     std::thread::sleep(std::time::Duration::from_secs(5));
                 }

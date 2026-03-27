@@ -1,6 +1,7 @@
 use scraper::{Html, Selector};
 use serde_json::Value;
 use std::fmt;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum LoginError {
@@ -35,9 +36,9 @@ pub fn get_legacy_token_proxied(
 ) -> Result<String> {
     let agent = if let Some(p) = proxy_url {
         let proxy = ureq::Proxy::new(p).map_err(|e| LoginError::Other(e.to_string()))?;
-        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).build())
+        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).timeout_global(Some(Duration::from_secs(20))).build())
     } else {
-        ureq::Agent::new_with_defaults()
+        ureq::Agent::new_with_config(ureq::config::Config::builder().timeout_global(Some(Duration::from_secs(20))).build())
     };
 
     let html = agent
@@ -115,9 +116,9 @@ pub fn check_token(
 
     let agent = if let Some(p) = proxy_url {
         let proxy = ureq::Proxy::new(p)?;
-        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).build())
+        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).timeout_global(Some(Duration::from_secs(20))).build())
     } else {
-        ureq::Agent::new_with_defaults()
+        ureq::Agent::new_with_config(ureq::config::Config::builder().timeout_global(Some(Duration::from_secs(20))).build())
     };
 
     let body = agent
