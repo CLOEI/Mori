@@ -75,7 +75,7 @@ class MoriWebSocket {
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   private destroyed = false
 
-  connect(url = 'ws://localhost:3000/ws') {
+  connect(url = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:3000/ws`) {
     if (this.ws) return
     this.ws = new WebSocket(url)
 

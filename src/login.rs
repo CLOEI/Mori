@@ -13,9 +13,12 @@ pub enum LoginError {
 impl fmt::Display for LoginError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LoginError::Exhausted        => write!(f, "Login attempts exhausted. Please try again after 24 hours."),
+            LoginError::Exhausted => write!(
+                f,
+                "Login attempts exhausted. Please try again after 24 hours."
+            ),
             LoginError::WrongCredentials => write!(f, "Account credentials mismatched."),
-            LoginError::Other(msg)       => write!(f, "{msg}"),
+            LoginError::Other(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -36,9 +39,18 @@ pub fn get_legacy_token_proxied(
 ) -> Result<String> {
     let agent = if let Some(p) = proxy_url {
         let proxy = ureq::Proxy::new(p).map_err(|e| LoginError::Other(e.to_string()))?;
-        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).timeout_global(Some(Duration::from_secs(20))).build())
+        ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .proxy(Some(proxy))
+                .timeout_global(Some(Duration::from_secs(20)))
+                .build(),
+        )
     } else {
-        ureq::Agent::new_with_config(ureq::config::Config::builder().timeout_global(Some(Duration::from_secs(20))).build())
+        ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .timeout_global(Some(Duration::from_secs(20)))
+                .build(),
+        )
     };
 
     let html = agent
@@ -70,10 +82,15 @@ pub fn get_legacy_token_proxied(
         ]).map_err(|e| LoginError::Other(e.to_string()))?;
 
     if response.status() != 200 {
-        return Err(LoginError::Other(format!("Login failed with status: {}", response.status())));
+        return Err(LoginError::Other(format!(
+            "Login failed with status: {}",
+            response.status()
+        )));
     }
 
-    let body = response.into_body().read_to_string()
+    let body = response
+        .into_body()
+        .read_to_string()
         .map_err(|e| LoginError::Other(e.to_string()))?;
 
     if let Ok(json) = serde_json::from_str::<Value>(&body) {
@@ -102,7 +119,9 @@ pub fn get_legacy_token_proxied(
         }
     }
 
-    Err(LoginError::Other("Login failed: unexpected response from server".into()))
+    Err(LoginError::Other(
+        "Login failed: unexpected response from server".into(),
+    ))
 }
 
 pub fn check_token(
@@ -116,9 +135,18 @@ pub fn check_token(
 
     let agent = if let Some(p) = proxy_url {
         let proxy = ureq::Proxy::new(p)?;
-        ureq::Agent::new_with_config(ureq::config::Config::builder().proxy(Some(proxy)).timeout_global(Some(Duration::from_secs(20))).build())
+        ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .proxy(Some(proxy))
+                .timeout_global(Some(Duration::from_secs(20)))
+                .build(),
+        )
     } else {
-        ureq::Agent::new_with_config(ureq::config::Config::builder().timeout_global(Some(Duration::from_secs(20))).build())
+        ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .timeout_global(Some(Duration::from_secs(20)))
+                .build(),
+        )
     };
 
     let body = agent
