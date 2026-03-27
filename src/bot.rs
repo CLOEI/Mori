@@ -944,7 +944,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             }
             "OnDialogRequest" => {
                 let message = vl.get(1).map(|v| v.as_string()).unwrap_or_default();
-                println!("[Bot] Dialog: {}", &message[..message.len().min(80)]);
+                println!("[Bot] Dialog: {}", message);
                 let cb = self.temporary_data.dialog_callback.lock().unwrap().take();
                 if let Some(cb) = cb {
                     cb(self);

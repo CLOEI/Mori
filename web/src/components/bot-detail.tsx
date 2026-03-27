@@ -416,10 +416,6 @@ function InventoryTable({
   inventory: import('@/lib/api').InventoryItem[]
   itemLabel: (id: number) => string
 }) {
-  if (inventory.length === 0) {
-    return <p className="text-xs text-muted-foreground px-1">Empty</p>
-  }
-
   async function cmd(type: string, item_id: number, count?: number) {
     await api.sendCmd(botId, { type, item_id, ...(count !== undefined ? { count } : {}) } as never)
   }
@@ -435,7 +431,13 @@ function InventoryTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {[...inventory].sort((a, b) => b.amount - a.amount).map((i) => (
+          {inventory.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={3} className="py-2 text-center text-muted-foreground">
+                Empty
+              </TableCell>
+            </TableRow>
+          ) : [...inventory].sort((a, b) => b.amount - a.amount).map((i) => (
             <TableRow key={i.item_id}>
               <TableCell>
                 {i.is_active && <span className="text-primary mr-1">●</span>}
