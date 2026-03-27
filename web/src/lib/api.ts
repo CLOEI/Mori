@@ -1,4 +1,4 @@
-const BASE = `${window.location.protocol}//${window.location.hostname}:3000`
+const BASE = window.location.origin
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
