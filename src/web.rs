@@ -84,7 +84,7 @@ async fn bot_state(
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum CmdRequest {
-    Move { x: f32, y: f32 },
+    Move { x: i32, y: i32 },
     WalkTo { x: u32, y: u32 },
     RunScript { content: String },
     StopScript,
@@ -146,8 +146,8 @@ async fn bot_cmd(
     Json(req): Json<CmdRequest>,
 ) -> StatusCode {
     let cmd = match req {
-        CmdRequest::Move { x, y }           => BotCommand::Move { x, y },
-        CmdRequest::WalkTo { x, y }         => BotCommand::WalkTo { x, y },
+        CmdRequest::Move { x, y }   => BotCommand::Move { x, y },
+        CmdRequest::WalkTo { x, y } => BotCommand::WalkTo { x, y },
         CmdRequest::RunScript { content }   => BotCommand::RunScript { content },
         CmdRequest::StopScript              => BotCommand::StopScript,
         CmdRequest::Wear { item_id }        => BotCommand::Wear { item_id },

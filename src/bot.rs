@@ -1561,15 +1561,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
     fn handle_command(&mut self, cmd: BotCommand) {
         match cmd {
             BotCommand::Move { x, y } => {
-                println!("[Bot] Command: Move to ({x}, {y})");
+                let cx = (self.pos_x / 32.0) as i32;
+                let cy = (self.pos_y / 32.0) as i32;
+                self.walk(cx + x, cy + y);
             }
             BotCommand::WalkTo { x, y } => {
                 self.find_path(x, y);
-            }
-            BotCommand::MoveDelta { dx, dy } => {
-                let cx = (self.pos_x / 32.0) as i32;
-                let cy = (self.pos_y / 32.0) as i32;
-                self.walk(cx + dx, cy + dy);
             }
             BotCommand::RunScript { content } => {
                 crate::lua_api::run_script(self, &content);

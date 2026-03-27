@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Gem, Wifi } from 'lucide-react'
+import { X, Gem, Wifi, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSetAtom, useAtomValue } from 'jotai'
 import { selectedBotIdAtom, botsAtom, itemNamesAtom, type LiveBot } from '@/lib/store'
 import { api } from '@/lib/api'
@@ -168,6 +168,7 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
               ['Grow ID', bot.track_info?.grow_id],
               ['Awesomeness', bot.track_info?.awesomeness],
               ['Playtime', bot.track_info ? `${Math.floor(bot.track_info.global_playtime / 3600)}h` : null],
+              ['Install Date', bot.track_info ? new Date(bot.track_info.install_date * 1000).toLocaleDateString() : null],
             ].map(([label, val]) => (
               <>
                 <span key={`${label}-k`} className="text-muted-foreground">{label}</span>
@@ -175,6 +176,10 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
               </>
             ))}
           </div>
+        </Section>
+
+        <Section label="Movement">
+          <DPad botId={bot.id} />
         </Section>
 
         <Section label="Inventory">
@@ -454,6 +459,29 @@ function InventoryTable({
         </TableBody>
       </Table>
     </ScrollArea>
+  )
+}
+
+function DPad({ botId }: { botId: number }) {
+  const move = (x: number, y: number) => api.sendCmd(botId, { type: 'move', x, y }).catch(() => {})
+
+  return (
+    <div className="grid grid-cols-3 gap-1 w-fit mx-auto">
+      <div />
+      <button onClick={() => move(0, -1)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+        <ChevronUp className="w-4 h-4" />
+      </button>
+      <div />
+      <button onClick={() => move(-1, 0)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <button onClick={() => move(0, 1)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+        <ChevronDown className="w-4 h-4" />
+      </button>
+      <button onClick={() => move(1, 0)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
   )
 }
 

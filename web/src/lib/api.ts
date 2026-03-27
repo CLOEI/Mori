@@ -82,7 +82,7 @@ export interface SpawnBotBody {
 }
 
 export type BotCmd =
-  | { type: 'move'; x: number; y: number }
+  | { type: 'move'; x: number; y: number }  // tile deltas
   | { type: 'walk_to'; x: number; y: number }
   | { type: 'run_script'; content: string }
   | { type: 'stop_script' }

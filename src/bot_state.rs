@@ -118,9 +118,8 @@ pub struct BotState {
 }
 
 pub enum BotCommand {
-    Move { x: f32, y: f32 },
+    Move { x: i32, y: i32 },
     WalkTo { x: u32, y: u32 },
-    MoveDelta { dx: i32, dy: i32 },
     RunScript { content: String },
     StopScript,
     Say { text: String },
