@@ -29,32 +29,25 @@ jobs:
           - host: windows-latest
             target: x86_64-pc-windows-msvc
             bin: Mori.exe
-            pkg: zip
           - host: windows-latest
             target: i686-pc-windows-msvc
             bin: Mori.exe
-            pkg: zip
           - host: macos-latest
             target: x86_64-apple-darwin
             bin: Mori
-            pkg: tar.gz
           - host: macos-latest
             target: aarch64-apple-darwin
             bin: Mori
-            pkg: tar.gz
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             bin: Mori
-            pkg: tar.gz
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             bin: Mori
-            pkg: tar.gz
             setup: sudo apt-get update && sudo apt-get install -y musl-tools
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             bin: Mori
-            pkg: tar.gz
             setup: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
     name: Build - ${{ matrix.settings.target }}
@@ -97,32 +90,26 @@ jobs:
         
         cargo build --release --target ${{ matrix.settings.target }}
 
-    - name: Package Artifacts
+    - name: Stage Artifacts
       shell: bash
       run: |
-        mkdir -p dist
+        mkdir -p staging
         
         # If cross-compiling, path is target/<triple>/release. Else target/release.
         if [ -f "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" ]; then
-          cp "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" dist/
+          cp "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" staging/
         else
-          cp "target/release/${{ matrix.settings.bin }}" dist/
+          cp "target/release/${{ matrix.settings.bin }}" staging/
         fi
 
-        cp items.dat dist/ || true
-        
-        FILENAME="${{ env.APP_NAME }}-${{ matrix.settings.target }}"
-        if [ "${{ matrix.settings.pkg }}" == "zip" ]; then
-          cd dist && 7z a -tzip "../$FILENAME.zip" * && cd ..
-        else
-          tar -czf "$FILENAME.tar.gz" -C dist .
-        fi
+        cp items.dat staging/ || true
+        cp -r dist staging
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.settings.target }}-archive
-        path: ${{ env.APP_NAME }}-${{ matrix.settings.target }}.${{ matrix.settings.pkg }}
+        name: ${{ env.APP_NAME }}-${{ matrix.settings.target }}
+        path: staging/
 
   release:
     name: Github Release
@@ -138,18 +125,29 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./downloads
-          pattern: '*-archive'
-          merge-multiple: true
 
       - name: Create Release
         shell: bash
         run: |
-          # Get version from latest commit message (e.g. 1.0.2)
           VERSION=$(git log -1 --pretty=%B | tr -d '\n')
           
           if echo "$VERSION" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+$"; then
+            mkdir -p release_assets
+            cd downloads
+            for dir in Mori-*/; do
+              target_dir="${dir%/}" 
+              cd "$target_dir"
+              if [[ "$target_dir" == *"windows"* ]]; then
+                7z a -tzip "../../release_assets/${target_dir}.zip" *
+              else
+                tar -czf "../../release_assets/${target_dir}.tar.gz" .
+              fi
+              cd ..
+            done
+            cd ..
+
             gh release create "$VERSION" \
-              ./downloads/* \
+              ./release_assets/* \
               --title "v$VERSION" \
               --generate-notes \
               --target ${{ github.sha }}
