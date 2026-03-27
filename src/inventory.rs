@@ -3,6 +3,11 @@ use std::collections::HashMap;
 use anyhow::Result;
 use crate::cursor::Cursor;
 
+const TEMPORARY_ITEM_IDS: &[u16] = &[
+    1424, // World Key
+    5640, // Magplant 5000 Remote
+];
+
 #[derive(Debug, Clone)]
 pub struct InventoryItem {
     pub id:     u16,
@@ -71,7 +76,7 @@ impl Inventory {
         }
     }
 
-    pub fn remove_item(&mut self, id: u16, amount: u8) {
+    pub fn sub_item(&mut self, id: u16, amount: u8) {
         if let Some(item) = self.items.get_mut(&id) {
             if item.amount <= amount {
                 self.items.remove(&id);
@@ -80,5 +85,25 @@ impl Inventory {
                 item.amount -= amount;
             }
         }
+    }
+
+    pub fn remove_item(&mut self, id: u16) {
+        if self.items.remove(&id).is_some() {
+            self.item_count = self.item_count.saturating_sub(1);
+        }
+    }
+
+    pub fn remove_temp_items(&mut self) -> bool {
+        let to_remove: Vec<u16> = self.items.keys()
+            .copied()
+            .filter(|id| TEMPORARY_ITEM_IDS.contains(id))
+            .collect();
+
+        let changed = !to_remove.is_empty();
+        for id in to_remove {
+            self.remove_item(id);
+        }
+
+        changed
     }
 }
