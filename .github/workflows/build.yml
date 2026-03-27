@@ -93,22 +93,23 @@ jobs:
     - name: Stage Artifacts
       shell: bash
       run: |
-        mkdir -p dist
+        mkdir -p staging
         
         # If cross-compiling, path is target/<triple>/release. Else target/release.
         if [ -f "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" ]; then
-          cp "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" dist/
+          cp "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" staging/
         else
-          cp "target/release/${{ matrix.settings.bin }}" dist/
+          cp "target/release/${{ matrix.settings.bin }}" staging/
         fi
 
-        cp items.dat dist/ || true
+        cp items.dat staging/ || true
+        cp dist staging
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.APP_NAME }}-${{ matrix.settings.target }}
-        path: dist/
+        path: staging/
 
   release:
     name: Github Release
