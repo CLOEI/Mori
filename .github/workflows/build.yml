@@ -103,7 +103,7 @@ jobs:
         fi
 
         cp items.dat staging/ || true
-        cp dist staging
+        cp -r dist staging
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
