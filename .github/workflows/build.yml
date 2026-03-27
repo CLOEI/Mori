@@ -58,6 +58,12 @@ jobs:
       with:
         submodules: 'recursive'
 
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Build Web
+      run: cd web && bun install && bun run build:release
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -96,7 +102,6 @@ jobs:
           cp "target/release/${{ matrix.settings.bin }}" dist/
         fi
 
-        cp index.html dist/ || true
         cp items.dat dist/ || true
 
     - name: Upload Artifact
