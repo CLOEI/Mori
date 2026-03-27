@@ -18,48 +18,138 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  APP_NAME: Mori
 
 jobs:
   build:
-
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         settings:
           - host: windows-latest
-            target: "x86_64-pc-windows-msvc" 
-            install: |
-              xcopy index.html dist\
-              xcopy target\release\Mori.exe dist\
-              xcopy items.dat dist\
-          
+            target: x86_64-pc-windows-msvc
+            bin: Mori.exe
+            pkg: zip
+          - host: windows-latest
+            target: i686-pc-windows-msvc
+            bin: Mori.exe
+            pkg: zip
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            bin: Mori
+            pkg: tar.gz
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            bin: Mori
+            pkg: tar.gz
           - host: ubuntu-latest
-            target: "x86_64-unknown-linux-gnu"
-            install: |
-              cp index.html target/release/Mori items.dat dist/
-          
-    name: Release - ${{ matrix.settings.target }}
+            target: x86_64-unknown-linux-gnu
+            bin: Mori
+            pkg: tar.gz
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            bin: Mori
+            pkg: tar.gz
+            setup: sudo apt-get update && sudo apt-get install -y musl-tools
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            bin: Mori
+            pkg: tar.gz
+            setup: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+    name: Build - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
-    steps:
-    - name: Cache Build
-      uses: Swatinem/rust-cache@v2
-      with:
-        # The prefix cache key, this can be changed to start a new cache manually.
-        # default: "v0-rust"
-        prefix-key: "${{ matrix.settings.target }}-build"
     
+    steps:
     - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-    - name: Build 
-      run: |
-        cargo build --release
 
-        mkdir dist
-        
-        ${{ matrix.settings.install }}
-
-    - uses: actions/upload-artifact@v4
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
       with:
-        name: '${{ matrix.settings.target }}'
-        path: dist
+        targets: ${{ matrix.settings.target }}
+
+    - name: Cache Build
+      uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "${{ matrix.settings.target }}-build"
+
+    - name: Setup Cross-Compilation Toolchain
+      if: matrix.settings.setup
+      run: ${{ matrix.settings.setup }}
+
+    - name: Build
+      shell: bash
+      run: |
+        # Explicitly set the linker for cross-compilation targets
+        if [ "${{ matrix.settings.target }}" == "aarch64-unknown-linux-gnu" ]; then
+          export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+        elif [ "${{ matrix.settings.target }}" == "x86_64-unknown-linux-musl" ]; then
+          export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc
+        fi
+        
+        cargo build --release --target ${{ matrix.settings.target }}
+
+    - name: Package Artifacts
+      shell: bash
+      run: |
+        mkdir -p dist
+        
+        # If cross-compiling, path is target/<triple>/release. Else target/release.
+        if [ -f "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" ]; then
+          cp "target/${{ matrix.settings.target }}/release/${{ matrix.settings.bin }}" dist/
+        else
+          cp "target/release/${{ matrix.settings.bin }}" dist/
+        fi
+
+        cp index.html dist/ || true
+        cp items.dat dist/ || true
+        
+        FILENAME="${{ env.APP_NAME }}-${{ matrix.settings.target }}"
+        if [ "${{ matrix.settings.pkg }}" == "zip" ]; then
+          cd dist && 7z a -tzip "../$FILENAME.zip" * && cd ..
+        else
+          tar -czf "$FILENAME.tar.gz" -C dist .
+        fi
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.settings.target }}-archive
+        path: ${{ env.APP_NAME }}-${{ matrix.settings.target }}.${{ matrix.settings.pkg }}
+
+  release:
+    name: Github Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./downloads
+          pattern: '*-archive'
+          merge-multiple: true
+
+      - name: Create Release
+        shell: bash
+        run: |
+          # Get version from latest commit message (e.g. 1.0.2)
+          VERSION=$(git log -1 --pretty=%B | tr -d '\n')
+          
+          if echo "$VERSION" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+$"; then
+            gh release create "$VERSION" \
+              ./downloads/* \
+              --title "v$VERSION" \
+              --generate-notes \
+              --target ${{ github.sha }}
+          else
+            echo "Commit message '$VERSION' is not a semver. No release created."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
