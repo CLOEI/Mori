@@ -1,4 +1,15 @@
-# Build stage
+# Web build stage
+FROM oven/bun:1 AS web-builder
+
+WORKDIR /app
+
+COPY web/package.json web/bun.lock* ./web/
+RUN cd web && bun install --frozen-lockfile
+
+COPY web ./web
+RUN cd web && bun run build:release
+
+# Rust build stage
 FROM rust:1.88-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
@@ -30,7 +41,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY --from=builder /app/target/release/Mori ./Mori
-COPY index.html ./index.html
+COPY --from=web-builder /app/dist ./dist
 COPY items.dat ./items.dat
 
 EXPOSE 3000

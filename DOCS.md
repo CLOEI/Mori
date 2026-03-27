@@ -90,7 +90,12 @@ Returns the full state of a bot.
   "world_width": 100,
   "world_height": 60,
   "tiles": [
-    { "fg_item_id": 0, "bg_item_id": 0 }
+    {
+      "fg_item_id": 0,
+      "bg_item_id": 0,
+      "flags": 0,
+      "tile_type": { "type": "Basic" }
+    }
   ],
   "players": [
     {
@@ -124,9 +129,18 @@ Returns the full state of a bot.
   "delays": {
     "place_ms": 500,
     "walk_ms": 500
+  },
+  "track_info": {
+    "level": 0,
+    "grow_id": 0,
+    "install_date": 0,
+    "global_playtime": 0,
+    "awesomeness": 0
   }
 }
 ```
+
+`track_info` is `null` until the server sends account data after login.
 
 | Status | Meaning |
 |--------|---------|

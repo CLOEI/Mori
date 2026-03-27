@@ -619,7 +619,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                             );
                                             self.world = Some(world.clone());
                                             let tiles: Vec<TileInfo> = world.tile_map.tiles.iter()
-                                                .map(|t| TileInfo { fg_item_id: t.fg_item_id, bg_item_id: t.bg_item_id })
+                                                .map(|t| TileInfo { fg_item_id: t.fg_item_id, bg_item_id: t.bg_item_id, flags: t.flags_raw, tile_type: t.tile_type.clone() })
                                                 .collect();
                                             let mut s = self.state.write().unwrap();
                                             s.world_name   = world.tile_map.world_name.clone();
@@ -641,6 +641,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                                     tile_type: t.tile_type.clone(),
                                                 })
                                                 .collect();
+                                            let ws_objs: Vec<WsObject> = world.objects.iter()
+                                                .map(|o| WsObject { uid: o.uid, item_id: o.item_id, x: o.x, y: o.y, count: o.count })
+                                                .collect();
                                             drop(s);
                                             self.emit(WsEvent::BotStatus  { bot_id: self.bot_id, status: "in_world".into() });
                                             self.emit(WsEvent::BotWorld   { bot_id: self.bot_id, world_name: world.tile_map.world_name.clone() });
@@ -651,6 +654,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                                 height: world.tile_map.height,
                                                 tiles:  ws_tiles,
                                             });
+                                            self.emit(WsEvent::ObjectsUpdate { bot_id: self.bot_id, objects: ws_objs });
                                         }
                                         Err(e) => println!("[Bot] World parse error: {e}"),
                                     }
@@ -676,6 +680,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                             let install_date   = fields.get("installDate")    .and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
                             let global_playtime= fields.get("Global_Playtime").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
                             let awesomeness    = fields.get("Awesomeness")    .and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+                            self.state.write().unwrap().track_info = Some(crate::bot_state::TrackInfo {
+                                level, grow_id, install_date, global_playtime, awesomeness,
+                            });
                             self.emit(WsEvent::BotTrackInfo { bot_id: self.bot_id, level, grow_id, install_date, global_playtime, awesomeness });
                         }
                         Some(IncomingPacket::ClientLogRequest) => {

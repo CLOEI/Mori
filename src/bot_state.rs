@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::mpsc;
+use crate::world::TileType;
 
 #[derive(Default, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -33,10 +34,18 @@ impl fmt::Display for BotStatus {
     }
 }
 
-#[derive(Default, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct TileInfo {
     pub fg_item_id: u16,
     pub bg_item_id: u16,
+    pub flags:      u16,
+    pub tile_type:  TileType,
+}
+
+impl Default for TileInfo {
+    fn default() -> Self {
+        Self { fg_item_id: 0, bg_item_id: 0, flags: 0, tile_type: TileType::Basic }
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -63,6 +72,15 @@ pub struct WorldObjectInfo {
     pub x:       f32,
     pub y:       f32,
     pub count:   u8,
+}
+
+#[derive(Default, Clone, Serialize)]
+pub struct TrackInfo {
+    pub level:           u32,
+    pub grow_id:         u64,
+    pub install_date:    u64,
+    pub global_playtime: u64,
+    pub awesomeness:     u32,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -96,6 +114,7 @@ pub struct BotState {
     pub ping_ms: u32,
     /// Configurable delays for bot actions.
     pub delays: BotDelays,
+    pub track_info: Option<TrackInfo>,
 }
 
 pub enum BotCommand {

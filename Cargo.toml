@@ -8,6 +8,7 @@ authors = ["Cendy"]
 bitflags = "2"
 rand = "0.9"
 axum = { version = "0.8.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
 rusty_enet = { git = "https://github.com/CLOEI/rusty_enet" }
 tokio = { version = "1.50.0", features = ["full"] }
 ureq = { version = "3.3.0", features = ["cookies", "socks-proxy"] }

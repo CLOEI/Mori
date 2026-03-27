@@ -2,11 +2,13 @@ use axum::{
     Router,
     extract::{Path, Query, State, WebSocketUpgrade},
     extract::ws::{Message, WebSocket},
-    http::{StatusCode, header},
+    http::{StatusCode, HeaderValue, Method},
     response::IntoResponse,
     routing::{delete, get, post},
     Json,
 };
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 
@@ -24,31 +26,6 @@ pub struct AppState {
     pub ws_tx:   WsTx,
 }
 
-async fn index() -> impl IntoResponse {
-    let base_dir = std::env::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."));
-
-    let watermark = r#"<script>
-(function() {
-    const el = document.createElement('div');
-    el.textContent = 'Mori - Created with \u2665\uFE0E by Cendy';
-    el.style.cssText = 'position:fixed;bottom:12px;right:16px;font-size:12px;opacity:0.45;pointer-events:none;z-index:9999;font-family:sans-serif;';
-    document.addEventListener('DOMContentLoaded', () => document.body.appendChild(el));
-})();
-</script>"#;
-
-    match std::fs::read_to_string(base_dir.join("index.html")) {
-        Ok(mut html) => {
-            if let Some(pos) = html.to_lowercase().rfind("</body>") {
-                html.insert_str(pos, watermark);
-            } else {
-                html.push_str(watermark);
-            }
-            (StatusCode::OK, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response()
-        }
-        Err(_) => (StatusCode::NOT_FOUND, "index.html not found").into_response(),
-    }
-}
 
 async fn list_bots(State(s): State<AppState>) -> Json<Vec<BotInfo>> {
     Json(s.manager.lock().unwrap().list())
@@ -216,11 +193,38 @@ async fn handle_socket(
     }
 }
 
+async fn index_html() -> impl IntoResponse {
+    let dist = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("dist");
+
+    let html = tokio::fs::read_to_string(dist.join("index.html"))
+        .await
+        .unwrap_or_default();
+
+    let injected = html.replace(
+        "</body>",
+        r#"<div style="position:fixed;bottom:8px;right:12px;font-size:10px;opacity:0.35;color:#fff;pointer-events:none;z-index:9999;font-family:sans-serif;">Mori created with &#x2764;&#xfe0e; by Cendy</div></body>"#,
+    );
+
+    axum::response::Html(injected)
+}
+
 pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
     let state = AppState { manager, ws_tx };
 
+    let cors = CorsLayer::new()
+        .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+        .allow_headers(Any);
+
+    let dist = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("dist");
+
     let app = Router::new()
-        .route("/", get(index))
+        .route("/", get(index_html))
+
         .route("/bots", get(list_bots).post(spawn_bot))
         .route("/bots/{id}", delete(stop_bot))
         .route("/bots/{id}/state", get(bot_state))
@@ -228,7 +232,9 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/items", get(list_items))
         .route("/items/names", get(item_names))
         .route("/ws", get(ws_handler))
-        .with_state(state);
+        .layer(cors)
+        .with_state(state)
+        .fallback_service(ServeDir::new(&dist).fallback(ServeFile::new(dist.join("index.html"))));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Dashboard  http://localhost:3000");
