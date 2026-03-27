@@ -3,6 +3,8 @@ import { Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { api, type ItemRecord, type ItemsPage } from '@/lib/api'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 export function ItemsPage() {
   const [q, setQ] = useState('')
@@ -60,31 +62,31 @@ export function ItemsPage() {
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-card border-b border-border text-[10px] uppercase tracking-wide text-muted-foreground">
-              <Th>ID</Th>
-              <Th>Name</Th>
-              <Th>Action</Th>
-              <Th>Rarity</Th>
-              <Th>Max</Th>
-              <Th>Grow (s)</Th>
-              <Th>Collision</Th>
-            </tr>
-          </thead>
-          <tbody>
+      <ScrollArea className="flex-1 min-h-0">
+        <Table className="text-xs">
+          <TableHeader className="sticky top-0 z-10 bg-card">
+            <TableRow className="border-b border-border">
+              <TableHead>ID</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Rarity</TableHead>
+              <TableHead>Max</TableHead>
+              <TableHead>Grow (s)</TableHead>
+              <TableHead>Collision</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data?.items.map((item) => <ItemRow key={item.id} item={item} />) ?? null}
             {!loading && data?.items.length === 0 && (
-              <tr>
-                <td colSpan={7} className="text-center text-muted-foreground py-12">
+              <TableRow>
+                <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                   No items found.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </ScrollArea>
 
       <div className="shrink-0 flex items-center justify-between px-6 py-2 border-t border-border bg-card">
         <Button
@@ -115,20 +117,16 @@ export function ItemsPage() {
   )
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-4 py-2 text-left font-semibold">{children}</th>
-}
-
 function ItemRow({ item }: { item: ItemRecord }) {
   return (
-    <tr className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-      <td className="px-4 py-1.5 text-muted-foreground font-mono">{item.id}</td>
-      <td className="px-4 py-1.5 font-medium">{item.name}</td>
-      <td className="px-4 py-1.5 text-muted-foreground">{item.action_type}</td>
-      <td className="px-4 py-1.5 text-muted-foreground">{item.rarity}</td>
-      <td className="px-4 py-1.5 text-muted-foreground">{item.max_item}</td>
-      <td className="px-4 py-1.5 text-muted-foreground">{item.grow_time || '—'}</td>
-      <td className="px-4 py-1.5 text-muted-foreground">{item.collision_type}</td>
-    </tr>
+    <TableRow>
+      <TableCell className="font-mono text-muted-foreground">{item.id}</TableCell>
+      <TableCell className="font-medium">{item.name}</TableCell>
+      <TableCell className="text-muted-foreground">{item.action_type}</TableCell>
+      <TableCell className="text-muted-foreground">{item.rarity}</TableCell>
+      <TableCell className="text-muted-foreground">{item.max_item}</TableCell>
+      <TableCell className="text-muted-foreground">{item.grow_time || '—'}</TableCell>
+      <TableCell className="text-muted-foreground">{item.collision_type}</TableCell>
+    </TableRow>
   )
 }

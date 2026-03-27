@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 type Entry = { sig: string; desc: string }
 type Section = { title: string; entries: Entry[] }
@@ -263,33 +265,36 @@ export function DocsPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="max-w-3xl mx-auto px-6 py-6 space-y-7">
           {filtered.map((section) => (
             <div key={section.title}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 pb-2 border-b border-border">
                 {section.title}
               </p>
-              <div>
-                {section.entries.map((entry, i) => (
-                  <div
-                    key={i}
-                    className="flex gap-3 items-baseline py-1.5 text-xs border-b border-border/50 last:border-b-0"
-                  >
-                    <span className="font-mono text-primary whitespace-nowrap shrink-0">
-                      {entry.sig}
-                    </span>
-                    <span className="text-muted-foreground">{entry.desc}</span>
-                  </div>
-                ))}
-              </div>
+              <Table className="text-xs">
+                <TableHeader>
+                  <TableRow className="border-b border-border">
+                    <TableHead className="w-64">Signature</TableHead>
+                    <TableHead>Description</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {section.entries.map((entry, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-primary whitespace-nowrap align-top">{entry.sig}</TableCell>
+                      <TableCell className="text-muted-foreground align-top">{entry.desc}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           ))}
           {filtered.length === 0 && (
             <p className="text-center text-muted-foreground text-xs py-12">No results.</p>
           )}
         </div>
-      </div>
+      </ScrollArea>
     </div>
   )
 }

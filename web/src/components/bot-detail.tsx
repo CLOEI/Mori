@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { parseGTColors } from '@/lib/gt-colors'
 import { Minimap } from '@/components/minimap'
 import { cn } from '@/lib/utils'
@@ -156,22 +157,9 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
             empty="No players"
           />
         </Section>
-
-        <Section label="Floating Objects">
-          <DataTable
-            columns={['Item', 'Amt', 'Pos', 'UID']}
-            rows={bot.objects.map((o) => [
-              itemLabel(o.item_id),
-              String(o.count),
-              `${o.x.toFixed(1)},${o.y.toFixed(1)}`,
-              String(o.uid),
-            ])}
-            empty="No objects"
-          />
-        </Section>
       </div>
 
-      {/* Right column: account + inventory */}
+      {/* Right column: account + inventory + objects */}
       <div className="flex flex-col gap-4">
         <Section label="Account">
           <div className="rounded border border-border bg-background p-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
@@ -191,6 +179,19 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
 
         <Section label="Inventory">
           <InventoryTable botId={bot.id} inventory={bot.inventory} itemLabel={itemLabel} />
+        </Section>
+
+        <Section label="Floating Objects">
+          <DataTable
+            columns={['Item', 'Amt', 'Pos', 'UID']}
+            rows={bot.objects.map((o) => [
+              itemLabel(o.item_id),
+              String(o.count),
+              `${o.x.toFixed(1)},${o.y.toFixed(1)}`,
+              String(o.uid),
+            ])}
+            empty="No objects"
+          />
         </Section>
       </div>
     </div>
@@ -370,34 +371,34 @@ function DataTable({
   maxH?: string
 }) {
   return (
-    <div className={cn('overflow-y-auto rounded border border-border', maxH)}>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-card text-[10px] uppercase tracking-wide text-muted-foreground sticky top-0">
+    <ScrollArea className={cn('rounded border border-border', maxH)}>
+      <Table className="text-xs">
+        <TableHeader className="sticky top-0 bg-card">
+          <TableRow className="border-b border-border">
             {columns.map((c) => (
-              <th key={c} className="px-3 py-1.5 text-left font-semibold">{c}</th>
+              <TableHead key={c}>{c}</TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="px-3 py-2 text-center text-muted-foreground">
+            <TableRow>
+              <TableCell colSpan={columns.length} className="py-2 text-center text-muted-foreground">
                 {empty}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : (
             rows.map((row, i) => (
-              <tr key={i} className="border-t border-border/50 hover:bg-muted/50 transition-colors">
+              <TableRow key={i}>
                 {row.map((cell, j) => (
-                  <td key={j} className="px-3 py-1.5 text-foreground/80">{cell}</td>
+                  <TableCell key={j}>{cell}</TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))
           )}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </ScrollArea>
   )
 }
 
@@ -419,24 +420,24 @@ function InventoryTable({
   }
 
   return (
-    <div className="overflow-y-auto max-h-72 rounded border border-border">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-card text-[10px] uppercase tracking-wide text-muted-foreground sticky top-0">
-            <th className="px-3 py-1.5 text-left font-semibold">Item</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Amt</th>
-            <th className="px-3 py-1.5 text-left font-semibold">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+    <ScrollArea className="max-h-72 rounded border border-border">
+      <Table className="text-xs">
+        <TableHeader className="sticky top-0 bg-card">
+          <TableRow className="border-b border-border">
+            <TableHead>Item</TableHead>
+            <TableHead>Amt</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {[...inventory].sort((a, b) => b.amount - a.amount).map((i) => (
-            <tr key={i.item_id} className="border-t border-border/50 hover:bg-muted/50 transition-colors">
-              <td className="px-3 py-1.5 text-foreground/80">
+            <TableRow key={i.item_id}>
+              <TableCell>
                 {i.is_active && <span className="text-primary mr-1">●</span>}
                 {itemLabel(i.item_id)}
-              </td>
-              <td className="px-3 py-1.5 text-foreground/80">{i.amount}</td>
-              <td className="px-2 py-1">
+              </TableCell>
+              <TableCell>{i.amount}</TableCell>
+              <TableCell className="px-2 py-1">
                 <div className="flex gap-1 flex-wrap">
                   {i.action_type === 20 && (
                     i.is_active
@@ -447,12 +448,12 @@ function InventoryTable({
                   <Btn onClick={() => cmd('drop', i.item_id, i.amount)}>Drop All</Btn>
                   <Btn onClick={() => cmd('trash', i.item_id, 1)} variant="danger">Trash</Btn>
                 </div>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </ScrollArea>
   )
 }
 
