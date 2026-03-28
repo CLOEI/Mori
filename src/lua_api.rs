@@ -552,15 +552,14 @@ impl LuaUserData for LuaTile {
             }
             let tbl = lua.create_table()?;
             match &t.0.tile_type {
-                TileType::Sign { text, flags } => {
+                TileType::Sign { label } => {
                     tbl.set("type", "sign")?;
-                    tbl.set("text", text.clone())?;
-                    tbl.set("flags", *flags)?;
+                    tbl.set("label", label.clone())?;
                 }
-                TileType::Door { text, owner_uid } => {
+                TileType::Door { label, flags } => {
                     tbl.set("type", "door")?;
-                    tbl.set("text", text.clone())?;
-                    tbl.set("owner_uid", *owner_uid)?;
+                    tbl.set("text", label.clone())?;
+                    tbl.set("flags", *flags)?;
                 }
                 TileType::Lock { settings, owner_uid, access_count, .. } => {
                     tbl.set("type", "lock")?;
@@ -568,15 +567,26 @@ impl LuaUserData for LuaTile {
                     tbl.set("owner_uid", *owner_uid)?;
                     tbl.set("access_count", *access_count)?;
                 }
-                TileType::Seed { time_passed, item_on_tree } => {
+                TileType::Seed { age: time_passed, item_on_tree } => {
                     tbl.set("type", "seed")?;
                     tbl.set("time_passed", *time_passed)?;
                     tbl.set("item_on_tree", *item_on_tree)?;
                 }
-                TileType::Mannequin { text, clothing_1, .. } => {
+                TileType::Mannequin { 
+                    label, hat, shirt, pants, boots,
+                    face, hand, back, hair, neck, .. 
+                } => {
                     tbl.set("type", "mannequin")?;
-                    tbl.set("text", text.clone())?;
-                    tbl.set("clothing_1", *clothing_1)?;
+                    tbl.set("label", label.clone())?;
+                    tbl.set("hat", *hat)?;
+                    tbl.set("shirt", *shirt)?;
+                    tbl.set("pants", *pants)?;
+                    tbl.set("boots", *boots)?;
+                    tbl.set("face", *face)?;
+                    tbl.set("hand", *hand)?;
+                    tbl.set("back", *back)?;
+                    tbl.set("hair", *hair)?;
+                    tbl.set("neck", *neck)?;
                 }
                 TileType::WeatherMachine { settings } => {
                     tbl.set("type", "weather_machine")?;

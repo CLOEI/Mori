@@ -201,75 +201,81 @@ impl Tile {
 #[serde(tag = "type")]
 pub enum TileType {
     Basic,
-    Sign {
-        text:  String,
-        flags: u8,
-    },
     Door {
-        text:      String,
-        owner_uid: u32,
+        label:      String,
+        flags:     u8,
+    },
+    Sign {
+        label:  String,
     },
     Lock {
-        settings:     u8,
-        owner_uid:    u32,
-        access_count: u32,
-        access_uids:  Vec<u32>,
+        settings:      u8,
+        owner_uid:     u32,
+        access_count:  u32,
+        access_uids:   Vec<u32>,
         minimum_level: u8,
     },
     Seed {
-        time_passed:  u32,
+        age:  u32,
         item_on_tree: u8,
     },
-    Mailbox {
-        s1: String,
-        s2: String,
-        s3: String,
-        u4: u8,
-    },
-    Bulletin {
-        s1: String,
-        s2: String,
-        s3: String,
-        u4: u8,
-    },
+    // Mailbox {
+    //     s1: String,
+    //     s2: String,
+    //     s3: String,
+    //     u4: u8,
+    // },
+    // Bulletin {
+    //     s1: String,
+    //     s2: String,
+    //     s3: String,
+    //     u4: u8,
+    // },
     Dice {
         symbol: u8,
     },
-    ChemicalSource {
-        time_passed: u32,
+    Provider {
+        age: u32,
     },
     AchievementBlock {
         data:      u32,
         tile_type: u8,
     },
     HearthMonitor {
-        data:        u32,
+        player_id:   u32,
         player_name: String,
     },
-    DonationBox {
-        s1: String,
-        s2: String,
-        s3: String,
-        u4: u8,
-    },
+    // DonationBox {
+    //     s1: String,
+    //     s2: String,
+    //     s3: String,
+    //     u4: u8,
+    // },
+    // BigLock {
+    //     s1: String,
+    //     s2: String,
+    //     s3: String,
+    //     u4: u8,
+    // },
     Mannequin {
-        text:       String,
-        unknown_1:  u8,
-        clothing_1: u32,
-        clothing_2: u16,
-        clothing_3: u16,
-        clothing_4: u16,
-        clothing_5: u16,
-        clothing_6: u16,
-        clothing_7: u16,
-        clothing_8: u16,
-        clothing_9: u16,
-        clothing_10: u16,
+        label:      String,
+        unknown_1: u8,
+        unknown_2: u16,
+        unknown_3: u16,
+        hat:       u16,
+        shirt:     u16,
+        pants:     u16,
+        boots:     u16,
+        face:      u16,
+        hand:      u16,
+        back:      u16,
+        hair:      u16,
+        neck:      u16,
     },
     BunnyEgg {
         egg_placed: u32,
     },
-    GamePack {
+    GameGrave {
         team: u8,
     },
     GameGenerator,
@@ -278,24 +284,25 @@ pub enum TileType {
         unknown_2: u32,
     },
     PhoneBooth {
-        clothing_1: u16,
-        clothing_2: u16,
-        clothing_3: u16,
-        clothing_4: u16,
-        clothing_5: u16,
-        clothing_6: u16,
-        clothing_7: u16,
-        clothing_8: u16,
-        clothing_9: u16,
+        hat: u16,
+        shirt: u16,
+        pants: u16,
+        shoes: u16,
+        face: u16,
+        hand: u16,
+        back: u16,
+        hair: u16,
+        neck: u16,
     },
     Crystal {
-        data: String,
+        crystals: Vec<u8>,
     },
     CrimeInProgress {
-        data:      String,
-        unknown_2: u32,
-        unknown_3: u8,
+        label:      String,
+        unknown_1: u32,
+        unknown_2: u8,
     },
+    Spotlight,
     DisplayBlock {
         item_id: u32,
     },
@@ -314,24 +321,26 @@ pub enum TileType {
         temperature: u32,
     },
     GivingTree {
-        unknown_1: u16,
-        unknown_2: u32,
+        harvested:             u8,
+        age:                   u16,
+        unknown_1:             u16,
+        decoration_percentage: u8,
     },
     SteamOrgan {
         instrument_type: u8,
         note:            u32,
     },
     SilkWorm {
-        type_:           u8,
-        name:            String,
-        age:             u32,
-        unknown_1:       u32,
-        unknown_2:       u32,
-        can_be_fed:      u8,
-        food_saturation: u32,
+        flags:            u8,
+        name:             String,
+        age:              u32,
+        unknown_1:        u32,
+        unknown_2:        u32,
+        can_be_fed:       u8,
+        food_saturation:  u32,
         water_saturation: u32,
-        color:           u32,
-        sick_duration:   u32,
+        color:            u32,
+        sick_duration:    u32,
     },
     SewingMachine {
         bolt_ids: Vec<u32>,
@@ -346,12 +355,12 @@ pub enum TileType {
     },
     PetBattleCage {
         label:     String,
-        unknown_1: u32,
-        unknown_2: u32,
-        unknown_3: u32,
+        base_pet: u32,
+        pet_1: u32,
+        pet_2: u32,
     },
     PetTrainer {
-        name:            String,
+        label:            String,
         pet_total_count: u32,
         unknown_1:       u32,
         pets_id:         Vec<u32>,
@@ -360,7 +369,7 @@ pub enum TileType {
         temperature: u32,
     },
     LockBot {
-        time_passed: u32,
+        age: u32,
     },
     WeatherMachine {
         settings: u32,
@@ -387,18 +396,19 @@ pub enum TileType {
         lb:      u8,
     },
     Portrait {
-        label:     String,
-        unknown_1: u32,
-        unknown_2: u32,
-        unknown_3: u32,
-        unknown_4: u32,
-        face:      u32,
-        hat:       u32,
-        hair:      u32,
-        unknown_5: u16,
-        unknown_6: u16,
+        label:               String,
+        unknown_1:           u32,
+        unknown_2:           u32,
+        unknown_3:           [u8; 5],
+        unknown_4:           u8,
+        unknown_5:           u16,
+        face:                u16,
+        hat:                 u16,
+        hair:                u16,
+        unknown_6:           u32,
+        infinity_crown_data: Option<String>,
     },
-    GuildWeatherMachine {
+    WeatherMachine2 {
         unknown_1: u32,
         gravity:   u32,
         flags:     u8,
@@ -427,11 +437,7 @@ pub enum TileType {
         volume: u32,
     },
     GeigerCharger {
-        seconds_from_start:  u32,
-        seconds_to_complete: u32,
-        charging_percent:    u32,
-        minutes_from_start:  u32,
-        minutes_to_complete: u32,
+        unknown_1:  u32,
     },
     AdventureBegins,
     TombRobber,
@@ -444,8 +450,10 @@ pub enum TileType {
         fish_status:    u16,
         fish_id:        u32,
         fish_total_exp: u32,
+        unknown_1:      [u8; 8],
         fish_level:     u32,
         unknown_2:      u32,
+        unknown_3:      [u8; 5],
     },
     ItemSucker {
         item_id_to_suck: u32,
@@ -454,26 +462,38 @@ pub enum TileType {
         limit:           u32,
     },
     CyBot {
-        sync_timer:    u32,
-        activated:     u32,
         command_datas: Vec<(u32, u32)>, // (command_id, is_command_used)
+        sync_timer:         u32,
+        activated:     u32,
     },
-    GuildItem,
+    // GuildBlock {
+    //     label: String,
+    // },
+    GuildItem {
+        unknown_1: [u8; 17],
+    },
     Growscan {
         unknown_1: u8,
     },
     ContainmentFieldPowerNode {
-        ghost_jar_count: u32,
-        unknown_1:       Vec<u32>,
+        time: u32,
+        linked_nodes:       Vec<u32>,
     },
     SpiritBoard {
-        unknown_1: u32,
-        unknown_2: u32,
-        unknown_3: u32,
+        player_required: u32,
+        unk1:            String,
+        command:         String,
+        required_items:  Vec<u32>,
+    },
+    TesseractManipulator {
+        gems:           u32,
+        next_update_ms: u32,
+        item_id:        u32,
+        enabled:        u32,
     },
     StormyCloud {
-        sting_duration:    u32,
-        is_solid:          u32,
+        sting_duration:     u32,
+        is_solid:           u32,
         non_solid_duration: u32,
     },
     TemporaryPlatform {
@@ -481,15 +501,17 @@ pub enum TileType {
     },
     SafeVault,
     AngelicCountingCloud {
-        is_raffling: u32,
+        state: u32,
         unknown_1:   u16,
-        ascii_code:  u8,
+        ascii_code:  Option<u8>,
     },
     InfinityWeatherMachine {
         interval_minutes:     u32,
         weather_machine_list: Vec<u32>,
     },
-    PineappleGuzzler,
+    PineappleGuzzler {
+        pineapple_count: u32,
+    },
     KrakenGalaticBlock {
         pattern_index: u8,
         unknown_1:     u32,
@@ -498,25 +520,8 @@ pub enum TileType {
         b:             u8,
     },
     FriendsEntrance {
-        owner_user_id: u32,
-        unknown_1:     u16,
-        unknown_2:     u16,
-    },
-    TesseractManipulator {
-        gems:      u32,
-        next_update_ms: u32,
-        item_id:   u32,
-        enabled: u32,
-    },
-    Spotlight,
-    BigLock {
-        s1: String,
-        s2: String,
-        s3: String,
-        u4: u8,
-    },
-    GuildBlock {
-        label: String,
+        owner_user_id:          u32,
+        allowed_friends_userid: Vec<u32>,
     },
     Unknown {
         kind: u8,
@@ -528,16 +533,16 @@ pub enum TileType {
 fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileType> {
     match kind {
         1 => {
-            // Sign
-            let text  = cur.plain_string()?;
+            // Door
+            let label      = cur.plain_string()?;
             let flags = cur.u8()?;
-            Ok(TileType::Sign { text, flags })
+            Ok(TileType::Door { label, flags })
         }
         2 => {
-            // Door
-            let text      = cur.plain_string()?;
-            let owner_uid = cur.u32()?;
-            Ok(TileType::Door { text, owner_uid })
+            // Sign
+            let label  = cur.plain_string()?;
+            cur.u32()?; // always 0xFFFFFFFF
+            Ok(TileType::Sign { label })
         }
         3 => {
             // Lock
@@ -549,7 +554,9 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
                 access_uids.push(cur.u32()?);
             }
             let minimum_level = cur.u8()?;
-            cur.skip(7)?; // unknown_1[7]
+            cur.skip(7)?;
+
+            // Guild Lock
             if fg_item_id == 5814 {
                 cur.skip(16)?;
             }
@@ -557,26 +564,26 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         4 => {
             // Seed
-            let time_passed  = cur.u32()?;
+            let age  = cur.u32()?;
             let item_on_tree = cur.u8()?;
-            Ok(TileType::Seed { time_passed, item_on_tree })
+            Ok(TileType::Seed { age, item_on_tree })
         }
-        6 => {
-            // Mailbox
-            let s1 = cur.plain_string()?;
-            let s2 = cur.plain_string()?;
-            let s3 = cur.plain_string()?;
-            let u4 = cur.u8()?;
-            Ok(TileType::Mailbox { s1, s2, s3, u4 })
-        }
-        7 => {
-            // Bulletin
-            let s1 = cur.plain_string()?;
-            let s2 = cur.plain_string()?;
-            let s3 = cur.plain_string()?;
-            let u4 = cur.u8()?;
-            Ok(TileType::Bulletin { s1, s2, s3, u4 })
-        }
+        // 6 => {
+        //     // Mailbox
+        //     let s1 = cur.plain_string()?;
+        //     let s2 = cur.plain_string()?;
+        //     let s3 = cur.plain_string()?;
+        //     let u4 = cur.u8()?;
+        //     Ok(TileType::Mailbox { s1, s2, s3, u4 })
+        // }
+        // 7 => {
+        //     // Bulletin
+        //     let s1 = cur.plain_string()?;
+        //     let s2 = cur.plain_string()?;
+        //     let s3 = cur.plain_string()?;
+        //     let u4 = cur.u8()?;
+        //     Ok(TileType::Bulletin { s1, s2, s3, u4 })
+        // }
         8 => {
             // Dice
             let symbol = cur.u8()?;
@@ -584,8 +591,11 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         9 => {
             // ChemicalSource
-            let time_passed = cur.u32()?;
-            Ok(TileType::ChemicalSource { time_passed })
+            let age = cur.u32()?;
+            if fg_item_id == 10656 {
+                cur.skip(4)?;
+            }
+            Ok(TileType::Provider { age })
         }
         10 => {
             // AchievementBlock
@@ -595,44 +605,44 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         11 => {
             // HearthMonitor
-            let data        = cur.u32()?;
+            let player_id      = cur.u32()?;
             let player_name = cur.plain_string()?;
-            Ok(TileType::HearthMonitor { data, player_name })
+            Ok(TileType::HearthMonitor { player_id, player_name })
         }
-        12 => {
-            // DonationBox
-            let s1 = cur.plain_string()?;
-            let s2 = cur.plain_string()?;
-            let s3 = cur.plain_string()?;
-            let u4 = cur.u8()?;
-            Ok(TileType::DonationBox { s1, s2, s3, u4 })
-        }
-        13 => {
-            // BigLock — same wire format as Mailbox / Bulletin / DonationBox
-            let s1 = cur.plain_string()?;
-            let s2 = cur.plain_string()?;
-            let s3 = cur.plain_string()?;
-            let u4 = cur.u8()?;
-            Ok(TileType::BigLock { s1, s2, s3, u4 })
-        }
+        // 12 => {
+        //     // DonationBox
+        //     let s1 = cur.plain_string()?;
+        //     let s2 = cur.plain_string()?;
+        //     let s3 = cur.plain_string()?;
+        //     let u4 = cur.u8()?;
+        //     Ok(TileType::DonationBox { s1, s2, s3, u4 })
+        // }
+        // 13 => {
+        //     // BigLock
+        //     let s1 = cur.plain_string()?;
+        //     let s2 = cur.plain_string()?;
+        //     let s3 = cur.plain_string()?;
+        //     let u4 = cur.u8()?;
+        //     Ok(TileType::BigLock { s1, s2, s3, u4 })
+        // }
         14 => {
             // Mannequin
-            let text        = cur.plain_string()?;
-            let unknown_1   = cur.u8()?;
-            let clothing_1  = cur.u32()?;
-            let clothing_2  = cur.u16()?;
-            let clothing_3  = cur.u16()?;
-            let clothing_4  = cur.u16()?;
-            let clothing_5  = cur.u16()?;
-            let clothing_6  = cur.u16()?;
-            let clothing_7  = cur.u16()?;
-            let clothing_8  = cur.u16()?;
-            let clothing_9  = cur.u16()?;
-            let clothing_10 = cur.u16()?;
+            let label      = cur.plain_string()?;
+            let unknown_1 = cur.u8()?;
+            let unknown_2 = cur.u16()?;
+            let unknown_3 = cur.u16()?;
+            let hat       = cur.u16()?;
+            let shirt     = cur.u16()?;
+            let pants     = cur.u16()?;
+            let boots     = cur.u16()?;
+            let face      = cur.u16()?;
+            let hand      = cur.u16()?;
+            let back      = cur.u16()?;
+            let hair      = cur.u16()?;
+            let neck      = cur.u16()?;
             Ok(TileType::Mannequin {
-                text, unknown_1, clothing_1, clothing_2, clothing_3,
-                clothing_4, clothing_5, clothing_6, clothing_7,
-                clothing_8, clothing_9, clothing_10,
+                label, unknown_1, unknown_2, unknown_3,
+                hat, shirt, pants, boots, face, hand, back, hair, neck,
             })
         }
         15 => {
@@ -641,9 +651,9 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             Ok(TileType::BunnyEgg { egg_placed })
         }
         16 => {
-            // GamePack
+            // GameGrave
             let team = cur.u8()?;
-            Ok(TileType::GamePack { team })
+            Ok(TileType::GameGrave { team })
         }
         17 => Ok(TileType::GameGenerator),
         18 => {
@@ -654,31 +664,38 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         19 => {
             // PhoneBooth
-            let clothing_1 = cur.u16()?;
-            let clothing_2 = cur.u16()?;
-            let clothing_3 = cur.u16()?;
-            let clothing_4 = cur.u16()?;
-            let clothing_5 = cur.u16()?;
-            let clothing_6 = cur.u16()?;
-            let clothing_7 = cur.u16()?;
-            let clothing_8 = cur.u16()?;
-            let clothing_9 = cur.u16()?;
+            let hat = cur.u16()?;
+            let shirt = cur.u16()?;
+            let pants = cur.u16()?;
+            let shoes = cur.u16()?;
+            let face = cur.u16()?;
+            let hand = cur.u16()?;
+            let back = cur.u16()?;
+            let hair = cur.u16()?;
+            let neck = cur.u16()?;
             Ok(TileType::PhoneBooth {
-                clothing_1, clothing_2, clothing_3, clothing_4, clothing_5,
-                clothing_6, clothing_7, clothing_8, clothing_9,
+                hat, shirt, pants, shoes, face,
+                hand, back, hair, neck,
             })
         }
         20 => {
             // Crystal
-            let data = cur.plain_string()?;
-            Ok(TileType::Crystal { data })
+            let crystal_count = cur.u16()?;
+            let mut crystals = Vec::with_capacity(crystal_count as usize);
+            for _ in 0..crystal_count {
+                crystals.push(cur.u8()?);
+            }
+            Ok(TileType::Crystal { crystals })
         }
         21 => {
             // CrimeInProgress
-            let data      = cur.plain_string()?;
-            let unknown_2 = cur.u32()?;
-            let unknown_3 = cur.u8()?;
-            Ok(TileType::CrimeInProgress { data, unknown_2, unknown_3 })
+            let label      = cur.plain_string()?;
+            let unknown_1 = cur.u32()?;
+            let unknown_2 = cur.u8()?;
+            Ok(TileType::CrimeInProgress { label, unknown_1, unknown_2 })
+        }
+        22 => {
+            Ok(TileType::Spotlight)
         }
         23 => {
             // DisplayBlock
@@ -716,9 +733,11 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         28 => {
             // GivingTree
-            let unknown_1 = cur.u16()?;
-            let unknown_2 = cur.u32()?;
-            Ok(TileType::GivingTree { unknown_1, unknown_2 })
+            let harvested             = cur.u8()?;
+            let age                   = cur.u16()?;
+            let unknown_1             = cur.u16()?;
+            let decoration_percentage = cur.u8()?;
+            Ok(TileType::GivingTree { harvested, age, unknown_1, decoration_percentage })
         }
         30 => {
             // SteamOrgan
@@ -728,7 +747,7 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         31 => {
             // SilkWorm
-            let type_            = cur.u8()?;
+            let flags            = cur.u8()?;
             let name             = cur.plain_string()?;
             let age              = cur.u32()?;
             let unknown_1        = cur.u32()?;
@@ -739,14 +758,14 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             let color            = cur.u32()?;
             let sick_duration    = cur.u32()?;
             Ok(TileType::SilkWorm {
-                type_, name, age, unknown_1, unknown_2,
+                flags, name, age, unknown_1, unknown_2,
                 can_be_fed, food_saturation, water_saturation,
                 color, sick_duration,
             })
         }
         32 => {
             // SewingMachine
-            let bolt_len = cur.u16()? as u32;
+            let bolt_len = cur.u32()?;
             let mut bolt_ids = Vec::new();
             for _ in 0..bolt_len {
                 bolt_ids.push(cur.u32()?);
@@ -755,7 +774,11 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         33 => {
             // CountryFlag
-            let country = cur.plain_string()?;
+            let country = if fg_item_id == 3394 {
+                cur.plain_string()?
+            } else {
+                String::new()
+            };
             Ok(TileType::CountryFlag { country })
         }
         34 => Ok(TileType::LobsterTrap),
@@ -768,21 +791,21 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         36 => {
             // PetBattleCage
             let label     = cur.plain_string()?;
-            let unknown_1 = cur.u32()?;
-            let unknown_2 = cur.u32()?;
-            let unknown_3 = cur.u32()?;
-            Ok(TileType::PetBattleCage { label, unknown_1, unknown_2, unknown_3 })
+            let base_pet = cur.u32()?;
+            let pet_1 = cur.u32()?;
+            let pet_2 = cur.u32()?;
+            Ok(TileType::PetBattleCage { label, base_pet, pet_1, pet_2 })
         }
         37 => {
             // PetTrainer
-            let name            = cur.plain_string()?;
+            let label            = cur.plain_string()?;
             let pet_total_count = cur.u32()?;
             let unknown_1       = cur.u32()?;
             let mut pets_id     = Vec::new();
             for _ in 0..pet_total_count {
                 pets_id.push(cur.u32()?);
             }
-            Ok(TileType::PetTrainer { name, pet_total_count, unknown_1, pets_id })
+            Ok(TileType::PetTrainer { label, pet_total_count, unknown_1, pets_id })
         }
         38 => {
             // SteamEngine
@@ -791,8 +814,8 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         39 => {
             // LockBot
-            let time_passed = cur.u32()?;
-            Ok(TileType::LockBot { time_passed })
+            let age = cur.u32()?;
+            Ok(TileType::LockBot { age })
         }
         40 => {
             // WeatherMachine
@@ -805,7 +828,7 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             Ok(TileType::SpiritStorageUnit { ghost_jar_count })
         }
         42 => {
-            // DataBedrock — skip 21 bytes
+            // DataBedrock — skip 21 bytes (unk1[17] + pad1[4])
             cur.skip(21)?;
             Ok(TileType::DataBedrock)
         }
@@ -832,7 +855,6 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             Ok(TileType::VipEntrance { unknown_1, owner_uid, access_uids })
         }
         45 => Ok(TileType::ChallangeTimer),
-        46 => Ok(TileType::Spotlight),
         47 => {
             // FishWallMount
             let label   = cur.plain_string()?;
@@ -842,27 +864,37 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         48 => {
             // Portrait
+            //      unk5(u2), face(u2), hat(u2), hair(u2), unk6(u4),
+            //      then conditionally infinity_crown_data(gt_str) if hat == 12958.
+            // + unk4 is u1), face/hat/hair were u32 (should be u16), unk6 was missing,
+            // and the conditional infinity_crown_data was missing entirely.
             let label     = cur.plain_string()?;
             let unknown_1 = cur.u32()?;
             let unknown_2 = cur.u32()?;
-            let unknown_3 = cur.u32()?;
-            let unknown_4 = cur.u32()?;
-            let face      = cur.u32()?;
-            let hat       = cur.u32()?;
-            let hair      = cur.u32()?;
+            let mut unknown_3 = [0u8; 5];
+            for b in &mut unknown_3 { *b = cur.u8()?; }
+            let unknown_4 = cur.u8()?;
             let unknown_5 = cur.u16()?;
-            let unknown_6 = cur.u16()?;
+            let face      = cur.u16()?;
+            let hat       = cur.u16()?;
+            let hair      = cur.u16()?;
+            let unknown_6 = cur.u32()?;
+            let infinity_crown_data = if hat == 12958 {
+                Some(cur.plain_string()?)
+            } else {
+                None
+            };
             Ok(TileType::Portrait {
                 label, unknown_1, unknown_2, unknown_3, unknown_4,
-                face, hat, hair, unknown_5, unknown_6,
+                unknown_5, face, hat, hair, unknown_6, infinity_crown_data,
             })
         }
         49 => {
-            // GuildWeatherMachine
+            // WeatherMachine2, Weather Machine stuff, heatwave
             let unknown_1 = cur.u32()?;
             let gravity   = cur.u32()?;
             let flags     = cur.u8()?;
-            Ok(TileType::GuildWeatherMachine { unknown_1, gravity, flags })
+            Ok(TileType::WeatherMachine2 { unknown_1, gravity, flags })
         }
         50 => {
             // FossilPrepStation
@@ -895,7 +927,7 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             let temperature_level = cur.u32()?;
             let ingredient_count  = cur.u32()?;
             let mut ingredients   = Vec::new();
-            for _ in 0..ingredient_count {
+            for _ in 0..(ingredient_count / 2) {
                 let item_id    = cur.u32()?;
                 let time_added = cur.u32()?;
                 ingredients.push((item_id, time_added));
@@ -913,14 +945,9 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         57 => {
             // GeigerCharger
-            let seconds_from_start  = cur.u32()?;
-            let seconds_to_complete = cur.u32()?;
-            let charging_percent    = cur.u32()?;
-            let minutes_from_start  = cur.u32()?;
-            let minutes_to_complete = cur.u32()?;
+            let unknown_1 = cur.u32()?;
             Ok(TileType::GeigerCharger {
-                seconds_from_start, seconds_to_complete, charging_percent,
-                minutes_from_start, minutes_to_complete,
+                unknown_1
             })
         }
         58 => Ok(TileType::AdventureBegins),
@@ -933,13 +960,18 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         61 => {
             // TrainingPort
+            // and unknown_3 (5 bytes) after unknown_2, both missing before.
             let fish_lb        = cur.u32()?;
             let fish_status    = cur.u16()?;
             let fish_id        = cur.u32()?;
             let fish_total_exp = cur.u32()?;
+            let mut unknown_1  = [0u8; 8];
+            for b in &mut unknown_1 { *b = cur.u8()?; }
             let fish_level     = cur.u32()?;
             let unknown_2      = cur.u32()?;
-            Ok(TileType::TrainingPort { fish_lb, fish_status, fish_id, fish_total_exp, fish_level, unknown_2 })
+            let mut unknown_3  = [0u8; 5];
+            for b in &mut unknown_3 { *b = cur.u8()?; }
+            Ok(TileType::TrainingPort { fish_lb, fish_status, fish_id, fish_total_exp, unknown_1, fish_level, unknown_2, unknown_3 })
         }
         62 => {
             // ItemSucker
@@ -951,8 +983,7 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         63 => {
             // CyBot
-            let sync_timer         = cur.u32()?;
-            let activated          = cur.u32()?;
+            // is wrong. Now commands are read first, then timer and activated after.
             let command_data_count = cur.u32()?;
             let mut command_datas  = Vec::new();
             for _ in 0..command_data_count {
@@ -961,16 +992,20 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
                 cur.skip(7)?;
                 command_datas.push((command_id, is_command_used));
             }
-            Ok(TileType::CyBot { sync_timer, activated, command_datas })
+            let sync_timer     = cur.u32()?;
+            let activated = cur.u32()?;
+            Ok(TileType::CyBot { command_datas, sync_timer, activated })
         }
-        64 => {
-            // GuildBlock (kind 0x40) — reads one string at tileextra+0x28
-            let label = cur.plain_string()?;
-            Ok(TileType::GuildBlock { label })
-        }
+        // 64 => {
+        //     // GuildBlock (kind 0x40) — reads one string at tileextra+0x28
+        //     let label = cur.plain_string()?;
+        //     Ok(TileType::GuildBlock { label })
+        // }
         65 => {
             // GuildItem (kind 0x41) — default case in game switch, no bytes in stream
-            Ok(TileType::GuildItem)
+            let mut unknown_1  = [0u8; 17];
+            for b in &mut unknown_1 { *b = cur.u8()?; }
+            Ok(TileType::GuildItem{ unknown_1 })
         }
         66 => {
             // Growscan
@@ -979,27 +1014,34 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         }
         67 => {
             // ContainmentFieldPowerNode
-            let ghost_jar_count  = cur.u32()?;
-            let unknown_1_size   = cur.u32()?;
-            let mut unknown_1    = Vec::new();
-            for _ in 0..unknown_1_size {
-                unknown_1.push(cur.u32()?);
+            let time  = cur.u32()?;
+            let linked_node_count   = cur.u32()?;
+            let mut linked_nodes    = Vec::new();
+            for _ in 0..linked_node_count {
+                linked_nodes.push(cur.u32()?);
             }
-            Ok(TileType::ContainmentFieldPowerNode { ghost_jar_count, unknown_1 })
+            Ok(TileType::ContainmentFieldPowerNode { time, linked_nodes})
         }
         68 => {
             // SpiritBoard
-            let unknown_1 = cur.u32()?;
-            let unknown_2 = cur.u32()?;
-            let unknown_3 = cur.u32()?;
-            Ok(TileType::SpiritBoard { unknown_1, unknown_2, unknown_3 })
+            // player_required(u4), unk1(gt_str), command(gt_str),
+            // num_required_items(u4), required_items[].
+            let player_required    = cur.u32()?;
+            let unk1               = cur.plain_string()?;
+            let command            = cur.plain_string()?;
+            let num_required_items = cur.u32()?;
+            let mut required_items = Vec::new();
+            for _ in 0..num_required_items {
+                required_items.push(cur.u32()?);
+            }
+            Ok(TileType::SpiritBoard { player_required, unk1, command, required_items })
         }
         69 => {
             // TesseractManipulator (item 6952)
-            let gems      = cur.u32()?;
+            let gems           = cur.u32()?;
             let next_update_ms = cur.u32()?;
-            let item_id   = cur.u32()?;
-            let enabled = cur.u32()?;
+            let item_id        = cur.u32()?;
+            let enabled        = cur.u32()?;
             Ok(TileType::TesseractManipulator { gems, next_update_ms, item_id, enabled })
         }
         72 => {
@@ -1017,10 +1059,14 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         74 => Ok(TileType::SafeVault),
         75 => {
             // AngelicCountingCloud
-            let is_raffling = cur.u32()?;
+            let state = cur.u32()?;
             let unknown_1   = cur.u16()?;
-            let ascii_code  = cur.u8()?;
-            Ok(TileType::AngelicCountingCloud { is_raffling, unknown_1, ascii_code })
+            let ascii_code  = if state == 2 {
+                Some(cur.u8()?)
+            } else {
+                None
+            };
+            Ok(TileType::AngelicCountingCloud { state, unknown_1, ascii_code })
         }
         77 => {
             // InfinityWeatherMachine
@@ -1032,7 +1078,11 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             }
             Ok(TileType::InfinityWeatherMachine { interval_minutes, weather_machine_list })
         }
-        79 => Ok(TileType::PineappleGuzzler),
+        79 => {
+            // PineappleGuzzler
+            let pineapple_count             = cur.u32()?;
+            Ok(TileType::PineappleGuzzler { pineapple_count })
+        },
         80 => {
             // KrakenGalaticBlock
             let pattern_index = cur.u8()?;
@@ -1045,9 +1095,13 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
         81 => {
             // FriendsEntrance
             let owner_user_id = cur.u32()?;
-            let unknown_1     = cur.u16()?;
-            let unknown_2     = cur.u16()?;
-            Ok(TileType::FriendsEntrance { owner_user_id, unknown_1, unknown_2 })
+            cur.skip(2)?;
+            let num_allowed = cur.u16()? as u32;
+            let mut allowed_friends_userid = Vec::new();
+            for _ in 0..num_allowed {
+                allowed_friends_userid.push(cur.u32()?);
+            }
+            Ok(TileType::FriendsEntrance { owner_user_id, allowed_friends_userid })
         }
         _ => {
             // Unknown / unhandled kind — log and return marker (no bytes consumed beyond kind)
