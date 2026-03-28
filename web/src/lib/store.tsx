@@ -55,6 +55,7 @@ export function makeBot(id: number, username: string): LiveBot {
 export const botsAtom = atom<Map<number, LiveBot>>(new Map())
 export const selectedBotIdAtom = atom<number | null>(null)
 export const itemNamesAtom = atom<Record<string, string>>({})
+export const itemColorsAtom = atom<Record<string, number>>({})
 
 // Derived: selected bot
 export const selectedBotAtom = atom((get) => {
@@ -79,6 +80,7 @@ function patchBot(
 export function useMoriStore() {
   const setBots = useSetAtom(botsAtom)
   const setItemNames = useSetAtom(itemNamesAtom)
+  const setItemColors = useSetAtom(itemColorsAtom)
 
   useEffect(() => {
     moriWs.connect()
@@ -98,6 +100,7 @@ export function useMoriStore() {
     }).catch(() => {})
 
     api.getItemNames().then(setItemNames).catch(() => {})
+    api.getItemColors().then(setItemColors).catch(() => {})
 
     // Wire WS events directly against atom setters
     const handlers: Array<[string, (d: never) => void]> = [

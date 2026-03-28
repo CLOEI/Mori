@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Application, Graphics, Container } from 'pixi.js'
 import { useAtomValue } from 'jotai'
-import { itemNamesAtom, type LiveBot } from '@/lib/store'
+import { itemNamesAtom, itemColorsAtom, type LiveBot } from '@/lib/store'
 import { api } from '@/lib/api'
 import type { TileData } from '@/lib/ws'
 
@@ -56,19 +56,10 @@ interface TooltipState {
 }
 
 const TILE_PX = 4
+const CHAR_PX = 2
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 4
 
-function tileColor(fg: number): number | null {
-  if (fg === 0) return null
-  if (fg === 2) return 0x5c4a2a
-  if (fg === 4) return 0x2d6e2d
-  if (fg === 8) return 0x8b7355
-  if (fg === 10) return 0x4a90d9
-  if (fg === 1000) return 0x6b4226
-  if (fg >= 6 && fg <= 7) return 0xc8a850
-  return 0x4a4a5a
-}
 
 function clampOffset(
   ox: number,
@@ -91,6 +82,7 @@ function clampOffset(
 export function Minimap({ bot }: { bot: LiveBot }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const itemNames = useAtomValue(itemNamesAtom)
+  const itemColors = useAtomValue(itemColorsAtom)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const appRef = useRef<Application | null>(null)
   const layersRef = useRef<{
@@ -102,6 +94,8 @@ export function Minimap({ bot }: { bot: LiveBot }) {
 
   const botRef = useRef(bot)
   botRef.current = bot
+  const itemColorsRef = useRef(itemColors)
+  itemColorsRef.current = itemColors
 
   const zoom = useRef(3)
   const offset = useRef({ x: 0, y: 0 })
@@ -175,13 +169,14 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       const b = botRef.current
 
       if (b.tiles.length > 0) {
+        const colors = itemColorsRef.current
         for (let i = 0; i < b.tiles.length; i++) {
           const tile = b.tiles[i]
-          const color = tileColor(tile.fg)
-          if (color === null) continue
+          if (tile.fg === 0) continue
+          const color = colors[tile.fg] ?? 0x4a4a5a
           const tx = (i % b.world_width) * TILE_PX
           const ty = Math.floor(i / b.world_width) * TILE_PX
-          tileGfx.rect(tx, ty, TILE_PX - 1, TILE_PX - 1).fill(color)
+          tileGfx.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
         }
       }
 
@@ -190,10 +185,10 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       }
 
       for (const p of b.players.values()) {
-        playerGfx.rect(p.pos_x * TILE_PX, p.pos_y * TILE_PX, TILE_PX - 1, TILE_PX - 1).fill(0x60a5fa)
+        playerGfx.rect(p.pos_x * TILE_PX + (TILE_PX - CHAR_PX) / 2, (p.pos_y + 1) * TILE_PX - CHAR_PX, CHAR_PX, CHAR_PX).fill(0x60a5fa)
       }
 
-      botGfx.rect(b.pos_x * TILE_PX, b.pos_y * TILE_PX, TILE_PX - 1, TILE_PX - 1).fill(0xef4444)
+      botGfx.rect(b.pos_x * TILE_PX + (TILE_PX - CHAR_PX) / 2, (b.pos_y + 1) * TILE_PX - CHAR_PX, CHAR_PX, CHAR_PX).fill(0xef4444)
 
       centerOnBot()
     })
@@ -218,15 +213,15 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     g.clear()
     for (let i = 0; i < bot.tiles.length; i++) {
       const tile = bot.tiles[i]
-      const color = tileColor(tile.fg)
-      if (color === null) continue
+      if (tile.fg === 0) continue
+      const color = itemColors[tile.fg] ?? 0x4a4a5a
       const tx = (i % bot.world_width) * TILE_PX
       const ty = Math.floor(i / bot.world_width) * TILE_PX
-      g.rect(tx, ty, TILE_PX - 1, TILE_PX - 1).fill(color)
+      g.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
     }
     centerOnBot()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bot.tiles, bot.world_width])
+  }, [bot.tiles, bot.world_width, itemColors])
 
   // ── Draw objects ───────────────────────────────────────────────────────────
 
@@ -250,7 +245,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     const g = layers.players
     g.clear()
     for (const p of bot.players.values()) {
-      g.rect(p.pos_x * TILE_PX, p.pos_y * TILE_PX, TILE_PX - 1, TILE_PX - 1).fill(0x60a5fa)
+      g.rect(p.pos_x * TILE_PX, p.pos_y * TILE_PX, TILE_PX, TILE_PX).fill(0x60a5fa)
     }
   }, [bot.players])
 
@@ -260,7 +255,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     const layers = layersRef.current
     if (layers) {
       layers.bot.clear()
-      layers.bot.rect(bot.pos_x * TILE_PX, bot.pos_y * TILE_PX, TILE_PX - 1, TILE_PX - 1).fill(0xef4444)
+      layers.bot.rect(bot.pos_x * TILE_PX + (TILE_PX - CHAR_PX) / 2, (bot.pos_y + 1) * TILE_PX - CHAR_PX, CHAR_PX, CHAR_PX).fill(0xef4444)
     }
     centerOnBot()
   // eslint-disable-next-line react-hooks/exhaustive-deps

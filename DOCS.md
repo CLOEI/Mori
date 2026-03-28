@@ -259,6 +259,23 @@ Enable or disable automatic collection of nearby dropped items.
 
 ---
 
+### GET `/items/colors`
+
+Returns a flat map of all item IDs to their minimap color as `0xRRGGBB`. Colors are derived from the `base_color` field in `items.dat`, which is stored as BGRA and converted server-side.
+
+**Response**
+```json
+{
+  "0": 0,
+  "2": 1588250666,
+  "8": 2303786022
+}
+```
+
+Keys are item IDs as strings. No query parameters.
+
+---
+
 ### GET `/items/names`
 
 Returns a flat map of all item IDs to their names. Useful for quick lookups without pagination.

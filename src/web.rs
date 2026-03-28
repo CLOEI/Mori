@@ -169,6 +169,25 @@ async fn item_names(State(s): State<AppState>) -> Json<std::collections::HashMap
     Json(map)
 }
 
+async fn item_colors(State(s): State<AppState>) -> Json<std::collections::HashMap<u32, u32>> {
+    let mgr = s.manager.lock().unwrap();
+    let map = mgr.items_dat.items.iter()
+        .map(|i| {
+            let raw = if i.id % 2 == 0 {
+                // Block: use seed (id+1) base_color
+                mgr.items_dat.find_by_id(i.id + 1)
+                    .map(|seed| seed.base_color)
+                    .unwrap_or(i.base_color)
+            } else {
+                // Seed: use own overlay_color
+                i.overlay_color
+            };
+            (i.id, crate::items::bgra_to_rgb(raw))
+        })
+        .collect();
+    Json(map)
+}
+
 async fn bot_cmd(
     State(s): State<AppState>,
     Path(id): Path<u32>,
@@ -262,6 +281,7 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/bots/{id}/cmd", post(bot_cmd))
         .route("/items", get(list_items))
         .route("/items/names", get(item_names))
+        .route("/items/colors", get(item_colors))
         .route("/ws", get(ws_handler))
         .layer(cors)
         .with_state(state)
