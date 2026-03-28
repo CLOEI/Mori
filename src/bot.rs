@@ -692,21 +692,24 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                             if s.contains("action|logon_fail") {
                                 if self.pending_2fa {
                                     self.pending_2fa = false;
-                                    println!("[Bot] Logon failed — 2FA (Advanced Account Protection). Retrying in 120 s.");
+                                    let secs = self.delays.twofa_secs;
+                                    println!("[Bot] Logon failed — 2FA (Advanced Account Protection). Retrying in {secs} s.");
                                     self.state.write().unwrap().status = BotStatus::TwoFactorAuth;
-                                    self.reconnect_after = Some(std::time::Instant::now() + std::time::Duration::from_secs(120));
+                                    self.reconnect_after = Some(std::time::Instant::now() + std::time::Duration::from_secs(secs));
                                     self.emit(WsEvent::BotStatus { bot_id: self.bot_id, status: "two_factor_auth".into() });
                                 } else if self.pending_server_overload {
                                     self.pending_server_overload = false;
-                                    println!("[Bot] Logon failed — server overloaded. Retrying in 30 s.");
+                                    let secs = self.delays.server_overload_secs;
+                                    println!("[Bot] Logon failed — server overloaded. Retrying in {secs} s.");
                                     self.state.write().unwrap().status = BotStatus::ServerOverloaded;
-                                    self.reconnect_after = Some(std::time::Instant::now() + std::time::Duration::from_secs(30));
+                                    self.reconnect_after = Some(std::time::Instant::now() + std::time::Duration::from_secs(secs));
                                     self.emit(WsEvent::BotStatus { bot_id: self.bot_id, status: "server_overloaded".into() });
                                 } else if self.pending_too_many_logins {
                                     self.pending_too_many_logins = false;
-                                    println!("[Bot] Logon failed — too many logins at once. Retrying in 5 s.");
+                                    let secs = self.delays.too_many_logins_secs;
+                                    println!("[Bot] Logon failed — too many logins at once. Retrying in {secs} s.");
                                     self.state.write().unwrap().status = BotStatus::TooManyLogins;
-                                    self.reconnect_after = Some(std::time::Instant::now() + std::time::Duration::from_secs(5));
+                                    self.reconnect_after = Some(std::time::Instant::now() + std::time::Duration::from_secs(secs));
                                     self.emit(WsEvent::BotStatus { bot_id: self.bot_id, status: "too_many_logins".into() });
                                 } else if self.pending_relogon {
                                     self.pending_relogon = false;
@@ -1896,6 +1899,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             BotCommand::SetDelays(d) => {
                 self.delays = d.clone();
                 self.state.write().unwrap().delays = d;
+            }
+            BotCommand::SetAutoCollect { enabled } => {
+                self.auto_collect = enabled;
+                self.state.write().unwrap().auto_collect = enabled;
             }
         }
     }

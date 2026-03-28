@@ -85,13 +85,22 @@ pub struct TrackInfo {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BotDelays {
-    pub place_ms: u64,
-    pub walk_ms:  u64,
+    pub place_ms:             u64,
+    pub walk_ms:              u64,
+    pub twofa_secs:           u64,
+    pub server_overload_secs: u64,
+    pub too_many_logins_secs: u64,
 }
 
 impl Default for BotDelays {
     fn default() -> Self {
-        Self { place_ms: 500, walk_ms: 500 }
+        Self {
+            place_ms:             500,
+            walk_ms:              500,
+            twofa_secs:           120,
+            server_overload_secs: 30,
+            too_many_logins_secs: 5,
+        }
     }
 }
 
@@ -117,6 +126,8 @@ pub struct BotState {
     /// Configurable delays for bot actions.
     pub delays: BotDelays,
     pub track_info: Option<TrackInfo>,
+    /// Whether the run loop should auto-collect nearby dropped items.
+    pub auto_collect: bool,
 }
 
 pub enum BotCommand {
@@ -138,6 +149,7 @@ pub enum BotCommand {
     Respawn,
     FindPath { x: u32, y: u32 },
     SetDelays(BotDelays),
+    SetAutoCollect { enabled: bool },
 }
 
 pub type CmdSender   = mpsc::Sender<BotCommand>;

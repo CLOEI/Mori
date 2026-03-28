@@ -19,6 +19,8 @@ export type BotStatus =
   | 'in_world'
   | 'two_factor_auth'
   | 'server_overloaded'
+  | 'too_many_logins'
+  | 'update_required'
 
 export interface BotSummary {
   id: number
@@ -68,8 +70,9 @@ export interface BotState {
   gems: number
   console: string[]
   ping_ms: number
-  delays: { place_ms: number; walk_ms: number }
+  delays: { place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
   track_info: { level: number; grow_id: number; install_date: number; global_playtime: number; awesomeness: number } | null
+  auto_collect: boolean
 }
 
 export interface SpawnBotBody {
@@ -98,7 +101,8 @@ export type BotCmd =
   | { type: 'unwear'; item_id: number }
   | { type: 'drop'; item_id: number; count: number }
   | { type: 'trash'; item_id: number; count: number }
-  | { type: 'set_delays'; place_ms: number; walk_ms: number }
+  | { type: 'set_delays'; place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
+  | { type: 'set_auto_collect'; enabled: boolean }
 
 export interface ItemRecord {
   id: number

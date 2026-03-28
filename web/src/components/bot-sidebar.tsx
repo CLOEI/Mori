@@ -15,6 +15,8 @@ const STATUS_COLOR: Record<BotStatus, string> = {
   in_world: 'bg-emerald-500',
   two_factor_auth: 'bg-orange-500',
   server_overloaded: 'bg-red-500',
+  too_many_logins: 'bg-purple-500',
+  update_required: 'bg-gray-500',
 }
 
 const STATUS_LABEL: Record<BotStatus, string> = {
@@ -23,6 +25,8 @@ const STATUS_LABEL: Record<BotStatus, string> = {
   in_world: 'In World',
   two_factor_auth: '2FA',
   server_overloaded: 'Overloaded',
+  too_many_logins: 'Too Many Logins',
+  update_required: 'Update Required',
 }
 
 export function BotSidebar({ onClose }: { onClose?: () => void }) {

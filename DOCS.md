@@ -154,7 +154,10 @@ Returns the full state of a bot.
   "ping_ms": 0,
   "delays": {
     "place_ms": 500,
-    "walk_ms": 500
+    "walk_ms": 500,
+    "twofa_secs": 120,
+    "server_overload_secs": 30,
+    "too_many_logins_secs": 5
   },
   "track_info": {
     "level": 0,
@@ -162,7 +165,8 @@ Returns the full state of a bot.
     "install_date": 0,
     "global_playtime": 0,
     "awesomeness": 0
-  }
+  },
+  "auto_collect": true
 }
 ```
 
@@ -235,9 +239,22 @@ Permanently delete items.
 ```
 
 #### `set_delays`
-Configure action delays in milliseconds.
+Configure action delays. `place_ms` and `walk_ms` are in milliseconds; the `*_secs` fields control how long the bot waits before reconnecting after each login failure type.
 ```json
-{ "type": "set_delays", "place_ms": 500, "walk_ms": 500 }
+{
+  "type": "set_delays",
+  "place_ms": 500,
+  "walk_ms": 500,
+  "twofa_secs": 120,
+  "server_overload_secs": 30,
+  "too_many_logins_secs": 5
+}
+```
+
+#### `set_auto_collect`
+Enable or disable automatic collection of nearby dropped items.
+```json
+{ "type": "set_auto_collect", "enabled": true }
 ```
 
 ---
@@ -625,8 +642,10 @@ The bot's GrowID was resolved from the server. Fired after `SetHasGrowID` is rec
 | `connecting` | Initial state, attempting to connect |
 | `connected` | Connected to game server |
 | `in_world` | Logged in and inside a world |
-| `two_factor_auth` | Blocked by 2FA — retries after 120s |
-| `server_overloaded` | Server overloaded — retries after 30s |
+| `two_factor_auth` | Blocked by 2FA — retries after `twofa_secs` |
+| `server_overloaded` | Server overloaded — retries after `server_overload_secs` |
+| `too_many_logins` | Too many concurrent logins — retries after `too_many_logins_secs` |
+| `update_required` | Client update required — bot stops permanently |
 
 ### Coordinates
 
@@ -634,7 +653,10 @@ All `x`/`y` values are in **tile coordinates** (pixels ÷ 32). The bot's positio
 
 ### Default Delays
 
-| Delay | Default |
-|-------|---------|
-| `place_ms` | 500ms |
-| `walk_ms` | 500ms |
+| Delay | Default | Description |
+|-------|---------|-------------|
+| `place_ms` | 500ms | Delay between place/punch actions |
+| `walk_ms` | 500ms | Delay between walk/pathfind steps |
+| `twofa_secs` | 120s | Reconnect wait after 2FA block |
+| `server_overload_secs` | 30s | Reconnect wait after server overload |
+| `too_many_logins_secs` | 5s | Reconnect wait after too-many-logins rejection |

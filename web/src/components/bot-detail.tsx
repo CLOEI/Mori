@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { parseGTColors } from '@/lib/gt-colors'
@@ -19,6 +20,8 @@ const STATUS_DOT: Record<BotStatus, string> = {
   in_world: 'bg-emerald-500',
   two_factor_auth: 'bg-orange-500',
   server_overloaded: 'bg-red-500',
+  too_many_logins: 'bg-purple-500',
+  update_required: 'bg-gray-500',
 }
 
 export function BotDetail({ bot }: { bot: LiveBot }) {
@@ -57,6 +60,7 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
           ping_ms: s.ping_ms,
           delays: s.delays,
           track_info: s.track_info,
+          auto_collect: s.auto_collect,
         })
       })
     }).catch(() => {})
@@ -125,7 +129,7 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
         </TabsContent>
 
         <TabsContent value="config" className="flex-1 overflow-auto m-0 p-4">
-          <ConfigTab botId={bot.id} delays={bot.delays} />
+          <ConfigTab botId={bot.id} delays={bot.delays} autoCollect={bot.auto_collect} />
         </TabsContent>
       </Tabs>
     </div>
@@ -277,19 +281,28 @@ function ScriptTab({ botId }: { botId: number }) {
 function ConfigTab({
   botId,
   delays,
+  autoCollect,
 }: {
   botId: number
-  delays: { place_ms: number; walk_ms: number }
+  delays: { place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
+  autoCollect: boolean
 }) {
   const [placeMs, setPlaceMs] = useState(String(delays.place_ms))
   const [walkMs, setWalkMs] = useState(String(delays.walk_ms))
+  const [twofaSecs, setTwofaSecs] = useState(String(delays.twofa_secs))
+  const [serverOverloadSecs, setServerOverloadSecs] = useState(String(delays.server_overload_secs))
+  const [tooManyLoginsSecs, setTooManyLoginsSecs] = useState(String(delays.too_many_logins_secs))
   const [status, setStatus] = useState('')
+  const setBots = useSetAtom(botsAtom)
 
   // sync when bot prop changes
   useEffect(() => {
     setPlaceMs(String(delays.place_ms))
     setWalkMs(String(delays.walk_ms))
-  }, [delays.place_ms, delays.walk_ms])
+    setTwofaSecs(String(delays.twofa_secs))
+    setServerOverloadSecs(String(delays.server_overload_secs))
+    setTooManyLoginsSecs(String(delays.too_many_logins_secs))
+  }, [delays.place_ms, delays.walk_ms, delays.twofa_secs, delays.server_overload_secs, delays.too_many_logins_secs])
 
   async function save() {
     try {
@@ -297,6 +310,9 @@ function ConfigTab({
         type: 'set_delays',
         place_ms: parseInt(placeMs, 10),
         walk_ms: parseInt(walkMs, 10),
+        twofa_secs: parseInt(twofaSecs, 10),
+        server_overload_secs: parseInt(serverOverloadSecs, 10),
+        too_many_logins_secs: parseInt(tooManyLoginsSecs, 10),
       })
       setStatus('Saved')
       setTimeout(() => setStatus(''), 2000)
@@ -334,10 +350,72 @@ function ConfigTab({
           />
         </label>
       </div>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Pending Retry Delays (s)
+      </p>
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">2FA / Account Protection (s)</span>
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={twofaSecs}
+            onChange={(e) => setTwofaSecs(e.target.value)}
+            className="h-7 text-xs"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Server Overloaded (s)</span>
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={serverOverloadSecs}
+            onChange={(e) => setServerOverloadSecs(e.target.value)}
+            className="h-7 text-xs"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Too Many Logins (s)</span>
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={tooManyLoginsSecs}
+            onChange={(e) => setTooManyLoginsSecs(e.target.value)}
+            className="h-7 text-xs"
+          />
+        </label>
+      </div>
       <div className="flex items-center gap-2">
         <Button size="sm" className="text-xs" onClick={save}>Save</Button>
         {status && <span className="text-xs text-muted-foreground">{status}</span>}
       </div>
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Behaviour
+      </p>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <Switch
+          size="sm"
+          checked={autoCollect}
+          onCheckedChange={(enabled) => {
+            setBots((m) => {
+              const bot = m.get(botId)
+              if (!bot) return m
+              return new Map(m).set(botId, { ...bot, auto_collect: enabled })
+            })
+            api.sendCmd(botId, { type: 'set_auto_collect', enabled }).catch(() => {
+              setBots((m) => {
+                const bot = m.get(botId)
+                if (!bot) return m
+                return new Map(m).set(botId, { ...bot, auto_collect: !enabled })
+              })
+            })
+          }}
+        />
+        <span className="text-xs text-muted-foreground">Auto-collect dropped items</span>
+      </label>
     </div>
   )
 }

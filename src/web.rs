@@ -121,6 +121,7 @@ enum CmdRequest {
     Drop { item_id: u32, count: u32 },
     Trash { item_id: u32, count: u32 },
     SetDelays(BotDelays),
+    SetAutoCollect { enabled: bool },
 }
 
 #[derive(Deserialize)]
@@ -183,6 +184,7 @@ async fn bot_cmd(
         CmdRequest::Drop { item_id, count } => BotCommand::Drop { item_id, count },
         CmdRequest::Trash { item_id, count } => BotCommand::Trash { item_id, count },
         CmdRequest::SetDelays(d) => BotCommand::SetDelays(d),
+        CmdRequest::SetAutoCollect { enabled } => BotCommand::SetAutoCollect { enabled },
     };
     if s.manager.lock().unwrap().send_cmd(id, cmd) {
         StatusCode::NO_CONTENT
