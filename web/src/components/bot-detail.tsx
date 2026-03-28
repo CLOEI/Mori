@@ -217,7 +217,7 @@ function ConsoleTab({ lines }: { lines: string[] }) {
   }, [lines])
 
   return (
-    <ScrollArea className="flex-1 rounded border border-border bg-background p-3 font-mono text-[12px] leading-relaxed">
+    <ScrollArea className="flex-1 min-h-0 rounded border border-border bg-background p-3 font-mono text-[12px] leading-relaxed">
       {lines.length === 0 ? (
         <span className="text-muted-foreground">No output yet.</span>
       ) : (
