@@ -558,7 +558,7 @@ impl LuaUserData for LuaTile {
                 }
                 TileType::Door { label, flags } => {
                     tbl.set("type", "door")?;
-                    tbl.set("text", label.clone())?;
+                    tbl.set("label", label.clone())?;
                     tbl.set("flags", *flags)?;
                 }
                 TileType::Lock { settings, owner_uid, access_count, .. } => {
