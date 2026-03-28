@@ -309,7 +309,7 @@ impl Bot {
             state,
             cmd_rx,
             temporary_data:  TemporaryData::default(),
-            auto_collect:    false,
+            auto_collect:    true,
             collect_timer:   std::time::Instant::now(),
             astar:           AStar::new(),
             delays:          BotDelays::default(),
@@ -428,7 +428,7 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             state,
             cmd_rx,
             temporary_data:  TemporaryData::default(),
-            auto_collect:    false,
+            auto_collect:    true,
             collect_timer:   std::time::Instant::now(),
             astar:           AStar::new(),
             delays:          BotDelays::default(),
@@ -607,6 +607,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             }
             self.service_once();
             self.drain_script_requests();
+            if self.auto_collect
+                && self.collect_timer.elapsed() >= std::time::Duration::from_millis(500)
+            {
+                self.collect_timer = std::time::Instant::now();
+                self.collect();
+            }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
@@ -864,12 +870,6 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     }
                 }
             }
-        }
-        if self.auto_collect
-            && self.collect_timer.elapsed() >= std::time::Duration::from_millis(500)
-        {
-            self.collect_timer = std::time::Instant::now();
-            self.collect();
         }
     }
 
@@ -1660,6 +1660,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     value:       *uid,
                     ..Default::default()
                 };
+
+                println!("Collect : {:?}", pkt);
                 self.send_game_packet(&pkt, true);
                 sent += 1;
             }
