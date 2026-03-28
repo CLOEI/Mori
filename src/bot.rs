@@ -1549,7 +1549,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
     pub fn wear(&mut self, item_id: u32) {
         let pkt = GameUpdatePacket {
-            packet_type: GamePacketType::ItemActivateObjectRequest,
+            packet_type: GamePacketType::ItemActivateRequest,
             value:       item_id,
             ..Default::default()
         };
@@ -1930,7 +1930,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
     pub fn unwear(&mut self, item_id: u32) {
         let pkt = GameUpdatePacket {
-            packet_type: GamePacketType::ItemActivateObjectRequestAlt,
+            packet_type: GamePacketType::ItemActivateRequest,
             value: item_id,
             ..Default::default()
         };
