@@ -81,6 +81,14 @@ export interface SpawnBotBody {
   proxy_password?: string
 }
 
+export interface SpawnLtokenBody {
+  ltoken: string
+  proxy_host?: string
+  proxy_port?: number
+  proxy_username?: string
+  proxy_password?: string
+}
+
 export type BotCmd =
   | { type: 'move'; x: number; y: number }  // tile deltas
   | { type: 'walk_to'; x: number; y: number }
@@ -122,6 +130,7 @@ export interface ItemsPage {
 export const api = {
   getBots: () => req<BotSummary[]>('GET', '/bots'),
   spawnBot: (body: SpawnBotBody) => req<{ id: number }>('POST', '/bots', body),
+  spawnLtokenBot: (body: SpawnLtokenBody) => req<{ id: number }>('POST', '/bots/ltoken', body),
   deleteBot: (id: number) => req<void>('DELETE', `/bots/${id}`),
   getBotState: (id: number) => req<BotState>('GET', `/bots/${id}/state`),
   sendCmd: (id: number, cmd: BotCmd) => req<void>('POST', `/bots/${id}/cmd`, cmd),

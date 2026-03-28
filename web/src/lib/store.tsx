@@ -183,6 +183,9 @@ export function useMoriStore() {
       ['InventoryUpdate', (d: { bot_id: number; gems: number; items: InventoryItem[] }) =>
         setBots((m) => patchBot(m, d.bot_id, { gems: d.gems, inventory: d.items }))],
 
+      ['BotUsername', (d: { bot_id: number; username: string }) =>
+        setBots((m) => patchBot(m, d.bot_id, { username: d.username }))],
+
       ['Console', (d: { bot_id: number; message: string }) =>
         setBots((m) => {
           const bot = m.get(d.bot_id)

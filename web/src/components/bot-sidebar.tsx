@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { botsAtom, selectedBotIdAtom } from '@/lib/store'
-import { api, type BotStatus, type SpawnBotBody } from '@/lib/api'
+import { api, type BotStatus, type SpawnBotBody, type SpawnLtokenBody } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 const STATUS_COLOR: Record<BotStatus, string> = {
@@ -66,17 +67,14 @@ export function BotSidebar({ onClose }: { onClose?: () => void }) {
 function AddBotForm({ onDone }: { onDone: () => void }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [ltokenStr, setLtokenStr] = useState('')
   const [showProxy, setShowProxy] = useState(false)
   const [proxyStr, setProxyStr] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [method, setMethod] = useState<'legacy' | 'ltoken'>('legacy')
 
-  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    const body: SpawnBotBody = { username, password }
+  function buildProxy(body: SpawnBotBody | SpawnLtokenBody) {
     if (showProxy && proxyStr) {
       const parts = proxyStr.split(':')
       if (parts.length >= 2) {
@@ -86,9 +84,23 @@ function AddBotForm({ onDone }: { onDone: () => void }) {
         if (parts[3]) body.proxy_password = parts[3]
       }
     }
+  }
+
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
 
     try {
-      await api.spawnBot(body)
+      if (method === 'legacy') {
+        const body: SpawnBotBody = { username, password }
+        buildProxy(body)
+        await api.spawnBot(body)
+      } else {
+        const body: SpawnLtokenBody = { ltoken: ltokenStr }
+        buildProxy(body)
+        await api.spawnLtokenBot(body)
+      }
       onDone()
     } catch {
       setError('Failed to spawn bot')
@@ -99,21 +111,41 @@ function AddBotForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-1.5">
-      <Input
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        className="h-7 text-xs"
-        required
-      />
-      <Input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="h-7 text-xs"
-        required
-      />
+      <Tabs value={method} onValueChange={(v) => setMethod(v as 'legacy' | 'ltoken')}>
+        <TabsList className="w-full h-7">
+          <TabsTrigger value="legacy" className="flex-1 text-[10px]">Legacy</TabsTrigger>
+          <TabsTrigger value="ltoken" className="flex-1 text-[10px]">Ltoken</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="legacy" className="flex flex-col gap-1.5 mt-1.5">
+          <Input
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="h-7 text-xs"
+            required={method === 'legacy'}
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-7 text-xs"
+            required={method === 'legacy'}
+          />
+        </TabsContent>
+
+        <TabsContent value="ltoken" className="mt-1.5">
+          <Input
+            placeholder="token|rid|mac|wk"
+            value={ltokenStr}
+            onChange={(e) => setLtokenStr(e.target.value)}
+            className="h-7 text-xs font-mono"
+            required={method === 'ltoken'}
+          />
+        </TabsContent>
+      </Tabs>
+
       <button
         type="button"
         onClick={() => setShowProxy((v) => !v)}
@@ -130,6 +162,7 @@ function AddBotForm({ onDone }: { onDone: () => void }) {
           className="h-7 text-xs font-mono"
         />
       )}
+
       <Button type="submit" size="sm" className="w-full text-xs" disabled={loading}>
         {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Spawn'}
       </Button>

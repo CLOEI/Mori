@@ -74,6 +74,39 @@ impl BotManager {
         id
     }
 
+    pub fn spawn_ltoken(&mut self, ltoken_str: String, proxy: Option<Socks5Config>) -> u32 {
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let stop_flag  = Arc::new(AtomicBool::new(false));
+        let stop_clone = stop_flag.clone();
+
+        let state = Arc::new(RwLock::new(BotState {
+            status: BotStatus::Connecting,
+            ..Default::default()
+        }));
+        let state_clone = state.clone();
+
+        let (cmd_tx, cmd_rx) = mpsc::channel::<BotCommand>();
+
+        let items_dat = self.items_dat.clone();
+        let ws_tx_clone = self.ws_tx.clone();
+
+        std::thread::spawn(move || {
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let mut bot = crate::bot::Bot::new_ltoken(&ltoken_str, proxy, state_clone, cmd_rx, items_dat, id, Some(ws_tx_clone));
+                bot.run(stop_clone);
+            })) {
+                Ok(_)  => println!("[Bot:{id}] Stopped."),
+                Err(_) => println!("[Bot:{id}] Crashed."),
+            }
+        });
+
+        self.bots.insert(id, BotEntry { username: String::new(), stop_flag, state, cmd_tx });
+        let _ = self.ws_tx.send(WsEvent::BotAdded { bot_id: id, username: String::new() });
+        id
+    }
+
     pub fn stop(&mut self, id: u32) -> bool {
         if let Some(entry) = self.bots.remove(&id) {
             entry.stop_flag.store(true, Ordering::Relaxed);

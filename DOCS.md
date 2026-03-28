@@ -65,6 +65,32 @@ Spawns a new bot.
 
 ---
 
+### POST `/bots/ltoken`
+
+Spawns a new bot using a pre-existing ltoken instead of username/password. The token is validated immediately — if it fails the bot stops without retrying.
+
+**Request Body**
+```json
+{
+  "ltoken": "token|rid|mac|wk",
+  "proxy_host": "string",
+  "proxy_port": 1080,
+  "proxy_username": "string",
+  "proxy_password": "string"
+}
+```
+
+`ltoken` is a `|`-separated string of four fields: the refresh token, a 32-char hex RID, a MAC address (`XX:XX:XX:XX:XX:XX`), and a 32-char hex WK.
+
+`proxy_host` and `proxy_port` are required together to enable SOCKS5 proxy. Username/password are optional.
+
+**Response**
+```json
+{ "id": 1 }
+```
+
+---
+
 ### DELETE `/bots/{id}`
 
 Stops and removes a bot.
@@ -572,6 +598,18 @@ A console message was received (game chat, script output, etc.).
   "data": {
     "bot_id": 1,
     "message": "string"
+  }
+}
+```
+
+#### `BotUsername`
+The bot's GrowID was resolved from the server. Fired after `SetHasGrowID` is received — useful for ltoken bots whose username is unknown at spawn time.
+```json
+{
+  "event": "BotUsername",
+  "data": {
+    "bot_id": 1,
+    "username": "string"
   }
 }
 ```

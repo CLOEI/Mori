@@ -101,6 +101,14 @@ impl Default for TemporaryData {
     }
 }
 
+/// How the bot authenticates. Controls both initial login and token-refresh fallback.
+enum LoginMethod {
+    /// Standard GrowID login: if check_token fails, re-login with password.
+    Legacy { password: String },
+    /// Token provided directly: if check_token fails, stop the bot (no fallback).
+    Ltoken,
+}
+
 /// Data captured from `OnSendToServer`, kept until the next ServerHello.
 struct RedirectData {
     server:  String,
@@ -116,7 +124,7 @@ pub struct Bot {
     host:     BotHost,
     pub proxy: Option<Socks5Config>,
     pub username: String,
-    password: String,
+    login_method: LoginMethod,
     /// Legacy token from HTTP login (used in first ServerHello only).
     ltoken:   String,
     /// `meta` from server_data.php — echoed in all login packets.
@@ -281,7 +289,7 @@ impl Bot {
             host,
             proxy,
             username: username.to_string(),
-            password: password.to_string(),
+            login_method: LoginMethod::Legacy { password: password.to_string() },
             ltoken:   creds.ltoken,
             meta:     creds.meta,
             mac,
@@ -328,6 +336,124 @@ impl Bot {
             s.mac      = bot.mac.clone();
         }
         bot.host.connect(creds.addr, 2, 0);
+        bot
+    }
+
+    /// Parses a `token|rid|mac|wk` string.
+    fn parse_ltoken_string(s: &str) -> Option<(String, String, String, String)> {
+        let mut parts = s.splitn(4, '|');
+        let token = parts.next()?.to_string();
+        let rid   = parts.next()?.to_string();
+        let mac   = parts.next()?.to_string();
+        let wk    = parts.next()?.to_string();
+        if rid.len() != 32 || wk.len() != 32 { return None; }
+        Some((token, rid, mac, wk))
+    }
+
+    pub fn new_ltoken(
+        ltoken_str: &str,
+        proxy: Option<Socks5Config>,
+        state: Arc<RwLock<BotState>>,
+        cmd_rx: CmdReceiver,
+        items_dat: Arc<ItemsDat>,
+        bot_id: u32,
+        ws_tx: Option<WsTx>,
+    ) -> Self {
+        let (ltoken, rid, mac, wk) = Self::parse_ltoken_string(ltoken_str)
+            .expect("[Bot] Invalid ltoken string — expected token|rid|mac|wk");
+
+        let hash  = hash_string(&format!("{}RT", mac));
+        let hash2 = hash_string(&format!("{}RT", random_hex(16)));
+
+        let proxy_url = proxy.as_ref().map(|p| p.to_url());
+        let proxy_url_ref = proxy_url.as_deref();
+        let login_info = LoginInfo { protocol: PROTOCOL, game_version: GAME_VER.into() };
+
+        let mut alternate = false;
+        let server_data = loop {
+            println!("[Bot] fetching server_data (alternate={alternate})...");
+            match get_server_data_proxied(alternate, &login_info, proxy_url_ref) {
+                Ok(s)  => break s,
+                Err(e) => {
+                    alternate = !alternate;
+                    println!("[Bot] fetch: server_data failed: {e} — retrying in 5s");
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                }
+            }
+        };
+
+        let klv = compute_klv(GAME_VER, &PROTOCOL.to_string(), &rid, hash);
+        let login_data = format!(
+            "tankIDName|\ntankIDPass|\nrequestedName|\nf|1\nprotocol|{PROTOCOL}\n\
+game_version|{GAME_VER}\nfz|22243512\ncbits|1024\nplayer_age|20\nGDPR|2\nFCMToken|\n\
+category|_-5100\ntotalPlaytime|0\nklv|{klv}\nhash2|{hash2}\nmeta|{}\nfhash|{FHASH}\n\
+rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}\nwk|{wk}\nzf|31631978\nlmode|1\n",
+            server_data.meta,
+        );
+
+        let ltoken = match check_token(&ltoken, &login_data, proxy_url_ref) {
+            Ok(new_token) => {
+                println!("[Bot] ltoken validated successfully");
+                new_token
+            }
+            Err(e) => panic!("[Bot] ltoken validation failed: {e} — stopping"),
+        };
+
+        let addr: SocketAddr = format!("{}:{}", server_data.server, server_data.port)
+            .parse()
+            .expect("Invalid server address");
+
+        let host = Self::create_host(proxy.as_ref());
+        let mut bot = Bot {
+            host,
+            proxy,
+            username:     String::new(),
+            login_method: LoginMethod::Ltoken,
+            ltoken,
+            meta:   server_data.meta,
+            mac,
+            hash,
+            hash2,
+            wk,
+            rid,
+            redirect:   None,
+            peer_id:    None,
+            pos_x:      0.0,
+            pos_y:      0.0,
+            start_time: std::time::Instant::now(),
+            local:      LocalPlayer::default(),
+            players:    std::collections::HashMap::new(),
+            inventory:  Inventory::default(),
+            world:      None,
+            state,
+            cmd_rx,
+            temporary_data:  TemporaryData::default(),
+            auto_collect:    false,
+            collect_timer:   std::time::Instant::now(),
+            astar:           AStar::new(),
+            delays:          BotDelays::default(),
+            items_dat,
+            event_tx:        None,
+            script_req_rx:   None,
+            script_reply_tx: None,
+            script_stop:     Arc::new(AtomicBool::new(false)),
+            reconnect_after: None,
+            pending_2fa:             false,
+            pending_relogon:         false,
+            pending_server_overload: false,
+            pending_too_many_logins: false,
+            pending_update_required: false,
+            stop_requested:          false,
+            bot_id,
+            ws_tx,
+            last_ping:       0,
+        };
+
+        {
+            let mut s = bot.state.write().unwrap();
+            s.mac = bot.mac.clone();
+        }
+        bot.host.connect(addr, 2, 0);
         bot
     }
 
@@ -421,7 +547,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         )
     }
 
-    /// Refreshes `self.ltoken`: tries check_token first, falls back to full re-login.
+    /// Refreshes `self.ltoken`: tries check_token first, then falls back based on login method.
     fn refresh_token(&mut self) {
         let login_data = self.build_login_data();
         let proxy = self.proxy.as_ref().map(|p| p.to_url());
@@ -433,12 +559,21 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 self.ltoken = new_token;
                 return;
             }
-            println!("[Bot] check_token failed — falling back to full re-login");
+            println!("[Bot] check_token failed");
         }
 
-        let creds = fetch_credentials(&self.username, &self.password, self.proxy.as_ref());
-        self.ltoken = creds.ltoken;
-        self.meta   = creds.meta;
+        match &self.login_method {
+            LoginMethod::Ltoken => {
+                println!("[Bot] ltoken login — no fallback credentials, stopping bot");
+                self.stop_requested = true;
+            }
+            LoginMethod::Legacy { password } => {
+                println!("[Bot] falling back to full re-login");
+                let creds = fetch_credentials(&self.username, password, self.proxy.as_ref());
+                self.ltoken = creds.ltoken;
+                self.meta   = creds.meta;
+            }
+        }
     }
 
     pub fn run(&mut self, stop_flag: Arc<AtomicBool>) {
@@ -850,6 +985,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     self.local.net_id  = data.get("netID").and_then(|s| s.parse().ok()).unwrap_or(0);
                     self.local.user_id = data.get("userID").and_then(|s| s.parse().ok()).unwrap_or(0);
                     println!("[Bot] OnSpawn (self) net_id={} user_id={}", self.local.net_id, self.local.user_id);
+                    println!("[Bot] ltoken string: {}|{}|{}|{}", self.ltoken, self.rid, self.mac, self.wk);
                     {
                         let mut s = self.state.write().unwrap();
                         s.status = BotStatus::InWorld;
@@ -975,6 +1111,14 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     cb(self);
                 }
             }
+            "SetHasGrowID" => {
+                if let Some(growid) = vl.get(2).map(|v| v.as_string()) {
+                    self.username = growid.clone();
+                    self.state.write().unwrap().username = growid.clone();
+                    self.emit(WsEvent::BotUsername { bot_id: self.bot_id, username: growid });
+                }
+            }
+
             "OnRequestWorldSelectMenu" => {
                 self.world = None;
                 {

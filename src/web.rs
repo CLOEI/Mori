@@ -60,6 +60,34 @@ async fn spawn_bot(
     Json(serde_json::json!({ "id": id }))
 }
 
+#[derive(Deserialize)]
+struct SpawnLtokenRequest {
+    ltoken:         String,
+    proxy_host:     Option<String>,
+    proxy_port:     Option<u16>,
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
+}
+
+async fn spawn_ltoken_bot(
+    State(s): State<AppState>,
+    Json(req): Json<SpawnLtokenRequest>,
+) -> Json<serde_json::Value> {
+    let proxy = match (req.proxy_host, req.proxy_port) {
+        (Some(host), Some(port)) => {
+            let addr = format!("{}:{}", host, port).parse().ok();
+            addr.map(|proxy_addr| Socks5Config {
+                proxy_addr,
+                username: req.proxy_username,
+                password: req.proxy_password,
+            })
+        }
+        _ => None,
+    };
+    let id = s.manager.lock().unwrap().spawn_ltoken(req.ltoken, proxy);
+    Json(serde_json::json!({ "id": id }))
+}
+
 async fn stop_bot(
     State(s): State<AppState>,
     Path(id): Path<u32>,
@@ -226,6 +254,7 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/", get(index_html))
 
         .route("/bots", get(list_bots).post(spawn_bot))
+        .route("/bots/ltoken", post(spawn_ltoken_bot))
         .route("/bots/{id}", delete(stop_bot))
         .route("/bots/{id}/state", get(bot_state))
         .route("/bots/{id}/cmd", post(bot_cmd))
