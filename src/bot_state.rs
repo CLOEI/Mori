@@ -98,6 +98,8 @@ impl Default for BotDelays {
 #[derive(Default, Clone, Serialize)]
 pub struct BotState {
     pub status:          BotStatus,
+    pub username:        String,
+    pub mac:             String,
     pub world_name:      String,
     /// Tile-coordinate position (pixels ÷ 32).
     pub pos_x:           f32,

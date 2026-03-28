@@ -1,27 +1,34 @@
 use mlua::prelude::*;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, atomic::Ordering};
 use std::time::Duration;
 
-use crate::bot::{Bot, BotEventRaw};
+use crate::bot::BotEventRaw;
 use crate::bot_state::BotState;
 use crate::inventory::{Inventory, InventoryItem};
 use crate::items::{ItemsDat, ItemInfo};
 use crate::packet::{GameUpdatePacket, GamePacketType, PacketFlags};
 use crate::player::Player;
+use crate::script_channel::{ScriptRequest as Req, ScriptReply as Rep};
 use crate::variant::{Variant, VariantList};
 use crate::world::{Tile, TileFlags, TileType, WorldObject};
 
 // ── Wrapper types ──────────────────────────────────────────────────────────────
 
-/// Raw-pointer proxy to the running Bot. Only valid within `run_script`.
+/// Channel-based proxy to the bot thread.
 struct BotProxy {
-    bot:   *mut Bot,
-    items: Arc<ItemsDat>,
-    state: Arc<RwLock<BotState>>,
+    req_tx:   crossbeam_channel::Sender<crate::script_channel::ScriptRequest>,
+    reply_rx: crossbeam_channel::Receiver<crate::script_channel::ScriptReply>,
+    items:    Arc<ItemsDat>,
+    state:    Arc<RwLock<BotState>>,
 }
 
-// Safety: only ever created + used inside a single bot thread.
-unsafe impl Send for BotProxy {}
+impl BotProxy {
+    /// Send a request to the bot thread and block until the reply arrives.
+    fn request(&self, req: crate::script_channel::ScriptRequest) -> crate::script_channel::ScriptReply {
+        self.req_tx.send(req).expect("bot thread gone");
+        self.reply_rx.recv().expect("bot thread gone")
+    }
+}
 
 
 struct LuaWorld {
@@ -48,18 +55,20 @@ struct LuaConsole(Arc<RwLock<BotState>>);
 
 impl LuaUserData for BotProxy {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("name", |_, p| Ok(unsafe { (*p.bot).username.clone() }));
+        fields.add_field_method_get("name", |_, p| {
+            Ok(p.state.read().unwrap().username.clone())
+        });
         fields.add_field_method_get("status", |_, p| {
-            Ok(unsafe { (*p.bot).state.read().unwrap().status.to_string() })
+            Ok(p.state.read().unwrap().status.to_string())
         });
         fields.add_field_method_get("gem_count", |_, p| {
-            Ok(unsafe { (*p.bot).inventory.gems })
+            Ok(p.state.read().unwrap().gems)
         });
         fields.add_field_method_get("auto_collect", |_, p| {
-            Ok(unsafe { (*p.bot).auto_collect })
+            match p.request(Req::GetAutoCollect) { Rep::Bool(v) => Ok(v), _ => Ok(false) }
         });
         fields.add_field_method_set("auto_collect", |_, p, v: bool| {
-            unsafe { (*p.bot).auto_collect = v };
+            p.request(Req::SetAutoCollect { enabled: v });
             Ok(())
         });
     }
@@ -67,25 +76,24 @@ impl LuaUserData for BotProxy {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         // ── Getters ────────────────────────────────────────────────────────────
         methods.add_method("getWorld", |_, p, ()| {
-            let bot = unsafe { &*p.bot };
-            match bot.world.clone() {
-                Some(world) => {
-                    let players: Vec<Player> = bot.players.values().cloned().collect();
-                    Ok(Some(LuaWorld {
-                        world,
-                        players,
-                        local_net_id:  bot.local.net_id,
-                        local_user_id: bot.local.user_id,
-                        local_name:    bot.username.clone(),
-                        local_pos:     (bot.pos_x, bot.pos_y),
-                    }))
-                }
-                None => Ok(None),
+            match p.request(Req::GetWorld) {
+                Rep::World(Some(snap)) => Ok(Some(LuaWorld {
+                    world:         snap.world,
+                    players:       snap.players,
+                    local_net_id:  snap.local_net_id,
+                    local_user_id: snap.local_user_id,
+                    local_name:    snap.local_name,
+                    local_pos:     snap.local_pos,
+                })),
+                _ => Ok(None),
             }
         });
 
         methods.add_method("getInventory", |_, p, ()| {
-            Ok(LuaInventory(unsafe { (*p.bot).inventory.clone() }))
+            match p.request(Req::GetInventory) {
+                Rep::Inventory(inv) => Ok(LuaInventory(inv)),
+                _                   => Ok(LuaInventory(crate::inventory::Inventory::default())),
+            }
         });
 
         methods.add_method("getConsole", |_, p, ()| {
@@ -93,242 +101,199 @@ impl LuaUserData for BotProxy {
         });
 
         methods.add_method("getLogin", |_, p, ()| {
-            Ok(LuaLogin { mac: unsafe { (*p.bot).mac.clone() } })
+            Ok(LuaLogin { mac: p.state.read().unwrap().mac.clone() })
         });
 
         methods.add_method("getPing", |_, p, ()| {
-            Ok(unsafe { (*p.bot).state.read().unwrap().ping_ms })
+            Ok(p.state.read().unwrap().ping_ms)
         });
 
         methods.add_method("getLocal", |_, p, ()| {
-            let bot = unsafe { &*p.bot };
-            let fake = Player {
-                net_id:     bot.local.net_id,
-                user_id:    bot.local.user_id,
-                name:       bot.username.clone(),
-                country:    String::new(),
-                position:   (bot.pos_x, bot.pos_y),
-                avatar:     String::new(),
-                online_id:  String::new(),
-                e_id:       String::new(),
-                ip:         String::new(),
-                col_rect:   String::new(),
-                title_icon: String::new(),
-                m_state:    0,
-                invisible:  false,
-            };
-            Ok(LuaPlayer(fake))
+            match p.request(Req::GetLocal) {
+                Rep::Local(snap) => Ok(LuaPlayer(Player {
+                    net_id:     snap.net_id,
+                    user_id:    snap.user_id,
+                    name:       snap.username,
+                    country:    String::new(),
+                    position:   (snap.pos_x, snap.pos_y),
+                    avatar:     String::new(),
+                    online_id:  String::new(),
+                    e_id:       String::new(),
+                    ip:         String::new(),
+                    col_rect:   String::new(),
+                    title_icon: String::new(),
+                    m_state:    0,
+                    invisible:  false,
+                })),
+                _ => Err(LuaError::runtime("getLocal failed")),
+            }
         });
 
         methods.add_method("getCaptcha", |_, _p, ()| Ok(None::<String>));
 
         // ── State queries ──────────────────────────────────────────────────────
         methods.add_method("isInWorld", |_, p, name: Option<String>| {
-            let bot = unsafe { &*p.bot };
-            match (&bot.world, name) {
-                (Some(w), Some(n)) => Ok(w.tile_map.world_name.to_uppercase() == n.to_uppercase()),
-                (Some(_), None)    => Ok(true),
-                (None, _)          => Ok(false),
-            }
+            match p.request(Req::IsInWorld { name }) { Rep::Bool(v) => Ok(v), _ => Ok(false) }
         });
 
         methods.add_method("isInTile", |_, p, (x, y): (u32, u32)| {
-            let bot = unsafe { &*p.bot };
-            let cx = (bot.pos_x / 32.0) as u32;
-            let cy = (bot.pos_y / 32.0) as u32;
-            Ok(cx == x && cy == y)
+            match p.request(Req::IsInTile { x, y }) { Rep::Bool(v) => Ok(v), _ => Ok(false) }
         });
 
         // ── Network ────────────────────────────────────────────────────────────
         methods.add_method("connect", |_, p, ()| {
-            unsafe { (*p.bot).reconnect() };
+            p.request(Req::Reconnect);
             Ok(true)
         });
 
         methods.add_method("disconnect", |_, p, ()| {
-            unsafe { (*p.bot).disconnect() };
+            p.request(Req::Disconnect);
             Ok(())
         });
 
         methods.add_method("sendRaw", |_, p, pkt: LuaAnyUserData| {
-            let pkt = pkt.borrow::<LuaGameUpdatePacket>()?;
-            unsafe { (*p.bot).send_game_packet(&pkt.0, true) };
+            let pkt = pkt.borrow::<LuaGameUpdatePacket>()?.0.clone();
+            p.request(Req::SendRaw { pkt });
             Ok(())
         });
 
         methods.add_method("sendPacket", |_, p, (ptype, text): (u8, String)| {
-            let bot = unsafe { &mut *p.bot };
-            match ptype {
-                2 => bot.send_text(&text),
-                3 => bot.send_game_message(&text),
-                _ => {}
-            }
+            p.request(Req::SendPacket { ptype, text });
             Ok(())
         });
 
         // ── World actions ──────────────────────────────────────────────────────
         methods.add_method("warp", |_, p, (name, id): (String, Option<String>)| {
-            let id = id.unwrap_or_default();
-            unsafe { (*p.bot).warp(&name, &id) };
+            p.request(Req::Warp { name, id: id.unwrap_or_default() });
             Ok(())
         });
 
         methods.add_method("say", |_, p, text: String| {
-            unsafe { (*p.bot).say(&text) };
+            p.request(Req::Say { text });
             Ok(())
         });
 
         methods.add_method("leaveWorld", |_, p, ()| {
-            unsafe { (*p.bot).leave_world() };
+            p.request(Req::LeaveWorld);
             Ok(())
         });
 
         methods.add_method("respawn", |_, p, ()| {
-            unsafe { (*p.bot).respawn() };
+            p.request(Req::Respawn);
             Ok(())
         });
 
         methods.add_method("active", |_, p, (x, y): (i32, i32)| {
-            unsafe { (*p.bot).active_tile(x, y) };
+            p.request(Req::Active { tile_x: x, tile_y: y });
             Ok(())
         });
 
         methods.add_method("place", |_, p, (x, y, item): (i32, i32, u32)| {
-            unsafe { (*p.bot).place(x, y, item, false) };
+            p.request(Req::Place { x, y, item });
             Ok(())
         });
 
         methods.add_method("hit", |_, p, (x, y): (i32, i32)| {
-            unsafe { (*p.bot).punch(x, y) };
+            p.request(Req::Hit { x, y });
             Ok(())
         });
 
         methods.add_method("wrench", |_, p, (x, y): (i32, i32)| {
-            unsafe { (*p.bot).wrench_at(x, y) };
+            p.request(Req::Wrench { x, y });
             Ok(())
         });
 
         methods.add_method("wrenchPlayer", |_, p, net_id: u32| {
-            unsafe { (*p.bot).wrench_player(net_id) };
+            p.request(Req::WrenchPlayer { net_id });
             Ok(())
         });
 
         methods.add_method("enter", |_, p, pass: Option<String>| {
-            let bot = unsafe { &mut *p.bot };
-            let cx = (bot.pos_x / 32.0) as i32;
-            let cy = (bot.pos_y / 32.0) as i32;
-            if let Some(pw) = pass {
-                bot.send_text(&format!("action|input\n|text|{pw}\n"));
-            } else {
-                bot.active_tile(cx, cy);
-            }
+            p.request(Req::Enter { pass });
             Ok(())
         });
 
         // ── Inventory ──────────────────────────────────────────────────────────
-        methods.add_method("wear", |_, p, item_id: u32| {
-            unsafe { (*p.bot).wear(item_id) };
-            Ok(())
-        });
-
-        methods.add_method("unwear", |_, p, item_id: u32| {
-            unsafe { (*p.bot).unwear(item_id) };
-            Ok(())
-        });
-
-        methods.add_method("drop", |_, p, (item_id, count): (u32, u32)| {
-            unsafe { (*p.bot).drop_item(item_id, count) };
-            Ok(())
-        });
-
-        methods.add_method("trash", |_, p, (item_id, count): (u32, u32)| {
-            unsafe { (*p.bot).trash_item(item_id, count) };
-            Ok(())
-        });
-
-        methods.add_method("fastDrop", |_, p, (item_id, count): (u32, u32)| {
-            unsafe { (*p.bot).fast_drop(item_id, count) };
-            Ok(())
-        });
-
-        methods.add_method("fastTrash", |_, p, (item_id, count): (u32, u32)| {
-            unsafe { (*p.bot).fast_trash(item_id, count) };
-            Ok(())
-        });
-
-        methods.add_method("use", |_, p, item_id: u32| {
-            unsafe { (*p.bot).wear(item_id) };
-            Ok(())
-        });
+        methods.add_method("wear",      |_, p, item_id: u32|          { p.request(Req::Wear      { item_id });        Ok(()) });
+        methods.add_method("unwear",    |_, p, item_id: u32|          { p.request(Req::Unwear    { item_id });        Ok(()) });
+        methods.add_method("use",       |_, p, item_id: u32|          { p.request(Req::Wear      { item_id });        Ok(()) });
+        methods.add_method("drop",      |_, p, (item_id, count): (u32, u32)| { p.request(Req::Drop  { item_id, count }); Ok(()) });
+        methods.add_method("trash",     |_, p, (item_id, count): (u32, u32)| { p.request(Req::Trash { item_id, count }); Ok(()) });
+        methods.add_method("fastDrop",  |_, p, (item_id, count): (u32, u32)| { p.request(Req::FastDrop  { item_id, count }); Ok(()) });
+        methods.add_method("fastTrash", |_, p, (item_id, count): (u32, u32)| { p.request(Req::FastTrash { item_id, count }); Ok(()) });
 
         // ── Movement ───────────────────────────────────────────────────────────
         methods.add_method("moveTo", |_, p, (dx, dy): (i32, i32)| {
-            let bot = unsafe { &mut *p.bot };
-            let cx = (bot.pos_x / 32.0) as i32;
-            let cy = (bot.pos_y / 32.0) as i32;
-            bot.walk(cx + dx, cy + dy);
+            let s = p.state.read().unwrap();
+            let cx = s.pos_x as i32;
+            let cy = s.pos_y as i32;
+            drop(s);
+            p.request(Req::Walk { tile_x: cx + dx, tile_y: cy + dy });
             Ok(())
         });
 
         methods.add_method("moveTile", |_, p, (x, y): (i32, i32)| {
-            unsafe { (*p.bot).walk(x, y) };
+            p.request(Req::Walk { tile_x: x, tile_y: y });
             Ok(())
         });
 
         methods.add_method("moveLeft", |_, p, range: Option<i32>| {
-            let bot = unsafe { &mut *p.bot };
-            let r  = range.unwrap_or(1);
-            let cx = (bot.pos_x / 32.0) as i32;
-            let cy = (bot.pos_y / 32.0) as i32;
-            bot.walk(cx - r, cy);
+            let r = range.unwrap_or(1);
+            let s = p.state.read().unwrap();
+            let cx = s.pos_x as i32; let cy = s.pos_y as i32;
+            drop(s);
+            p.request(Req::Walk { tile_x: cx - r, tile_y: cy });
             Ok(())
         });
 
         methods.add_method("moveRight", |_, p, range: Option<i32>| {
-            let bot = unsafe { &mut *p.bot };
-            let r  = range.unwrap_or(1);
-            let cx = (bot.pos_x / 32.0) as i32;
-            let cy = (bot.pos_y / 32.0) as i32;
-            bot.walk(cx + r, cy);
+            let r = range.unwrap_or(1);
+            let s = p.state.read().unwrap();
+            let cx = s.pos_x as i32; let cy = s.pos_y as i32;
+            drop(s);
+            p.request(Req::Walk { tile_x: cx + r, tile_y: cy });
             Ok(())
         });
 
         methods.add_method("moveUp", |_, p, range: Option<i32>| {
-            let bot = unsafe { &mut *p.bot };
-            let r  = range.unwrap_or(1);
-            let cx = (bot.pos_x / 32.0) as i32;
-            let cy = (bot.pos_y / 32.0) as i32;
-            bot.walk(cx, cy - r);
+            let r = range.unwrap_or(1);
+            let s = p.state.read().unwrap();
+            let cx = s.pos_x as i32; let cy = s.pos_y as i32;
+            drop(s);
+            p.request(Req::Walk { tile_x: cx, tile_y: cy - r });
             Ok(())
         });
 
         methods.add_method("moveDown", |_, p, range: Option<i32>| {
-            let bot = unsafe { &mut *p.bot };
-            let r  = range.unwrap_or(1);
-            let cx = (bot.pos_x / 32.0) as i32;
-            let cy = (bot.pos_y / 32.0) as i32;
-            bot.walk(cx, cy + r);
+            let r = range.unwrap_or(1);
+            let s = p.state.read().unwrap();
+            let cx = s.pos_x as i32; let cy = s.pos_y as i32;
+            drop(s);
+            p.request(Req::Walk { tile_x: cx, tile_y: cy + r });
             Ok(())
         });
 
         methods.add_method("setDirection", |_, p, facing_left: bool| {
-            unsafe { (*p.bot).set_direction(facing_left) };
+            p.request(Req::SetDirection { facing_left });
             Ok(())
         });
 
         methods.add_method("setMac", |_, p, mac: String| {
-            unsafe { (*p.bot).mac = mac };
+            p.request(Req::SetMac { mac });
             Ok(())
         });
 
         methods.add_method("setAutoCollect", |_, p, enabled: bool| {
-            unsafe { (*p.bot).auto_collect = enabled };
+            p.request(Req::SetAutoCollect { enabled });
             Ok(())
         });
 
         // ── Pathfinding ────────────────────────────────────────────────────────
         methods.add_method("getPath", |lua, p, (x, y): (u32, u32)| {
-            let nodes = unsafe { (*p.bot).compute_path(x, y) };
+            let nodes = match p.request(Req::GetPath { x, y }) {
+                Rep::Path(v) => v,
+                _            => vec![],
+            };
             let table = lua.create_table()?;
             for (i, (nx, ny)) in nodes.iter().enumerate() {
                 let t = lua.create_table()?;
@@ -340,45 +305,24 @@ impl LuaUserData for BotProxy {
         });
 
         methods.add_method("findPath", |_, p, (x, y): (u32, u32)| {
-            unsafe { (*p.bot).find_path(x, y) };
+            p.request(Req::FindPath { x, y });
             Ok(())
         });
 
         methods.add_method("collectObject", |_, p, (oid, range): (u32, f32)| {
-            unsafe { (*p.bot).collect_object_at(oid, range) };
+            p.request(Req::CollectObject { uid: oid, range });
             Ok(())
         });
 
         methods.add_method("collect", |_, p, (range, interval): (f32, u64)| {
-            let bot = unsafe { &mut *p.bot };
-            if bot.world.is_none() { return Ok(0usize); }
-            let uids: Vec<u32> = {
-                let w = bot.world.as_ref().unwrap();
-                let r2 = (range * 32.0).powi(2);
-                w.objects.iter()
-                    .filter(|o| {
-                        let dx = bot.pos_x - o.x;
-                        let dy = bot.pos_y - o.y;
-                        dx * dx + dy * dy <= r2
-                    })
-                    .map(|o| o.uid)
-                    .collect()
-            };
-            let count = uids.len();
-            for uid in uids {
-                bot.collect_object_at(uid, range);
-                std::thread::sleep(Duration::from_millis(interval));
+            match p.request(Req::Collect { range, interval_ms: interval }) {
+                Rep::CollectCount(n) => Ok(n),
+                _                   => Ok(0usize),
             }
-            Ok(count)
         });
 
         // ── Script control ─────────────────────────────────────────────────────
-        methods.add_method("stopScript",  |_, _p, ()| Ok(()));
-        methods.add_method("runScript",   |_, p, content: String| {
-            // nested script: just run it directly
-            unsafe { (*p.bot).run_script(&content) };
-            Ok(())
-        });
+        methods.add_method("stopScript", |_, _p, ()| Ok(()));
     }
 }
 
@@ -847,18 +791,39 @@ impl LuaUserData for LuaConsole {
     }
 }
 
-// ── Public entry point ────────────────────────────────────────────────────────
+// ── Public entry points ───────────────────────────────────────────────────────
 
-pub fn run_script(bot: &mut Bot, script: &str) {
-    bot.script_stop.store(false, std::sync::atomic::Ordering::Relaxed);
+/// Entry point called by the spawned script thread.
+pub fn run_script_threaded(
+    req_tx:    crossbeam_channel::Sender<crate::script_channel::ScriptRequest>,
+    reply_rx:  crossbeam_channel::Receiver<crate::script_channel::ScriptReply>,
+    event_rx:  crossbeam_channel::Receiver<crate::bot::BotEventRaw>,
+    items:     std::sync::Arc<crate::items::ItemsDat>,
+    state:     std::sync::Arc<std::sync::RwLock<crate::bot_state::BotState>>,
+    stop_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    username:  String,
+    script:    String,
+) {
+    run_script_inner(req_tx, reply_rx, event_rx, items, state, stop_flag, username, script);
+}
+
+fn run_script_inner(
+    req_tx:    crossbeam_channel::Sender<crate::script_channel::ScriptRequest>,
+    reply_rx:  crossbeam_channel::Receiver<crate::script_channel::ScriptReply>,
+    event_rx:  crossbeam_channel::Receiver<crate::bot::BotEventRaw>,
+    items:     std::sync::Arc<crate::items::ItemsDat>,
+    state:     std::sync::Arc<std::sync::RwLock<crate::bot_state::BotState>>,
+    stop_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    username:  String,
+    script:    String,
+) {
     let lua = Lua::new();
 
-    let script_stop      = bot.script_stop.clone();
-    let script_stop_sleep = bot.script_stop.clone();
+    let stop_hook = stop_flag.clone();
     let _ = lua.set_hook(
         mlua::HookTriggers { every_nth_instruction: Some(200), ..Default::default() },
         move |_lua, _debug| {
-            if script_stop.load(std::sync::atomic::Ordering::Relaxed) {
+            if stop_hook.load(Ordering::Relaxed) {
                 Err(LuaError::runtime("__script_stop__"))
             } else {
                 Ok(mlua::VmState::Continue)
@@ -866,28 +831,18 @@ pub fn run_script(bot: &mut Bot, script: &str) {
         },
     );
 
-    let items = bot.items_dat.clone();
-    let state = bot.state.clone();
-    let bot_ptr = bot as *mut Bot;
-
-    let proxy = BotProxy {
-        bot: bot_ptr,
-        items: items.clone(),
-        state: state.clone(),
-    };
+    let proxy = BotProxy { req_tx, reply_rx, items: items.clone(), state: state.clone() };
 
     let setup = || -> LuaResult<()> {
         lua.globals().set("bot", lua.create_userdata(proxy)?)?;
 
         // ── sleep(ms) ─────────────────────────────────────────────────────────
         {
-            let stop = script_stop_sleep.clone();
+            let stop = stop_flag.clone();
             lua.globals().set("sleep", lua.create_function(move |_, ms: u64| {
-                let start    = std::time::Instant::now();
-                let duration = Duration::from_millis(ms);
-                while start.elapsed() < duration {
-                    unsafe { (*bot_ptr).tick_during_script(&stop) };
-                    if stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let deadline = std::time::Instant::now() + Duration::from_millis(ms);
+                while std::time::Instant::now() < deadline {
+                    if stop.load(Ordering::Relaxed) {
                         return Err(LuaError::runtime("__script_stop__"));
                     }
                     std::thread::sleep(Duration::from_millis(10));
@@ -976,14 +931,7 @@ pub fn run_script(bot: &mut Bot, script: &str) {
 
         // ── getUsername() ─────────────────────────────────────────────────────
         {
-            let state2 = state.clone();
-            lua.globals().set("getUsername", lua.create_function(move |_, ()| {
-                Ok(state2.read().unwrap().status.to_string())
-            })?)?;
-        }
-        // override with actual username from bot pointer
-        unsafe {
-            let uname = (*bot_ptr).username.clone();
+            let uname = username.clone();
             lua.globals().set("getUsername", lua.create_function(move |_, ()| {
                 Ok(uname.clone())
             })?)?;
@@ -1011,24 +959,22 @@ end
         "#).exec()?;
 
         {
+            let event_rx2 = event_rx.clone();
+            let stop2     = stop_flag.clone();
             lua.globals().set("listenEvents", lua.create_function(move |lua, secs: Option<f64>| {
-                let start  = std::time::Instant::now();
+                let start = std::time::Instant::now();
                 lua.globals().set("__listening_stop", false)?;
 
                 while secs.map_or(true, |s| start.elapsed() < Duration::from_secs_f64(s)) {
-                    if lua.globals().get::<bool>("__listening_stop").unwrap_or(false) {
+                    if lua.globals().get::<bool>("__listening_stop").unwrap_or(false)
+                        || stop2.load(Ordering::Relaxed)
+                    {
                         break;
                     }
 
-                    unsafe { (*bot_ptr).service_once() };
-
-                    let events: Vec<BotEventRaw> = unsafe {
-                        (*bot_ptr).event_queue.drain(..).collect()
-                    };
-
                     let handlers: LuaTable = lua.globals().get("__events")?;
 
-                    for event in events {
+                    while let Ok(event) = event_rx2.try_recv() {
                         match event {
                             BotEventRaw::VariantList { vl, net_id } => {
                                 if let Ok(f) = handlers.get::<LuaFunction>(1u8) {
@@ -1126,15 +1072,13 @@ end
     };
 
     if let Err(e) = setup() {
-        let mut s = bot.state.write().unwrap();
-        s.console.push(format!("`4[Lua setup error] {e}"));
+        state.write().unwrap().console.push(format!("`4[Lua setup error] {e}"));
         return;
     }
 
-    if let Err(e) = lua.load(script).exec() {
+    if let Err(e) = lua.load(&script).exec() {
         if !e.to_string().contains("__script_stop__") {
-            let mut s = bot.state.write().unwrap();
-            s.console.push(format!("`4[Lua] {e}"));
+            state.write().unwrap().console.push(format!("`4[Lua] {e}"));
         }
     }
 }

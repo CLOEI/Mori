@@ -160,8 +160,12 @@ pub struct Bot {
     pub delays: BotDelays,
     /// Item database for collision-type lookups.
     pub items_dat: Arc<ItemsDat>,
-    /// Events pushed by packet handlers and drained by Lua's `listenEvents`.
-    pub event_queue: std::collections::VecDeque<BotEventRaw>,
+    /// Forwards events to the running script thread (None when no script is active).
+    event_tx: Option<crossbeam_channel::Sender<BotEventRaw>>,
+    /// Receives requests from the script thread.
+    script_req_rx: Option<crossbeam_channel::Receiver<crate::script_channel::ScriptRequest>>,
+    /// Sends replies back to the script thread.
+    script_reply_tx: Option<crossbeam_channel::Sender<crate::script_channel::ScriptReply>>,
     /// Set to true to interrupt a running Lua script.
     pub script_stop: Arc<AtomicBool>,
     /// When set, the bot will delay reconnecting until this instant (used for 2FA cooldown).
@@ -302,7 +306,9 @@ impl Bot {
             astar:           AStar::new(),
             delays:          BotDelays::default(),
             items_dat,
-            event_queue:     std::collections::VecDeque::new(),
+            event_tx:        None,
+            script_req_rx:   None,
+            script_reply_tx: None,
             script_stop:     Arc::new(AtomicBool::new(false)),
             reconnect_after: None,
             pending_2fa:             false,
@@ -316,6 +322,11 @@ impl Bot {
             last_ping:       0,
         };
 
+        {
+            let mut s = bot.state.write().unwrap();
+            s.username = username.to_string();
+            s.mac      = bot.mac.clone();
+        }
         bot.host.connect(creds.addr, 2, 0);
         bot
     }
@@ -460,6 +471,16 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 }
             }
             self.service_once();
+            self.drain_script_requests();
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    /// Sleep for `ms` milliseconds while keeping ENet alive.
+    pub fn sleep_ms(&mut self, ms: u64) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(ms);
+        while std::time::Instant::now() < deadline {
+            self.service_once();
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
@@ -509,7 +530,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         }
                         Some(IncomingPacket::GameMessage(s)) => {
                             println!("[Bot] GameMessage: {s}");
-                            self.event_queue.push_back(BotEventRaw::GameMessage { text: s.to_string() });
+                            if let Some(tx) = &self.event_tx { tx.try_send(BotEventRaw::GameMessage { text: s.to_string() }).ok(); }
                             if s.contains("Advanced Account Protection") {
                                 self.pending_2fa = true;
                             }
@@ -563,7 +584,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                             }
                         }
                         Some(IncomingPacket::GameUpdate(pkt)) => {
-                            self.event_queue.push_back(BotEventRaw::GameUpdate { pkt: pkt.clone() });
+                            if let Some(tx) = &self.event_tx { tx.try_send(BotEventRaw::GameUpdate { pkt: pkt.clone() }).ok(); }
                             match pkt.packet_type {
                                 GamePacketType::SetCharacterState => {
                                     self.local.hack_type    = pkt.value;
@@ -576,7 +597,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                     let extra = pkt.extra_data.clone();
                                     let net_id = id.0 as u32;
                                     if let Ok(vl) = VariantList::deserialize(&extra) {
-                                        self.event_queue.push_back(BotEventRaw::VariantList { vl, net_id });
+                                        if let Some(tx) = &self.event_tx { tx.try_send(BotEventRaw::VariantList { vl, net_id }).ok(); }
                                     }
                                     self.on_call_function(id, &extra);
                                 }
@@ -1331,7 +1352,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         };
 
         self.send_game_packet(&pkt, false);
-        std::thread::sleep(std::time::Duration::from_millis(self.delays.walk_ms));
+        self.sleep_ms(self.delays.walk_ms);
     }
 
     pub fn place(&mut self, offset_x: i32, offset_y: i32, item_id: u32, is_punch: bool) {
@@ -1371,7 +1392,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         pkt.packet_type = GamePacketType::State;
         pkt.flags       = flags;
         self.send_game_packet(&pkt, true);
-        std::thread::sleep(std::time::Duration::from_millis(self.delays.place_ms));
+        self.sleep_ms(self.delays.place_ms);
     }
 
     pub fn punch(&mut self, offset_x: i32, offset_y: i32) {
@@ -1562,6 +1583,116 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         }
     }
 
+    /// Process one request from the script thread and return the reply.
+    fn handle_script_request(&mut self, req: crate::script_channel::ScriptRequest) -> crate::script_channel::ScriptReply {
+        use crate::script_channel::{ScriptRequest as Req, ScriptReply as Rep, WorldSnapshot, LocalSnapshot};
+        match req {
+            Req::Reconnect                          => { self.reconnect(); Rep::Ack }
+            Req::Disconnect                         => { self.disconnect(); Rep::Ack }
+            Req::SendRaw { pkt }                    => { self.send_game_packet(&pkt, true); Rep::Ack }
+            Req::SendPacket { ptype, text }         => {
+                match ptype { 2 => self.send_text(&text), 3 => self.send_game_message(&text), _ => {} }
+                Rep::Ack
+            }
+            Req::Say { text }                       => { self.say(&text); Rep::Ack }
+            Req::Warp { name, id }                  => { self.warp(&name, &id); Rep::Ack }
+            Req::LeaveWorld                         => { self.leave_world(); Rep::Ack }
+            Req::Respawn                            => { self.respawn(); Rep::Ack }
+            Req::Active { tile_x, tile_y }          => { self.active_tile(tile_x, tile_y); Rep::Ack }
+            Req::Enter { pass }                     => {
+                let cx = (self.pos_x / 32.0) as i32;
+                let cy = (self.pos_y / 32.0) as i32;
+                if let Some(pw) = pass { self.send_text(&format!("action|input\n|text|{pw}\n")); }
+                else { self.active_tile(cx, cy); }
+                Rep::Ack
+            }
+            Req::Place { x, y, item }               => { self.place(x, y, item, false); Rep::Ack }
+            Req::Hit { x, y }                       => { self.punch(x, y); Rep::Ack }
+            Req::Wrench { x, y }                    => { self.wrench_at(x, y); Rep::Ack }
+            Req::WrenchPlayer { net_id }            => { self.wrench_player(net_id); Rep::Ack }
+            Req::Wear { item_id }                   => { self.wear(item_id); Rep::Ack }
+            Req::Unwear { item_id }                 => { self.unwear(item_id); Rep::Ack }
+            Req::Drop { item_id, count }            => { self.drop_item(item_id, count); Rep::Ack }
+            Req::Trash { item_id, count }           => { self.trash_item(item_id, count); Rep::Ack }
+            Req::FastDrop { item_id, count }        => { self.fast_drop(item_id, count); Rep::Ack }
+            Req::FastTrash { item_id, count }       => { self.fast_trash(item_id, count); Rep::Ack }
+            Req::Walk { tile_x, tile_y }            => { self.walk(tile_x, tile_y); Rep::Ack }
+            Req::SetDirection { facing_left }       => { self.set_direction(facing_left); Rep::Ack }
+            Req::FindPath { x, y }                  => { self.find_path(x, y); Rep::Ack }
+            Req::CollectObject { uid, range }       => { self.collect_object_at(uid, range); Rep::Ack }
+            Req::Collect { range, interval_ms } => {
+                let count = if let Some(w) = &self.world {
+                    let r2 = (range * 32.0).powi(2);
+                    let uids: Vec<u32> = w.objects.iter()
+                        .filter(|o| { let dx = self.pos_x - o.x; let dy = self.pos_y - o.y; dx*dx + dy*dy <= r2 })
+                        .map(|o| o.uid).collect();
+                    let n = uids.len();
+                    for uid in uids { self.collect_object_at(uid, range); self.sleep_ms(interval_ms); }
+                    n
+                } else { 0 };
+                Rep::CollectCount(count)
+            }
+            Req::SetMac { mac } => {
+                self.mac = mac.clone();
+                self.state.write().unwrap().mac = mac;
+                Rep::Ack
+            }
+            Req::SetAutoCollect { enabled }         => { self.auto_collect = enabled; Rep::Ack }
+            Req::GetWorld => {
+                let snap = self.world.clone().map(|world| {
+                    let players = self.players.values().cloned().collect();
+                    WorldSnapshot { world, players, local_net_id: self.local.net_id, local_user_id: self.local.user_id, local_name: self.username.clone(), local_pos: (self.pos_x, self.pos_y) }
+                });
+                Rep::World(snap)
+            }
+            Req::GetInventory => Rep::Inventory(self.inventory.clone()),
+            Req::GetLocal => Rep::Local(LocalSnapshot {
+                net_id: self.local.net_id, user_id: self.local.user_id,
+                pos_x: self.pos_x, pos_y: self.pos_y,
+                username: self.username.clone(), mac: self.mac.clone(),
+            }),
+            Req::GetPath { x, y }                  => Rep::Path(self.compute_path(x, y)),
+            Req::IsInWorld { name }                 => Rep::Bool(match (&self.world, name) {
+                (Some(w), Some(n)) => w.tile_map.world_name.to_uppercase() == n.to_uppercase(),
+                (Some(_), None)    => true,
+                (None, _)          => false,
+            }),
+            Req::IsInTile { x, y }                 => {
+                let cx = (self.pos_x / 32.0) as u32;
+                let cy = (self.pos_y / 32.0) as u32;
+                Rep::Bool(cx == x && cy == y)
+            }
+            Req::GetAutoCollect                     => Rep::Bool(self.auto_collect),
+            Req::GetPing                            => Rep::U32(self.state.read().unwrap().ping_ms),
+            Req::GetGems                            => Rep::I32(self.inventory.gems),
+
+        }
+    }
+
+    /// Drain all pending requests from the script thread, handling each one.
+    /// Detects when the script thread exits (channel closed) and clears channel fields.
+    fn drain_script_requests(&mut self) {
+        loop {
+            let req = match &self.script_req_rx {
+                Some(rx) => match rx.try_recv() {
+                    Ok(r)                                         => r,
+                    Err(crossbeam_channel::TryRecvError::Empty)   => break,
+                    Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                        self.script_req_rx   = None;
+                        self.script_reply_tx = None;
+                        self.event_tx        = None;
+                        break;
+                    }
+                },
+                None => break,
+            };
+            let reply = self.handle_script_request(req);
+            if let Some(tx) = &self.script_reply_tx {
+                tx.send(reply).ok();
+            }
+        }
+    }
+
     fn handle_command(&mut self, cmd: BotCommand) {
         match cmd {
             BotCommand::Move { x, y } => {
@@ -1573,7 +1704,34 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 self.find_path(x, y);
             }
             BotCommand::RunScript { content } => {
-                crate::lua_api::run_script(self, &content);
+                // Stop any currently running script first.
+                self.script_stop.store(true, Ordering::Relaxed);
+                // Drop old channels so the previous script thread (if any) sees disconnection.
+                self.script_req_rx   = None;
+                self.script_reply_tx = None;
+                self.event_tx        = None;
+
+                self.script_stop.store(false, Ordering::Relaxed);
+
+                let (req_tx,   req_rx)   = crossbeam_channel::unbounded::<crate::script_channel::ScriptRequest>();
+                let (reply_tx, reply_rx) = crossbeam_channel::unbounded::<crate::script_channel::ScriptReply>();
+                let (event_tx, event_rx) = crossbeam_channel::bounded::<BotEventRaw>(256);
+
+                self.script_req_rx   = Some(req_rx);
+                self.script_reply_tx = Some(reply_tx);
+                self.event_tx        = Some(event_tx);
+
+                let items     = self.items_dat.clone();
+                let state     = self.state.clone();
+                let stop_flag = self.script_stop.clone();
+                let username  = self.username.clone();
+
+                std::thread::spawn(move || {
+                    crate::lua_api::run_script_threaded(
+                        req_tx, reply_rx, event_rx,
+                        items, state, stop_flag, username, content,
+                    );
+                });
             }
             BotCommand::StopScript => { self.script_stop.store(true, Ordering::Relaxed); }
             BotCommand::Say { text } => { self.say(&text); }
@@ -1737,25 +1895,4 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             .collect()
     }
 
-    pub fn run_script(&mut self, script: &str) {
-        crate::lua_api::run_script(self, script);
-    }
-
-    /// Called from within a Lua `sleep()` to keep the bot alive.
-    /// Services ENet and drains pending commands, skipping RunScript to avoid
-    /// re-entrancy. StopScript sets the shared flag so the Lua hook aborts.
-    pub fn tick_during_script(&mut self, script_stop: &Arc<AtomicBool>) {
-        self.service_once();
-        while let Ok(cmd) = self.cmd_rx.try_recv() {
-            match cmd {
-                BotCommand::StopScript => {
-                    script_stop.store(true, Ordering::Relaxed);
-                }
-                BotCommand::RunScript { .. } => {
-                    // Already running a script; ignore.
-                }
-                other => self.handle_command(other),
-            }
-        }
-    }
 }

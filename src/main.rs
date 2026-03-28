@@ -19,6 +19,7 @@ pub mod packet;
 mod server_data;
 mod variant;
 mod web;
+pub mod script_channel;
 
 use std::sync::{Arc, Mutex};
 use bot_manager::BotManager;
