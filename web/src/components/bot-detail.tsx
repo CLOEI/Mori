@@ -116,8 +116,10 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
           ))}
         </TabsList>
 
-        <TabsContent value="overview" className="flex-1 overflow-auto m-0 p-4">
-          <OverviewTab bot={bot} />
+        <TabsContent value="overview" className="flex-1 overflow-hidden m-0">
+          <ScrollArea className="h-full p-4">
+            <OverviewTab bot={bot} />
+          </ScrollArea>
         </TabsContent>
 
         <TabsContent value="console" className="flex-1 overflow-hidden m-0 p-4 flex flex-col">
@@ -148,10 +150,14 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Left column: minimap + players + objects */}
+      {/* Left column: minimap + tiles + players */}
       <div className="flex flex-col gap-4">
         <Section label="Minimap" hint="click to walk · scroll to zoom">
           <Minimap bot={bot} />
+        </Section>
+
+        <Section label="Tiles in World">
+          <TilesTable tiles={bot.tiles} itemLabel={itemLabel} />
         </Section>
 
         <Section label="Players in World">
@@ -540,6 +546,23 @@ function InventoryTable({
       </Table>
     </ScrollArea>
   )
+}
+
+function TilesTable({
+  tiles,
+  itemLabel,
+}: {
+  tiles: { fg: number; bg: number; flags: number; tile_type: unknown }[]
+  itemLabel: (id: number) => string
+}) {
+  const counts = new Map<number, number>()
+  for (const t of tiles) {
+    if (t.fg !== 0) counts.set(t.fg, (counts.get(t.fg) ?? 0) + 1)
+  }
+  const rows = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, count]) => [itemLabel(id), count.toLocaleString()])
+  return <DataTable columns={['Tile', 'Count']} rows={rows} empty="No tiles" />
 }
 
 function DPad({ botId }: { botId: number }) {
