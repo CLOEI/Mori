@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Bot, Package, BookOpen } from 'lucide-react'
+import { Bot, Package, BookOpen, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BotsPage } from '@/pages/BotsPage'
 import { ItemsPage } from '@/pages/ItemsPage'
 import { DocsPage } from '@/pages/DocsPage'
+import { ProxyPage } from '@/pages/ProxyPage'
 
-type Page = 'bots' | 'items' | 'docs'
+type Page = 'bots' | 'items' | 'proxy' | 'docs'
 
 export default function App() {
   const [page, setPage] = useState<Page>('bots')
@@ -19,12 +20,14 @@ export default function App() {
         <nav className="flex gap-0.5">
           <NavBtn active={page === 'bots'} onClick={() => setPage('bots')} icon={<Bot className="w-3 h-3" />} label="Bots" />
           <NavBtn active={page === 'items'} onClick={() => setPage('items')} icon={<Package className="w-3 h-3" />} label="Items" />
+          <NavBtn active={page === 'proxy'} onClick={() => setPage('proxy')} icon={<ShieldCheck className="w-3 h-3" />} label="Proxy" />
           <NavBtn active={page === 'docs'} onClick={() => setPage('docs')} icon={<BookOpen className="w-3 h-3" />} label="Docs" />
         </nav>
       </header>
       <div className="flex-1 overflow-hidden">
         {page === 'bots' && <BotsPage />}
         {page === 'items' && <ItemsPage />}
+        {page === 'proxy' && <ProxyPage />}
         {page === 'docs' && <DocsPage />}
       </div>
     </div>

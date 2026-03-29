@@ -104,6 +104,25 @@ export type BotCmd =
   | { type: 'set_delays'; place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
   | { type: 'set_auto_collect'; enabled: boolean }
 
+export interface ProxyTestRequest {
+  proxy_host: string
+  proxy_port: number
+  proxy_username?: string
+  proxy_password?: string
+}
+
+export interface CheckResult {
+  ok: boolean
+  error?: string
+  detail?: string
+}
+
+export interface ProxyTestResult {
+  socks5: CheckResult
+  server_data: CheckResult
+  enet: CheckResult
+}
+
 export interface ItemRecord {
   id: number
   name: string
@@ -142,4 +161,5 @@ export const api = {
   getItemColors: () => req<Record<string, number>>('GET', '/items/colors'),
   getItems: (page = 1, q = '') =>
     req<ItemsPage>('GET', `/items?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  testProxy: (body: ProxyTestRequest) => req<ProxyTestResult>('POST', '/proxy/test', body),
 }

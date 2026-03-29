@@ -16,6 +16,7 @@ mod crypto;
 mod dashboard;
 mod login;
 pub mod packet;
+mod proxy_test;
 mod server_data;
 mod variant;
 mod web;

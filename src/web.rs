@@ -17,6 +17,7 @@ use crate::bot_manager::{BotInfo, BotManager};
 use crate::bot_state::{BotCommand, BotDelays, BotState};
 use crate::events::WsTx;
 use crate::items::ItemInfo;
+use crate::proxy_test::{ProxyTestResult, run_proxy_test};
 
 pub type SharedManager = Arc<Mutex<BotManager>>;
 
@@ -212,6 +213,36 @@ async fn bot_cmd(
     }
 }
 
+// ── Proxy test ────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct ProxyTestRequest {
+    proxy_host:     String,
+    proxy_port:     u16,
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
+}
+
+async fn proxy_check(
+    Json(req): Json<ProxyTestRequest>,
+) -> Result<Json<ProxyTestResult>, StatusCode> {
+    let addr = format!("{}:{}", req.proxy_host, req.proxy_port)
+        .parse()
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let cfg = Socks5Config {
+        proxy_addr: addr,
+        username: req.proxy_username,
+        password: req.proxy_password,
+    };
+
+    let result = tokio::task::spawn_blocking(move || run_proxy_test(cfg))
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(result))
+}
+
 // ── WebSocket handler ─────────────────────────────────────────────────────────
 
 async fn ws_handler(
@@ -282,6 +313,7 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/items", get(list_items))
         .route("/items/names", get(item_names))
         .route("/items/colors", get(item_colors))
+        .route("/proxy/test", post(proxy_check))
         .route("/ws", get(ws_handler))
         .layer(cors)
         .with_state(state)

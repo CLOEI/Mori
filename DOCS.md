@@ -259,6 +259,63 @@ Enable or disable automatic collection of nearby dropped items.
 
 ---
 
+### POST `/proxy/test`
+
+Tests a SOCKS5 proxy against three checks and returns the result of each.
+
+All checks use the same proxy credentials. Each check is independent — a failed earlier check does not block later ones, except check 3 which requires a server address from check 2.
+
+**Request Body**
+```json
+{
+  "proxy_host": "103.160.95.181",
+  "proxy_port": 1080,
+  "proxy_username": "string",
+  "proxy_password": "string"
+}
+```
+
+`proxy_username` and `proxy_password` are optional.
+
+**Response**
+```json
+{
+  "socks5": {
+    "ok": true,
+    "error": null,
+    "detail": null
+  },
+  "server_data": {
+    "ok": true,
+    "error": null,
+    "detail": "1.2.3.4:17091"
+  },
+  "enet": {
+    "ok": true,
+    "error": null,
+    "detail": null
+  }
+}
+```
+
+Each check object has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ok` | bool | Whether the check passed |
+| `error` | string \| null | Error message if `ok` is false |
+| `detail` | string \| null | Extra info on success (check 2 returns the resolved `server:port`) |
+
+**Checks**
+
+| # | Name | What it does |
+|---|------|-------------|
+| 1 | `socks5` | TCP connect to the proxy + auth negotiation + `UDP ASSOCIATE`. Times out after 10 seconds. |
+| 2 | `server_data` | HTTP POST through the proxy to `growtopia1.com/growtopia/server_data.php`, falling back to `growtopia2.com` if the first fails. |
+| 3 | `enet` | Opens a second SOCKS5 UDP socket and attempts an ENet connect to the game server address obtained from check 2. Waits up to 10 seconds for a `Connect` event. Skipped if check 2 failed. |
+
+---
+
 ### GET `/items/colors`
 
 Returns a flat map of all item IDs to their minimap color as `0xRRGGBB`. Colors are derived from the `base_color` field in `items.dat`, which is stored as BGRA and converted server-side.
