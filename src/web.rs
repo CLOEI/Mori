@@ -1,9 +1,10 @@
 use axum::{
     Router,
+    body::Body,
     extract::{Path, Query, State, WebSocketUpgrade},
     extract::ws::{Message, WebSocket},
     http::{StatusCode, HeaderValue, Method},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{delete, get, post},
     Json,
 };
@@ -273,6 +274,28 @@ async fn handle_socket(
     }
 }
 
+async fn growtopia_cdn(Path(path): Path<String>) -> Response {
+    let url = format!("https://growserver-cache.netlify.app/{}", path);
+    match tokio::task::spawn_blocking(move || ureq::get(&url).call()).await {
+        Ok(Ok(resp)) => {
+            let content_type = resp.headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("application/octet-stream")
+                .to_owned();
+            let bytes = match resp.into_body().read_to_vec() {
+                Ok(b) => b,
+                Err(_) => return StatusCode::BAD_GATEWAY.into_response(),
+            };
+            Response::builder()
+                .header("content-type", content_type)
+                .body(Body::from(bytes))
+                .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+        }
+        Ok(Err(_)) | Err(_) => StatusCode::BAD_GATEWAY.into_response(),
+    }
+}
+
 async fn index_html() -> impl IntoResponse {
     let dist = std::env::current_dir()
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
@@ -314,6 +337,7 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/items/names", get(item_names))
         .route("/items/colors", get(item_colors))
         .route("/proxy/test", post(proxy_check))
+        .route("/growtopia-cdn/{*path}", get(growtopia_cdn))
         .route("/ws", get(ws_handler))
         .layer(cors)
         .with_state(state)

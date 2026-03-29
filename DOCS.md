@@ -259,6 +259,23 @@ Enable or disable automatic collection of nearby dropped items.
 
 ---
 
+### GET `/growtopia-cdn/{*path}`
+
+Proxies a request to `https://growserver-cache.netlify.app/{path}` and returns the response body with the original `content-type` header.
+
+**Example**
+```
+GET /growtopia-cdn/growtopia/game/fire.rttex
+→ proxied to https://growserver-cache.netlify.app/growtopia/game/fire.rttex
+```
+
+| Status | Meaning |
+|--------|---------|
+| `200` | Response from upstream |
+| `502` | Upstream request failed or body could not be read |
+
+---
+
 ### POST `/proxy/test`
 
 Tests a SOCKS5 proxy against three checks and returns the result of each.
