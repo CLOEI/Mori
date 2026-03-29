@@ -155,11 +155,7 @@ impl Socks5UdpSocket {
     }
 
     fn udp_associate(stream: &mut TcpStream) -> Result<SocketAddr, Socks5Error> {
-        let request = [
-            0x05, 0x03, 0x00, 0x01,
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00,
-        ];
+        let request = [0x05, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
         stream.write_all(&request)?;
 
@@ -226,7 +222,10 @@ impl Socks5UdpSocket {
 
     fn parse_udp_header<'a>(&self, data: &'a [u8]) -> io::Result<(SocketAddr, &'a [u8])> {
         if data.len() < 10 {
-            return Err(io::Error::new(ErrorKind::InvalidData, "UDP header too short"));
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "UDP header too short",
+            ));
         }
 
         if data[0] != 0x00 || data[1] != 0x00 {
@@ -234,7 +233,10 @@ impl Socks5UdpSocket {
         }
 
         if data[2] != 0x00 {
-            return Err(io::Error::new(ErrorKind::Unsupported, "Fragmentation not supported"));
+            return Err(io::Error::new(
+                ErrorKind::Unsupported,
+                "Fragmentation not supported",
+            ));
         }
 
         match data[3] {
@@ -245,15 +247,24 @@ impl Socks5UdpSocket {
             }
             0x04 => {
                 if data.len() < 22 {
-                    return Err(io::Error::new(ErrorKind::InvalidData, "IPv6 header too short"));
+                    return Err(io::Error::new(
+                        ErrorKind::InvalidData,
+                        "IPv6 header too short",
+                    ));
                 }
                 let ip_bytes: [u8; 16] = data[4..20].try_into().unwrap();
                 let ip = Ipv6Addr::from(ip_bytes);
                 let port = u16::from_be_bytes([data[20], data[21]]);
                 Ok((SocketAddr::from((ip, port)), &data[22..]))
             }
-            0x03 => Err(io::Error::new(ErrorKind::Unsupported, "Domain name addresses not supported")),
-            _ => Err(io::Error::new(ErrorKind::InvalidData, "Unsupported address type")),
+            0x03 => Err(io::Error::new(
+                ErrorKind::Unsupported,
+                "Domain name addresses not supported",
+            )),
+            _ => Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "Unsupported address type",
+            )),
         }
     }
 }

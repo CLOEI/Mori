@@ -65,6 +65,32 @@ Spawns a new bot.
 
 ---
 
+### POST `/bots/ltoken`
+
+Spawns a new bot using a pre-existing ltoken instead of username/password. The token is validated immediately — if it fails the bot stops without retrying.
+
+**Request Body**
+```json
+{
+  "ltoken": "token|rid|mac|wk",
+  "proxy_host": "string",
+  "proxy_port": 1080,
+  "proxy_username": "string",
+  "proxy_password": "string"
+}
+```
+
+`ltoken` is a `|`-separated string of four fields: the refresh token, a 32-char hex RID, a MAC address (`XX:XX:XX:XX:XX:XX`), and a 32-char hex WK.
+
+`proxy_host` and `proxy_port` are required together to enable SOCKS5 proxy. Username/password are optional.
+
+**Response**
+```json
+{ "id": 1 }
+```
+
+---
+
 ### DELETE `/bots/{id}`
 
 Stops and removes a bot.
@@ -128,7 +154,10 @@ Returns the full state of a bot.
   "ping_ms": 0,
   "delays": {
     "place_ms": 500,
-    "walk_ms": 500
+    "walk_ms": 500,
+    "twofa_secs": 120,
+    "server_overload_secs": 30,
+    "too_many_logins_secs": 5
   },
   "track_info": {
     "level": 0,
@@ -136,7 +165,8 @@ Returns the full state of a bot.
     "install_date": 0,
     "global_playtime": 0,
     "awesomeness": 0
-  }
+  },
+  "auto_collect": true
 }
 ```
 
@@ -209,10 +239,97 @@ Permanently delete items.
 ```
 
 #### `set_delays`
-Configure action delays in milliseconds.
+Configure action delays. `place_ms` and `walk_ms` are in milliseconds; the `*_secs` fields control how long the bot waits before reconnecting after each login failure type.
 ```json
-{ "type": "set_delays", "place_ms": 500, "walk_ms": 500 }
+{
+  "type": "set_delays",
+  "place_ms": 500,
+  "walk_ms": 500,
+  "twofa_secs": 120,
+  "server_overload_secs": 30,
+  "too_many_logins_secs": 5
+}
 ```
+
+#### `set_auto_collect`
+Enable or disable automatic collection of nearby dropped items.
+```json
+{ "type": "set_auto_collect", "enabled": true }
+```
+
+---
+
+### POST `/proxy/test`
+
+Tests a SOCKS5 proxy against three checks and returns the result of each.
+
+All checks use the same proxy credentials. Each check is independent — a failed earlier check does not block later ones, except check 3 which requires a server address from check 2.
+
+**Request Body**
+```json
+{
+  "proxy_host": "103.160.95.181",
+  "proxy_port": 1080,
+  "proxy_username": "string",
+  "proxy_password": "string"
+}
+```
+
+`proxy_username` and `proxy_password` are optional.
+
+**Response**
+```json
+{
+  "socks5": {
+    "ok": true,
+    "error": null,
+    "detail": null
+  },
+  "server_data": {
+    "ok": true,
+    "error": null,
+    "detail": "1.2.3.4:17091"
+  },
+  "enet": {
+    "ok": true,
+    "error": null,
+    "detail": null
+  }
+}
+```
+
+Each check object has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ok` | bool | Whether the check passed |
+| `error` | string \| null | Error message if `ok` is false |
+| `detail` | string \| null | Extra info on success (check 2 returns the resolved `server:port`) |
+
+**Checks**
+
+| # | Name | What it does |
+|---|------|-------------|
+| 1 | `socks5` | TCP connect to the proxy + auth negotiation + `UDP ASSOCIATE`. Times out after 10 seconds. |
+| 2 | `server_data` | HTTP POST through the proxy to `growtopia1.com/growtopia/server_data.php`, falling back to `growtopia2.com` if the first fails. |
+| 3 | `enet` | Opens a second SOCKS5 UDP socket and attempts an ENet connect to the game server address obtained from check 2. Waits up to 10 seconds for a `Connect` event. Skipped if check 2 failed. |
+
+---
+
+### GET `/items/colors`
+
+Returns a flat map of all item IDs to their minimap color as `0xRRGGBB`. Colors are derived from the `base_color` field in `items.dat`, which is stored as BGRA and converted server-side.
+
+**Response**
+```json
+{
+  "0": 0,
+  "2": 1588250666,
+  "8": 2303786022
+}
+```
+
+Keys are item IDs as strings. No query parameters.
 
 ---
 
@@ -490,13 +607,13 @@ Full world data sent once when the bot enters a world.
 | Type | Extra fields |
 |------|-------------|
 | `Basic` | — |
-| `Sign` | `text: string`, `flags: u8` |
-| `Door` | `text: string`, `owner_uid: u32` |
+| `Door` | `label: string`, `flags: u8` |
+| `Sign` | `label: string` |
 | `Lock` | `settings: u8`, `owner_uid: u32`, `access_count: u32`, `access_uids: u32[]`, `minimum_level: u8` |
-| `Seed` | `time_passed: u32`, `item_on_tree: u8` |
+| `Seed` | `age: u32`, `item_on_tree: u8` |
 | `VendingMachine` | `item_id: u32`, `price: i32` |
 | `DisplayBlock` | `item_id: u32` |
-| `Mannequin` | `text: string`, `clothing_1..10: u16/u32` |
+| `Mannequin` | `label: string`, `hat: u16`, `shirt: u16`, `pants: u16`, `boots: u16`, `face: u16`, `hand: u16`, `back: u16`, `hair: u16`, `neck: u16` |
 | `Dice` | `symbol: u8` |
 | `Forge` | `temperature: u32` |
 | `CookingOven` | `temperature_level: u32`, `ingredients: [u32,u32][]` |
@@ -576,6 +693,18 @@ A console message was received (game chat, script output, etc.).
 }
 ```
 
+#### `BotUsername`
+The bot's GrowID was resolved from the server. Fired after `SetHasGrowID` is received — useful for ltoken bots whose username is unknown at spawn time.
+```json
+{
+  "event": "BotUsername",
+  "data": {
+    "bot_id": 1,
+    "username": "string"
+  }
+}
+```
+
 ---
 
 ## Reference
@@ -587,8 +716,10 @@ A console message was received (game chat, script output, etc.).
 | `connecting` | Initial state, attempting to connect |
 | `connected` | Connected to game server |
 | `in_world` | Logged in and inside a world |
-| `two_factor_auth` | Blocked by 2FA — retries after 120s |
-| `server_overloaded` | Server overloaded — retries after 30s |
+| `two_factor_auth` | Blocked by 2FA — retries after `twofa_secs` |
+| `server_overloaded` | Server overloaded — retries after `server_overload_secs` |
+| `too_many_logins` | Too many concurrent logins — retries after `too_many_logins_secs` |
+| `update_required` | Client update required — bot stops permanently |
 
 ### Coordinates
 
@@ -596,7 +727,10 @@ All `x`/`y` values are in **tile coordinates** (pixels ÷ 32). The bot's positio
 
 ### Default Delays
 
-| Delay | Default |
-|-------|---------|
-| `place_ms` | 500ms |
-| `walk_ms` | 500ms |
+| Delay | Default | Description |
+|-------|---------|-------------|
+| `place_ms` | 500ms | Delay between place/punch actions |
+| `walk_ms` | 500ms | Delay between walk/pathfind steps |
+| `twofa_secs` | 120s | Reconnect wait after 2FA block |
+| `server_overload_secs` | 30s | Reconnect wait after server overload |
+| `too_many_logins_secs` | 5s | Reconnect wait after too-many-logins rejection |

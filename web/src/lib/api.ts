@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:3000'
+const BASE = window.location.origin
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -19,6 +19,8 @@ export type BotStatus =
   | 'in_world'
   | 'two_factor_auth'
   | 'server_overloaded'
+  | 'too_many_logins'
+  | 'update_required'
 
 export interface BotSummary {
   id: number
@@ -68,13 +70,22 @@ export interface BotState {
   gems: number
   console: string[]
   ping_ms: number
-  delays: { place_ms: number; walk_ms: number }
+  delays: { place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
   track_info: { level: number; grow_id: number; install_date: number; global_playtime: number; awesomeness: number } | null
+  auto_collect: boolean
 }
 
 export interface SpawnBotBody {
   username: string
   password: string
+  proxy_host?: string
+  proxy_port?: number
+  proxy_username?: string
+  proxy_password?: string
+}
+
+export interface SpawnLtokenBody {
+  ltoken: string
   proxy_host?: string
   proxy_port?: number
   proxy_username?: string
@@ -90,7 +101,27 @@ export type BotCmd =
   | { type: 'unwear'; item_id: number }
   | { type: 'drop'; item_id: number; count: number }
   | { type: 'trash'; item_id: number; count: number }
-  | { type: 'set_delays'; place_ms: number; walk_ms: number }
+  | { type: 'set_delays'; place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
+  | { type: 'set_auto_collect'; enabled: boolean }
+
+export interface ProxyTestRequest {
+  proxy_host: string
+  proxy_port: number
+  proxy_username?: string
+  proxy_password?: string
+}
+
+export interface CheckResult {
+  ok: boolean
+  error?: string
+  detail?: string
+}
+
+export interface ProxyTestResult {
+  socks5: CheckResult
+  server_data: CheckResult
+  enet: CheckResult
+}
 
 export interface ItemRecord {
   id: number
@@ -122,10 +153,13 @@ export interface ItemsPage {
 export const api = {
   getBots: () => req<BotSummary[]>('GET', '/bots'),
   spawnBot: (body: SpawnBotBody) => req<{ id: number }>('POST', '/bots', body),
+  spawnLtokenBot: (body: SpawnLtokenBody) => req<{ id: number }>('POST', '/bots/ltoken', body),
   deleteBot: (id: number) => req<void>('DELETE', `/bots/${id}`),
   getBotState: (id: number) => req<BotState>('GET', `/bots/${id}/state`),
   sendCmd: (id: number, cmd: BotCmd) => req<void>('POST', `/bots/${id}/cmd`, cmd),
   getItemNames: () => req<Record<string, string>>('GET', '/items/names'),
+  getItemColors: () => req<Record<string, number>>('GET', '/items/colors'),
   getItems: (page = 1, q = '') =>
     req<ItemsPage>('GET', `/items?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  testProxy: (body: ProxyTestRequest) => req<ProxyTestResult>('POST', '/proxy/test', body),
 }

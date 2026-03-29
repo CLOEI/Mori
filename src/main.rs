@@ -16,9 +16,11 @@ mod crypto;
 mod dashboard;
 mod login;
 pub mod packet;
+mod proxy_test;
 mod server_data;
 mod variant;
 mod web;
+pub mod script_channel;
 
 use std::sync::{Arc, Mutex};
 use bot_manager::BotManager;

@@ -17,6 +17,7 @@ use crate::bot_manager::{BotInfo, BotManager};
 use crate::bot_state::{BotCommand, BotDelays, BotState};
 use crate::events::WsTx;
 use crate::items::ItemInfo;
+use crate::proxy_test::{ProxyTestResult, run_proxy_test};
 
 pub type SharedManager = Arc<Mutex<BotManager>>;
 
@@ -60,6 +61,34 @@ async fn spawn_bot(
     Json(serde_json::json!({ "id": id }))
 }
 
+#[derive(Deserialize)]
+struct SpawnLtokenRequest {
+    ltoken:         String,
+    proxy_host:     Option<String>,
+    proxy_port:     Option<u16>,
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
+}
+
+async fn spawn_ltoken_bot(
+    State(s): State<AppState>,
+    Json(req): Json<SpawnLtokenRequest>,
+) -> Json<serde_json::Value> {
+    let proxy = match (req.proxy_host, req.proxy_port) {
+        (Some(host), Some(port)) => {
+            let addr = format!("{}:{}", host, port).parse().ok();
+            addr.map(|proxy_addr| Socks5Config {
+                proxy_addr,
+                username: req.proxy_username,
+                password: req.proxy_password,
+            })
+        }
+        _ => None,
+    };
+    let id = s.manager.lock().unwrap().spawn_ltoken(req.ltoken, proxy);
+    Json(serde_json::json!({ "id": id }))
+}
+
 async fn stop_bot(
     State(s): State<AppState>,
     Path(id): Path<u32>,
@@ -93,6 +122,7 @@ enum CmdRequest {
     Drop { item_id: u32, count: u32 },
     Trash { item_id: u32, count: u32 },
     SetDelays(BotDelays),
+    SetAutoCollect { enabled: bool },
 }
 
 #[derive(Deserialize)]
@@ -140,6 +170,25 @@ async fn item_names(State(s): State<AppState>) -> Json<std::collections::HashMap
     Json(map)
 }
 
+async fn item_colors(State(s): State<AppState>) -> Json<std::collections::HashMap<u32, u32>> {
+    let mgr = s.manager.lock().unwrap();
+    let map = mgr.items_dat.items.iter()
+        .map(|i| {
+            let raw = if i.id % 2 == 0 {
+                // Block: use seed (id+1) base_color
+                mgr.items_dat.find_by_id(i.id + 1)
+                    .map(|seed| seed.base_color)
+                    .unwrap_or(i.base_color)
+            } else {
+                // Seed: use own overlay_color
+                i.overlay_color
+            };
+            (i.id, crate::items::bgra_to_rgb(raw))
+        })
+        .collect();
+    Json(map)
+}
+
 async fn bot_cmd(
     State(s): State<AppState>,
     Path(id): Path<u32>,
@@ -155,12 +204,43 @@ async fn bot_cmd(
         CmdRequest::Drop { item_id, count } => BotCommand::Drop { item_id, count },
         CmdRequest::Trash { item_id, count } => BotCommand::Trash { item_id, count },
         CmdRequest::SetDelays(d) => BotCommand::SetDelays(d),
+        CmdRequest::SetAutoCollect { enabled } => BotCommand::SetAutoCollect { enabled },
     };
     if s.manager.lock().unwrap().send_cmd(id, cmd) {
         StatusCode::NO_CONTENT
     } else {
         StatusCode::NOT_FOUND
     }
+}
+
+// ── Proxy test ────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct ProxyTestRequest {
+    proxy_host:     String,
+    proxy_port:     u16,
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
+}
+
+async fn proxy_check(
+    Json(req): Json<ProxyTestRequest>,
+) -> Result<Json<ProxyTestResult>, StatusCode> {
+    let addr = format!("{}:{}", req.proxy_host, req.proxy_port)
+        .parse()
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let cfg = Socks5Config {
+        proxy_addr: addr,
+        username: req.proxy_username,
+        password: req.proxy_password,
+    };
+
+    let result = tokio::task::spawn_blocking(move || run_proxy_test(cfg))
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(result))
 }
 
 // ── WebSocket handler ─────────────────────────────────────────────────────────
@@ -226,11 +306,14 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/", get(index_html))
 
         .route("/bots", get(list_bots).post(spawn_bot))
+        .route("/bots/ltoken", post(spawn_ltoken_bot))
         .route("/bots/{id}", delete(stop_bot))
         .route("/bots/{id}/state", get(bot_state))
         .route("/bots/{id}/cmd", post(bot_cmd))
         .route("/items", get(list_items))
         .route("/items/names", get(item_names))
+        .route("/items/colors", get(item_colors))
+        .route("/proxy/test", post(proxy_check))
         .route("/ws", get(ws_handler))
         .layer(cors)
         .with_state(state)

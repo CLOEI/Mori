@@ -30,8 +30,9 @@ export interface LiveBot {
   objects: WorldObject[]
   inventory: InventoryItem[]
   console: string[]
-  delays: { place_ms: number; walk_ms: number }
+  delays: { place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
   track_info: TrackInfo | null
+  auto_collect: boolean
 }
 
 export function makeBot(id: number, username: string): LiveBot {
@@ -43,8 +44,9 @@ export function makeBot(id: number, username: string): LiveBot {
     world_width: 100, world_height: 60,
     tiles: [], players: new Map(),
     objects: [], inventory: [], console: [],
-    delays: { place_ms: 500, walk_ms: 500 },
+    delays: { place_ms: 500, walk_ms: 500, twofa_secs: 120, server_overload_secs: 30, too_many_logins_secs: 5 },
     track_info: null,
+    auto_collect: true,
   }
 }
 
@@ -53,6 +55,7 @@ export function makeBot(id: number, username: string): LiveBot {
 export const botsAtom = atom<Map<number, LiveBot>>(new Map())
 export const selectedBotIdAtom = atom<number | null>(null)
 export const itemNamesAtom = atom<Record<string, string>>({})
+export const itemColorsAtom = atom<Record<string, number>>({})
 
 // Derived: selected bot
 export const selectedBotAtom = atom((get) => {
@@ -77,6 +80,7 @@ function patchBot(
 export function useMoriStore() {
   const setBots = useSetAtom(botsAtom)
   const setItemNames = useSetAtom(itemNamesAtom)
+  const setItemColors = useSetAtom(itemColorsAtom)
 
   useEffect(() => {
     moriWs.connect()
@@ -96,6 +100,7 @@ export function useMoriStore() {
     }).catch(() => {})
 
     api.getItemNames().then(setItemNames).catch(() => {})
+    api.getItemColors().then(setItemColors).catch(() => {})
 
     // Wire WS events directly against atom setters
     const handlers: Array<[string, (d: never) => void]> = [
@@ -182,6 +187,9 @@ export function useMoriStore() {
 
       ['InventoryUpdate', (d: { bot_id: number; gems: number; items: InventoryItem[] }) =>
         setBots((m) => patchBot(m, d.bot_id, { gems: d.gems, inventory: d.items }))],
+
+      ['BotUsername', (d: { bot_id: number; username: string }) =>
+        setBots((m) => patchBot(m, d.bot_id, { username: d.username }))],
 
       ['Console', (d: { bot_id: number; message: string }) =>
         setBots((m) => {

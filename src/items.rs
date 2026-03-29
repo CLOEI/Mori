@@ -51,6 +51,23 @@ pub struct ItemInfo {
     pub description:         String,
 }
 
+// ── Color helpers ─────────────────────────────────────────────────────────────
+
+/// Items.dat packs colors as BGRA (MSB→LSB). Returns `(b, g, r, a)`.
+pub fn extract_bgra(color: u32) -> (u8, u8, u8, u8) {
+    let b = (color >> 24) as u8;
+    let g = ((color >> 16) & 0xFF) as u8;
+    let r = ((color >> 8) & 0xFF) as u8;
+    let a = (color & 0xFF) as u8;
+    (b, g, r, a)
+}
+
+/// Convert a BGRA-packed color to a `0xRRGGBB` value suitable for the minimap.
+pub fn bgra_to_rgb(color: u32) -> u32 {
+    let (b, g, r, _) = extract_bgra(color);
+    ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+}
+
 // ── Top-level container ───────────────────────────────────────────────────────
 
 pub struct ItemsDat {

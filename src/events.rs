@@ -61,6 +61,8 @@ pub enum WsEvent {
     Console { bot_id: u32, message: String },
     /// Account info extracted from the Track packet (sent once per login).
     BotTrackInfo { bot_id: u32, level: u32, grow_id: u64, install_date: u64, global_playtime: u64, awesomeness: u32 },
+    /// GrowID resolved from SetHasGrowID (useful when logged in via ltoken).
+    BotUsername { bot_id: u32, username: String },
 }
 
 pub type WsTx = tokio::sync::broadcast::Sender<WsEvent>;
