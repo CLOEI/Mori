@@ -550,13 +550,13 @@ Full world data sent once when the bot enters a world.
 | Type | Extra fields |
 |------|-------------|
 | `Basic` | — |
-| `Sign` | `text: string`, `flags: u8` |
-| `Door` | `text: string`, `owner_uid: u32` |
+| `Door` | `label: string`, `flags: u8` |
+| `Sign` | `label: string` |
 | `Lock` | `settings: u8`, `owner_uid: u32`, `access_count: u32`, `access_uids: u32[]`, `minimum_level: u8` |
-| `Seed` | `time_passed: u32`, `item_on_tree: u8` |
+| `Seed` | `age: u32`, `item_on_tree: u8` |
 | `VendingMachine` | `item_id: u32`, `price: i32` |
 | `DisplayBlock` | `item_id: u32` |
-| `Mannequin` | `text: string`, `clothing_1..10: u16/u32` |
+| `Mannequin` | `label: string`, `hat: u16`, `shirt: u16`, `pants: u16`, `boots: u16`, `face: u16`, `hand: u16`, `back: u16`, `hair: u16`, `neck: u16` |
 | `Dice` | `symbol: u8` |
 | `Forge` | `temperature: u32` |
 | `CookingOven` | `temperature_level: u32`, `ingredients: [u32,u32][]` |
