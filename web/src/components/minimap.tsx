@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Application, Graphics, Container } from 'pixi.js'
-import { useAtomValue } from 'jotai'
-import { itemNamesAtom, itemColorsAtom, type LiveBot } from '@/lib/store'
-import { api } from '@/lib/api'
+import { Application, Graphics, Container, Sprite, Assets } from 'pixi.js'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { itemNamesAtom, itemColorsAtom, itemsMapAtom, type LiveBot } from '@/lib/store'
+import { api, type ItemRecord } from '@/lib/api'
 import type { TileData } from '@/lib/ws'
+import { TileManager, type WorldData, type TileData as TileManagerData } from '@/lib/tile-manager'
+import { textureCacheManager } from '@/lib/texture-cache'
 
 const TILE_FLAGS: [number, string][] = [
-  // 0x0001 extra_data intentionally skipped — implied by tile_type
   [0x0002, 'has_parent'], [0x0004, 'spliced'], [0x0008, 'spawns_seeds'],
   [0x0010, 'seedling'], [0x0020, 'flipped_x'], [0x0040, 'on'],
   [0x0080, 'public'], [0x0100, 'bg_on'], [0x0200, 'alt_mode'],
@@ -83,26 +84,312 @@ export function Minimap({ bot }: { bot: LiveBot }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const itemNames = useAtomValue(itemNamesAtom)
   const itemColors = useAtomValue(itemColorsAtom)
+  const itemsMap = useAtomValue(itemsMapAtom)
+  const setItemsMap = useSetAtom(itemsMapAtom)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  const [items, setItems] = useState<ItemRecord[]>([])
+  const [useTileManager, setUseTileManager] = useState(false)
   const appRef = useRef<Application | null>(null)
   const layersRef = useRef<{
-    tiles: Graphics
+    tiles: Container
     objects: Graphics
     players: Graphics
     bot: Graphics
   } | null>(null)
+  const tileManagerRef = useRef<TileManager | null>(null)
 
   const botRef = useRef(bot)
-  botRef.current = bot
   const itemColorsRef = useRef(itemColors)
-  itemColorsRef.current = itemColors
+  const itemsRef = useRef(items)
+
+  // Update refs when props change
+  useEffect(() => {
+    botRef.current = bot
+    itemColorsRef.current = itemColors
+    itemsRef.current = items
+  }, [bot, itemColors, items])
+
+  // Load items data - only fetch items used in current world
+  useEffect(() => {
+    if (!bot || bot.tiles.length === 0) {
+      setItems([])
+      return
+    }
+
+    console.log('[Minimap] Loading items for world...')
+    
+    async function loadWorldItems() {
+      try {
+        // Collect unique item IDs from world tiles
+        const uniqueItemIds = new Set<number>()
+        for (const tile of bot.tiles) {
+          if (tile.fg !== 0) uniqueItemIds.add(tile.fg)
+          if (tile.bg !== 0) uniqueItemIds.add(tile.bg)
+        }
+        
+        console.log('[Minimap] Found', uniqueItemIds.size, 'unique items in world')
+        
+        // Check which items we already have cached
+        const missingIds: number[] = []
+        const cachedItems: ItemRecord[] = []
+        
+        for (const id of uniqueItemIds) {
+          const cached = itemsMap.get(id)
+          if (cached) {
+            cachedItems.push(cached)
+          } else {
+            missingIds.push(id)
+          }
+        }
+        
+        console.log('[Minimap] Using', cachedItems.length, 'cached items, fetching', missingIds.length, 'new items')
+        
+        // Fetch missing items using bulk get-items query
+        const newItems: ItemRecord[] = []
+        if (missingIds.length > 0) {
+          try {
+            const items = await api.getItemsByIds(missingIds)
+            newItems.push(...items)
+          } catch (err) {
+            console.warn('[Minimap] Failed to fetch items:', err)
+          }
+          
+          // Update cache with new items
+          if (newItems.length > 0) {
+            setItemsMap(prev => {
+              const updated = new Map(prev)
+              for (const item of newItems) {
+                updated.set(item.id, item)
+              }
+              return updated
+            })
+          }
+        }
+        
+        const allItems = [...cachedItems, ...newItems]
+        console.log('[Minimap] Loaded', allItems.length, 'items total')
+        setItems(allItems)
+        
+      } catch (err) {
+        console.error('[Minimap] Failed to load items:', err)
+        setItems([])
+      }
+    }
+    
+    loadWorldItems()
+  }, [bot, itemsMap, setItemsMap])
 
   const zoom = useRef(3)
   const offset = useRef({ x: 0, y: 0 })
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 })
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  function renderTilesInitial(container: Container, b: LiveBot, colors: Record<number, number>) {
+    const gfx = new Graphics()
+    for (let i = 0; i < b.tiles.length; i++) {
+      const tile = b.tiles[i]
+      if (tile.fg === 0) continue
+      const color = colors[tile.fg] ?? 0x4a4a5a
+      const tx = (i % b.world_width) * TILE_PX
+      const ty = Math.floor(i / b.world_width) * TILE_PX
+      gfx.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
+    }
+    container.addChild(gfx)
+  }
+
+  async function renderTilesWithTileManager(container: Container, b: LiveBot, items: ItemRecord[]) {
+    console.log('[Minimap] Starting TileManager render...', { 
+      tileCount: b.tiles.length, 
+      itemCount: items.length,
+      worldSize: `${b.world_width}x${b.world_height}` 
+    })
+    
+    container.removeChildren()
+    
+    if (items.length === 0 || b.tiles.length === 0) {
+      console.warn('[Minimap] Cannot render: missing items or tiles')
+      return
+    }
+
+    // Convert to WorldData format
+    const tiles: TileManagerData[] = b.tiles.map((tile, i) => ({
+      fgItemId: tile.fg,
+      bgItemId: tile.bg,
+      flags: tile.flags,
+      x: i % b.world_width,
+      y: Math.floor(i / b.world_width)
+    }))
+
+    const worldData: WorldData = {
+      width: b.world_width,
+      height: b.world_height,
+      tiles
+    }
+
+    // Create or update tile manager
+    if (!tileManagerRef.current) {
+      tileManagerRef.current = new TileManager(worldData, items)
+      console.log('[Minimap] Created new TileManager')
+    } else {
+      tileManagerRef.current.updateWorldData(worldData)
+      tileManagerRef.current.updateItems(items)
+      console.log('[Minimap] Updated existing TileManager')
+    }
+
+    const tileManager = tileManagerRef.current
+    const itemMap = new Map(items.map(item => [item.id, item]))
+
+    // Pre-load all unique textures we'll need
+    const texturePromises: Promise<void>[] = []
+    const textureCache = new Map<string, HTMLImageElement>()
+    let textureCount = 0
+
+    for (let y = 0; y < b.world_height; y++) {
+      for (let x = 0; x < b.world_width; x++) {
+        const tile = tileManager.getTile(x, y)
+        if (!tile) continue
+
+        // Background
+        if (tile.bgItemId !== 0) {
+          const item = itemMap.get(tile.bgItemId)
+          if (item) {
+            const coords = tileManager.getSpriteCoords(tile, true)
+            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
+            if (!textureCache.has(key)) {
+              textureCount++
+              texturePromises.push(
+                textureCacheManager.getCroppedTile(item.texture_file_name, coords.x, coords.y)
+                  .then(url => {
+                    const img = new Image()
+                    img.src = url
+                    return new Promise<void>((resolve) => {
+                      img.onload = () => {
+                        textureCache.set(key, img)
+                        resolve()
+                      }
+                      img.onerror = (err) => {
+                        console.error('[Minimap] Failed to load texture:', key, err)
+                        resolve()
+                      }
+                    })
+                  })
+                  .catch((err) => {
+                    console.error('[Minimap] Failed to get cropped tile:', key, err)
+                  })
+              )
+            }
+          }
+        }
+
+        // Foreground
+        if (tile.fgItemId !== 0) {
+          const item = itemMap.get(tile.fgItemId)
+          if (item) {
+            const coords = tileManager.getSpriteCoords(tile, false)
+            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
+            if (!textureCache.has(key)) {
+              textureCount++
+              texturePromises.push(
+                textureCacheManager.getCroppedTile(item.texture_file_name, coords.x, coords.y)
+                  .then(url => {
+                    const img = new Image()
+                    img.src = url
+                    return new Promise<void>((resolve) => {
+                      img.onload = () => {
+                        textureCache.set(key, img)
+                        resolve()
+                      }
+                      img.onerror = (err) => {
+                        console.error('[Minimap] Failed to load texture:', key, err)
+                        resolve()
+                      }
+                    })
+                  })
+                  .catch((err) => {
+                    console.error('[Minimap] Failed to get cropped tile:', key, err)
+                  })
+              )
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`[Minimap] Loading ${textureCount} unique textures...`)
+    
+    // Wait for all textures to load
+    await Promise.all(texturePromises)
+    
+    console.log(`[Minimap] Textures loaded: ${textureCache.size}/${textureCount}`)
+
+    // Now render all tiles using loaded textures
+    const bgContainer = new Container()
+    const fgContainer = new Container()
+    let bgSpriteCount = 0
+    let fgSpriteCount = 0
+    
+    for (let y = 0; y < b.world_height; y++) {
+      for (let x = 0; x < b.world_width; x++) {
+        const tile = tileManager.getTile(x, y)
+        if (!tile) continue
+
+        // Render background
+        if (tile.bgItemId !== 0) {
+          const item = itemMap.get(tile.bgItemId)
+          if (item) {
+            const coords = tileManager.getSpriteCoords(tile, true)
+            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
+            const img = textureCache.get(key)
+            if (img) {
+              try {
+                const texture = await Assets.load(img.src)
+                const sprite = new Sprite(texture)
+                sprite.x = x * TILE_PX
+                sprite.y = y * TILE_PX
+                sprite.width = TILE_PX
+                sprite.height = TILE_PX
+                bgContainer.addChild(sprite)
+                bgSpriteCount++
+              } catch (e) {
+                console.error('[Minimap] Error creating bg sprite:', e)
+              }
+            }
+          }
+        }
+
+        // Render foreground
+        if (tile.fgItemId !== 0) {
+          const item = itemMap.get(tile.fgItemId)
+          if (item) {
+            const coords = tileManager.getSpriteCoords(tile, false)
+            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
+            const img = textureCache.get(key)
+            if (img) {
+              try {
+                const texture = await Assets.load(img.src)
+                const sprite = new Sprite(texture)
+                sprite.x = x * TILE_PX
+                sprite.y = y * TILE_PX
+                sprite.width = TILE_PX
+                sprite.height = TILE_PX
+                fgContainer.addChild(sprite)
+                fgSpriteCount++
+              } catch (e) {
+                console.error('[Minimap] Error creating fg sprite:', e)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`[Minimap] Rendered ${bgSpriteCount} BG sprites, ${fgSpriteCount} FG sprites`)
+
+    container.addChild(bgContainer)
+    container.addChild(fgContainer)
+    
+    console.log('[Minimap] TileManager render complete!')
+  }
 
   function getWorldScreenSize() {
     const app = appRef.current
@@ -124,7 +411,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     world.y = offset.current.y
   }
 
-  function centerOnBot() {
+  const centerOnBot = useCallback(() => {
     const app = appRef.current
     const b = botRef.current
     if (!app) return
@@ -135,9 +422,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     }
     offset.current = clampOffset(raw.x, raw.y, dims.worldW, dims.worldH, dims.screenW, dims.screenH)
     applyTransform()
-  }
-
-  // ── Init Pixi ──────────────────────────────────────────────────────────────
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -157,27 +442,19 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       appRef.current = app
 
       const world = new Container()
-      const tileGfx = new Graphics()
+      const tileContainer = new Container()
       const objectGfx = new Graphics()
       const playerGfx = new Graphics()
       const botGfx = new Graphics()
-      world.addChild(tileGfx, objectGfx, playerGfx, botGfx)
+      world.addChild(tileContainer, objectGfx, playerGfx, botGfx)
       app.stage.addChild(world)
-      layersRef.current = { tiles: tileGfx, objects: objectGfx, players: playerGfx, bot: botGfx }
+      layersRef.current = { tiles: tileContainer, objects: objectGfx, players: playerGfx, bot: botGfx }
 
       // Draw whatever is already loaded (state was fetched before Pixi was ready)
       const b = botRef.current
 
       if (b.tiles.length > 0) {
-        const colors = itemColorsRef.current
-        for (let i = 0; i < b.tiles.length; i++) {
-          const tile = b.tiles[i]
-          if (tile.fg === 0) continue
-          const color = colors[tile.fg] ?? 0x4a4a5a
-          const tx = (i % b.world_width) * TILE_PX
-          const ty = Math.floor(i / b.world_width) * TILE_PX
-          tileGfx.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
-        }
+        renderTilesInitial(tileContainer, b, itemColorsRef.current)
       }
 
       for (const obj of b.objects) {
@@ -201,29 +478,61 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       }
       layersRef.current = null
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ── Draw tiles ─────────────────────────────────────────────────────────────
+  }, [centerOnBot])
 
   useEffect(() => {
     const layers = layersRef.current
     if (!layers || bot.tiles.length === 0) return
-    const g = layers.tiles
-    g.clear()
-    for (let i = 0; i < bot.tiles.length; i++) {
-      const tile = bot.tiles[i]
-      if (tile.fg === 0) continue
-      const color = itemColors[tile.fg] ?? 0x4a4a5a
-      const tx = (i % bot.world_width) * TILE_PX
-      const ty = Math.floor(i / bot.world_width) * TILE_PX
-      g.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
+    
+    console.log('[Minimap Effect] State:', { 
+      useTileManager, 
+      itemsLoaded: items.length,
+      tilesCount: bot.tiles.length,
+      willUseTileManager: useTileManager && items.length > 0
+    })
+    
+    if (useTileManager && items.length > 0) {
+      console.log('[Minimap Effect] Triggering TileManager render')
+      // Use TileManager for accurate sprite rendering
+      renderTilesWithTileManager(layers.tiles, bot, items)
+        .then(() => {
+          console.log('[Minimap Effect] Render completed successfully')
+          centerOnBot()
+        })
+        .catch((err) => {
+          console.error('[Minimap Effect] Render failed:', err)
+          // Fall back to color mode on error
+          layers.tiles.removeChildren()
+          const g = new Graphics()
+          for (let i = 0; i < bot.tiles.length; i++) {
+            const tile = bot.tiles[i]
+            if (tile.fg === 0) continue
+            const color = itemColors[tile.fg] ?? 0x4a4a5a
+            const tx = (i % bot.world_width) * TILE_PX
+            const ty = Math.floor(i / bot.world_width) * TILE_PX
+            g.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
+          }
+          layers.tiles.addChild(g)
+        })
+    } else {
+      console.log('[Minimap Effect] Using color mode', {
+        reason: !useTileManager ? 'toggle is off' : 'items not loaded'
+      })
+      // Use simple color-based rendering (faster for minimap)
+      layers.tiles.removeChildren()
+      const g = new Graphics()
+      for (let i = 0; i < bot.tiles.length; i++) {
+        const tile = bot.tiles[i]
+        if (tile.fg === 0) continue
+        const color = itemColors[tile.fg] ?? 0x4a4a5a
+        const tx = (i % bot.world_width) * TILE_PX
+        const ty = Math.floor(i / bot.world_width) * TILE_PX
+        g.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
+      }
+      layers.tiles.addChild(g)
+      centerOnBot()
     }
-    centerOnBot()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bot.tiles, bot.world_width, itemColors])
-
-  // ── Draw objects ───────────────────────────────────────────────────────────
+  }, [bot.tiles, bot.world_width, itemColors, useTileManager, items, centerOnBot])
 
   useEffect(() => {
     const layers = layersRef.current
@@ -237,8 +546,6 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     }
   }, [bot.objects])
 
-  // ── Draw players ───────────────────────────────────────────────────────────
-
   useEffect(() => {
     const layers = layersRef.current
     if (!layers) return
@@ -249,8 +556,6 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     }
   }, [bot.players])
 
-  // ── Draw bot square + follow camera ───────────────────────────────────────
-
   useEffect(() => {
     const layers = layersRef.current
     if (layers) {
@@ -258,10 +563,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       layers.bot.rect(bot.pos_x * TILE_PX + (TILE_PX - CHAR_PX) / 2, (bot.pos_y + 1) * TILE_PX - CHAR_PX, CHAR_PX, CHAR_PX).fill(0xef4444)
     }
     centerOnBot()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bot.pos_x, bot.pos_y])
-
-  // ── Hover: tile tooltip ────────────────────────────────────────────────────
+  }, [bot.pos_x, bot.pos_y, centerOnBot])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = containerRef.current!.getBoundingClientRect()
@@ -278,8 +580,6 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     setTooltip({ screenX: e.clientX, screenY: e.clientY, tileX, tileY, tile })
   }
 
-  // ── Click to walk ──────────────────────────────────────────────────────────
-
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (isDragging.current) return
@@ -292,8 +592,6 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     },
     [bot.id],
   )
-
-  // ── Drag to pan (clamped) ──────────────────────────────────────────────────
 
   const handleMouseDown = (e: React.MouseEvent) => {
     isDragging.current = false
@@ -322,8 +620,9 @@ export function Minimap({ bot }: { bot: LiveBot }) {
 
   // ── Scroll to zoom (clamped) ───────────────────────────────────────────────
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     const rect = containerRef.current!.getBoundingClientRect()
     const mx = e.clientX - rect.left
     const my = e.clientY - rect.top
@@ -340,7 +639,18 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     if (!dims) return
     offset.current = clampOffset(raw.x, raw.y, dims.worldW, dims.worldH, dims.screenW, dims.screenH)
     applyTransform()
-  }
+  }, [])
+
+  // Attach wheel event with passive: false to allow preventDefault
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+    }
+  }, [handleWheel])
 
   return (
     <div className="relative w-full aspect-video">
@@ -349,10 +659,21 @@ export function Minimap({ bot }: { bot: LiveBot }) {
         className="w-full h-full rounded border border-border bg-[#080c10] cursor-crosshair overflow-hidden"
         onClick={handleClick}
         onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setTooltip(null)}
       />
+
+      {/* Toggle button for TileManager rendering */}
+      <button
+        onClick={() => {
+          console.log('[Minimap] Button clicked! Current state:', useTileManager, '→ New state:', !useTileManager)
+          setUseTileManager(!useTileManager)
+        }}
+        className="absolute top-2 right-2 px-2 py-1 text-xs bg-background border border-border rounded hover:bg-accent"
+        title="Toggle accurate tile rendering"
+      >
+        {useTileManager ? '🎨 Sprites' : '🎨 Colors'}
+      </button>
 
       {tooltip && (
         <div
