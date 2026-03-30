@@ -1,4 +1,5 @@
 mod astar;
+mod auth;
 mod socks5;
 mod lua_api;
 mod constants;

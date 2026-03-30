@@ -1,3 +1,5 @@
+import { authStore } from './auth'
+
 const BASE = window.location.origin;
 
 async function req<T>(
@@ -5,11 +7,20 @@ async function req<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
+  const token = authStore.getToken()
+  const headers: Record<string, string> = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401) {
+    authStore.clearToken()
+    window.dispatchEvent(new CustomEvent('mori:unauthorized'))
+    throw new Error('Unauthorized')
+  }
   if (res.status === 204) return undefined as T;
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status}`);
   return res.json() as Promise<T>;
@@ -226,6 +237,13 @@ export interface ItemsPage {
 }
 
 export const api = {
+  // Auth
+  authStatus: () => fetch(`${BASE}/auth/status`).then(r => r.json()) as Promise<{ registered: boolean }>,
+  authSetup: (password: string) => fetch(`${BASE}/auth/setup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }),
+  authLogin: (password: string) => fetch(`${BASE}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }),
+  authLogout: () => req<void>('POST', '/auth/logout'),
+
+  // Bots
   getBots: () => req<BotSummary[]>("GET", "/bots"),
   spawnBot: (body: SpawnBotBody) => req<{ id: number }>("POST", "/bots", body),
   spawnLtokenBot: (body: SpawnLtokenBody) =>

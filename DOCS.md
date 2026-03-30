@@ -8,7 +8,65 @@
 
 ## HTTP API
 
-All endpoints return `application/json`. No authentication is required.
+All endpoints return `application/json`.
+
+Most endpoints are protected by authentication except for the frontend static files and `/auth/*` endpoints. Protected API endpoints require an `Authorization: Bearer <token>` header.
+The application is meant for a single user. Credentials are saved locally to `user.json`.
+
+---
+
+### GET `/auth/status`
+
+Check whether the master password has been configured yet.
+
+**Response**
+```json
+{ "registered": true }
+```
+
+---
+
+### POST `/auth/setup`
+
+Registers the master password for the application. This can only be done once.
+
+**Request Body**
+```json
+{ "password": "your_secure_password" }
+```
+
+**Response**
+| Status | Meaning |
+|--------|---------|
+| `204`  | Setup successful |
+| `409`  | Already registered |
+
+---
+
+### POST `/auth/login`
+
+Returns a session token valid until the server restarts or the user logs out.
+
+**Request Body**
+```json
+{ "password": "your_secure_password" }
+```
+
+**Response**
+```json
+{ "token": "uuid-v4-token" }
+```
+
+---
+
+### POST `/auth/logout`
+
+Invalidates the current session token.
+
+**Response**
+| Status | Meaning |
+|--------|---------|
+| `204`  | Logged out |
 
 ---
 
@@ -441,7 +499,7 @@ Returns a flat array containing only the items whose IDs were requested. Items n
 
 ## WebSocket
 
-Connect to `ws://localhost:3000/ws`.
+Connect to `ws://localhost:3000/ws?token=<your_session_token>`.
 
 All messages are JSON text frames with the format:
 ```json

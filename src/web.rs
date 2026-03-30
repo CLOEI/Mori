@@ -1,9 +1,10 @@
 use axum::{
     Router,
     body::Body,
-    extract::{Path, Query, State, WebSocketUpgrade},
+    extract::{Path, Query, Request, State, WebSocketUpgrade},
     extract::ws::{Message, WebSocket},
     http::{StatusCode, HeaderValue, Method},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
     Json,
@@ -13,6 +14,7 @@ use tower_http::services::{ServeDir, ServeFile};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 
+use crate::auth::AuthState;
 use crate::bot::Socks5Config;
 use crate::bot_manager::{BotInfo, BotManager};
 use crate::bot_state::{BotCommand, BotDelays, BotState};
@@ -26,8 +28,108 @@ pub type SharedManager = Arc<Mutex<BotManager>>;
 pub struct AppState {
     pub manager: SharedManager,
     pub ws_tx:   WsTx,
+    pub auth:    AuthState,
 }
 
+// ── Auth middleware ────────────────────────────────────────────────────────────
+
+/// Extract the Bearer token from the `Authorization` header.
+fn extract_bearer(req: &Request) -> Option<String> {
+    let hdr = req.headers().get("Authorization")?.to_str().ok()?;
+    hdr.strip_prefix("Bearer ").map(str::to_owned)
+}
+
+async fn auth_middleware(
+    State(s): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    // Let the auth endpoints and the frontend pass through unauthenticated.
+    let path = req.uri().path();
+    if path.starts_with("/auth/") || path == "/" || path.starts_with("/assets/") {
+        return next.run(req).await;
+    }
+
+    // WebSocket token is passed as a query param `?token=…`
+    if path == "/ws" {
+        let token = req.uri().query()
+            .and_then(|q| {
+                url::form_urlencoded::parse(q.as_bytes())
+                    .find(|(k, _)| k == "token")
+                    .map(|(_, v)| v.into_owned())
+            });
+        if let Some(t) = token {
+            if s.auth.validate_token(&t) {
+                return next.run(req).await;
+            }
+        }
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    // All other routes need a valid Bearer token.
+    if let Some(token) = extract_bearer(&req) {
+        if s.auth.validate_token(&token) {
+            return next.run(req).await;
+        }
+    }
+    StatusCode::UNAUTHORIZED.into_response()
+}
+
+// ── Auth handlers ─────────────────────────────────────────────────────────────
+
+/// GET /auth/status  →  { registered: bool }
+async fn auth_status(State(s): State<AppState>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "registered": s.auth.is_registered() }))
+}
+
+#[derive(Deserialize)]
+struct SetupRequest {
+    password: String,
+}
+
+/// POST /auth/setup  →  registers the single user (only works once)
+async fn auth_setup(
+    State(s): State<AppState>,
+    Json(req): Json<SetupRequest>,
+) -> Response {
+    if s.auth.is_registered() {
+        return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "already registered" }))).into_response();
+    }
+    match s.auth.register(&req.password) {
+        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct LoginRequest {
+    password: String,
+}
+
+/// POST /auth/login  →  { token: "…" }
+async fn auth_login(
+    State(s): State<AppState>,
+    Json(req): Json<LoginRequest>,
+) -> Response {
+    match s.auth.login(&req.password) {
+        Some(token) => Json(serde_json::json!({ "token": token })).into_response(),
+        None => (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({ "error": "invalid password" })),
+        ).into_response(),
+    }
+}
+
+/// POST /auth/logout
+async fn auth_logout(State(s): State<AppState>) -> StatusCode {
+    s.auth.logout();
+    StatusCode::NO_CONTENT
+}
+
+// ── Bot handlers ───────────────────────────────────────────────────────────────
 
 async fn list_bots(State(s): State<AppState>) -> Json<Vec<BotInfo>> {
     Json(s.manager.lock().unwrap().list())
@@ -341,7 +443,8 @@ async fn index_html() -> impl IntoResponse {
 }
 
 pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
-    let state = AppState { manager, ws_tx };
+    let auth = AuthState::new();
+    let state = AppState { manager, ws_tx, auth };
 
     let cors = CorsLayer::new()
         .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
@@ -355,6 +458,13 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
     let app = Router::new()
         .route("/", get(index_html))
 
+        // Auth endpoints (public)
+        .route("/auth/status", get(auth_status))
+        .route("/auth/setup",  post(auth_setup))
+        .route("/auth/login",  post(auth_login))
+        .route("/auth/logout", post(auth_logout))
+
+        // Protected API
         .route("/bots", get(list_bots).post(spawn_bot))
         .route("/bots/ltoken", post(spawn_ltoken_bot))
         .route("/bots/{id}", delete(stop_bot))
@@ -366,6 +476,8 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/proxy/test", post(proxy_check))
         .route("/growtopia-cdn/{*path}", get(growtopia_cdn))
         .route("/ws", get(ws_handler))
+
+        .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
         .layer(cors)
         .with_state(state)
         .fallback_service(ServeDir::new(&dist).fallback(ServeFile::new(dist.join("index.html"))));

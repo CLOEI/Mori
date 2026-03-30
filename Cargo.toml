@@ -21,3 +21,7 @@ urlencoding = "2"
 anyhow = "1.0.102"
 mlua = { version = "0.11.6", features = ["lua55", "vendored", "anyhow"]}
 crossbeam-channel = "0.5.15"
+argon2 = "0.5"
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+rand_core = { version = "0.6", features = ["getrandom"] }

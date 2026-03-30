@@ -1,4 +1,5 @@
 import type { BotStatus, WorldObject, InventoryItem } from './api'
+import { authStore } from './auth'
 
 // ── Event payload types ────────────────────────────────────────────────────
 
@@ -75,8 +76,10 @@ class MoriWebSocket {
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   private destroyed = false
 
-  connect(url = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`) {
+  connect(baseUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`) {
     if (this.ws) return
+    const token = authStore.getToken()
+    const url = token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl
     this.ws = new WebSocket(url)
 
     this.ws.onmessage = (e) => {
@@ -91,7 +94,7 @@ class MoriWebSocket {
     this.ws.onclose = () => {
       this.ws = null
       if (!this.destroyed) {
-        this.retryTimer = setTimeout(() => this.connect(url), 3000)
+        this.retryTimer = setTimeout(() => this.connect(baseUrl), 3000)
       }
     }
 
