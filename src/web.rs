@@ -44,9 +44,12 @@ async fn auth_middleware(
     req: Request,
     next: Next,
 ) -> Response {
-    // Let the auth endpoints and the frontend pass through unauthenticated.
     let path = req.uri().path();
-    if path.starts_with("/auth/") || path == "/" || path.starts_with("/assets/") {
+    if path.starts_with("/auth/")
+        || path == "/"
+        || path.starts_with("/assets/")
+        || path.starts_with("/growtopia-cdn/")
+    {
         return next.run(req).await;
     }
 
