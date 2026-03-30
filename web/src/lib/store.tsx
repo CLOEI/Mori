@@ -1,10 +1,8 @@
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useEffect } from 'react'
 import { moriWs, type TileData } from './ws'
-import type { BotStatus, BotSummary, InventoryItem, Player, WorldObject } from './api'
+import type { BotStatus, BotSummary, InventoryItem, Player, WorldObject, ItemRecord } from './api'
 import { api } from './api'
-
-// ── Per-bot live state ─────────────────────────────────────────────────────
 
 export interface TrackInfo {
   level: number
@@ -55,20 +53,16 @@ export function makeBot(id: number, username: string): LiveBot {
   }
 }
 
-// ── Atoms ──────────────────────────────────────────────────────────────────
-
 export const botsAtom = atom<Map<number, LiveBot>>(new Map())
 export const selectedBotIdAtom = atom<number | null>(null)
 export const itemNamesAtom = atom<Record<string, string>>({})
 export const itemColorsAtom = atom<Record<string, number>>({})
+export const itemsMapAtom = atom<Map<number, ItemRecord>>(new Map())
 
-// Derived: selected bot
 export const selectedBotAtom = atom((get) => {
   const id = get(selectedBotIdAtom)
   return id !== null ? (get(botsAtom).get(id) ?? null) : null
 })
-
-// ── Helper: patch one bot in the map ──────────────────────────────────────
 
 function patchBot(
   map: Map<number, LiveBot>,
@@ -79,8 +73,6 @@ function patchBot(
   if (!bot) return map
   return new Map(map).set(id, { ...bot, ...patch })
 }
-
-// ── Bootstrap + WS wiring hook (mount once at app root) ───────────────────
 
 export function useMoriStore() {
   const setBots = useSetAtom(botsAtom)
@@ -107,7 +99,6 @@ export function useMoriStore() {
     api.getItemNames().then(setItemNames).catch(() => {})
     api.getItemColors().then(setItemColors).catch(() => {})
 
-    // Wire WS events directly against atom setters
     const handlers: Array<[string, (d: never) => void]> = [
       ['BotAdded', (d: { bot_id: number; username: string }) =>
         setBots((m) => new Map(m).set(d.bot_id, makeBot(d.bot_id, d.username)))],
@@ -215,7 +206,5 @@ export function useMoriStore() {
     }
   }, [setBots, setItemNames])
 }
-
-// ── Convenience hooks ──────────────────────────────────────────────────────
 
 export { useAtom, useAtomValue, useSetAtom }

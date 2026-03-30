@@ -1,48 +1,66 @@
-import { useState, useRef, useEffect } from 'react'
-import { X, Gem, Wifi, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useSetAtom, useAtomValue } from 'jotai'
-import { selectedBotIdAtom, botsAtom, itemNamesAtom, type LiveBot } from '@/lib/store'
-import { api } from '@/lib/api'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { parseGTColors } from '@/lib/gt-colors'
-import { Minimap } from '@/components/minimap'
-import { cn } from '@/lib/utils'
-import type { BotStatus } from '@/lib/api'
+import { useState, useRef, useEffect, Fragment, type ReactNode } from "react";
+import {
+  X,
+  Gem,
+  Wifi,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { useSetAtom, useAtomValue } from "jotai";
+import {
+  selectedBotIdAtom,
+  botsAtom,
+  itemNamesAtom,
+  type LiveBot,
+} from "@/lib/store";
+import { api } from "@/lib/api";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import { parseGTColors } from "@/lib/gt-colors";
+import { Minimap } from "@/components/minimap";
+import { cn } from "@/lib/utils";
+import type { BotStatus } from "@/lib/api";
 
 const STATUS_DOT: Record<BotStatus, string> = {
-  connecting: 'bg-yellow-500',
-  connected: 'bg-blue-500',
-  in_world: 'bg-emerald-500',
-  two_factor_auth: 'bg-orange-500',
-  server_overloaded: 'bg-red-500',
-  too_many_logins: 'bg-purple-500',
-  update_required: 'bg-gray-500',
-}
+  connecting: "bg-yellow-500",
+  connected: "bg-blue-500",
+  in_world: "bg-emerald-500",
+  two_factor_auth: "bg-orange-500",
+  server_overloaded: "bg-red-500",
+  too_many_logins: "bg-purple-500",
+  update_required: "bg-gray-500",
+};
 
 export function BotDetail({ bot }: { bot: LiveBot }) {
-  const setSelectedId = useSetAtom(selectedBotIdAtom)
-  const setBots = useSetAtom(botsAtom)
+  const setSelectedId = useSetAtom(selectedBotIdAtom);
+  const setBots = useSetAtom(botsAtom);
 
   // Seed full state from REST on mount / bot change
   useEffect(() => {
     api.getBotState(bot.id).then((s) => {
       setBots((m) => {
-        const existing = m.get(bot.id)
-        if (!existing) return m
-        const players = new Map(
-          s.players.map((p) => [p.net_id, p])
-        )
+        const existing = m.get(bot.id);
+        if (!existing) return m;
+        const players = new Map(s.players.map((p) => [p.net_id, p]));
         const tiles = s.tiles.map((t) => ({
           fg: t.fg_item_id,
           bg: t.bg_item_id,
           flags: t.flags,
           tile_type: t.tile_type,
-        }))
+        }));
         return new Map(m).set(bot.id, {
           ...existing,
           status: s.status,
@@ -64,21 +82,29 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
           auto_collect: s.auto_collect,
           collect_radius_tiles: s.collect_radius_tiles,
           collect_blacklist: s.collect_blacklist,
-        })
-      })
-    }).catch(() => {})
-  }, [bot.id, setBots])
+        });
+      });
+    })
+      .catch(() => {});
+  }, [bot.id, setBots]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header bar */}
       <div className="shrink-0 flex items-center gap-2 px-4 h-10 bg-card border-b border-border">
-        <span className={cn('w-2 h-2 rounded-full shrink-0', STATUS_DOT[bot.status])} />
+        <span
+          className={cn(
+            "w-2 h-2 rounded-full shrink-0",
+            STATUS_DOT[bot.status],
+          )}
+        />
         <span className="font-semibold text-xs">{bot.username}</span>
         {bot.world_name && (
           <>
             <span className="text-border text-xs">|</span>
-            <span className="text-xs text-muted-foreground">{bot.world_name}</span>
+            <span className="text-xs text-muted-foreground">
+              {bot.world_name}
+            </span>
             <span className="text-xs text-muted-foreground/50">
               ({bot.pos_x.toFixed(1)}, {bot.pos_y.toFixed(1)})
             </span>
@@ -106,9 +132,12 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
+      <Tabs
+        defaultValue="overview"
+        className="flex-1 flex flex-col overflow-hidden"
+      >
         <TabsList className="shrink-0 w-full justify-start rounded-none border-b border-border bg-card/40 h-9 px-2 gap-0">
-          {(['overview', 'console', 'script', 'config'] as const).map((t) => (
+          {(["overview", "console", "script", "config"] as const).map((t) => (
             <TabsTrigger
               key={t}
               value={t}
@@ -125,31 +154,41 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="console" className="flex-1 overflow-hidden m-0 p-4 flex flex-col">
+        <TabsContent
+          value="console"
+          className="flex-1 overflow-hidden m-0 p-4 flex flex-col"
+        >
           <ConsoleTab lines={bot.console} />
         </TabsContent>
 
-        <TabsContent value="script" className="flex-1 overflow-hidden m-0 p-4 flex flex-col gap-3">
+        <TabsContent
+          value="script"
+          className="flex-1 overflow-hidden m-0 p-4 flex flex-col gap-3"
+        >
           <ScriptTab botId={bot.id} />
         </TabsContent>
 
         <TabsContent value="config" className="flex-1 overflow-auto m-0 p-4">
-          <ConfigTab botId={bot.id} delays={bot.delays} autoCollect={bot.auto_collect} />
+          <ConfigTab
+            botId={bot.id}
+            delays={bot.delays}
+            autoCollect={bot.auto_collect}
+          />
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
 
 // ── Overview tab ────────────────────────────────────────────────────────────
 
 function OverviewTab({ bot }: { bot: LiveBot }) {
-  const players = [...bot.players.values()]
-  const itemNames = useAtomValue(itemNamesAtom)
+  const players = [...bot.players.values()];
+  const itemNames = useAtomValue(itemNamesAtom);
   const itemLabel = (id: number) => {
-    const name = itemNames[String(id)]
-    return name ? `${name} (${id})` : String(id)
-  }
+    const name = itemNames[String(id)];
+    return name ? `${name} (${id})` : String(id);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,7 +204,7 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
 
         <Section label="Players in World">
           <DataTable
-            columns={['Name', 'Net ID', 'Country']}
+            columns={["Name", "Net ID", "Country"]}
             rows={players.map((p) => [p.name, String(p.net_id), p.country])}
             empty="No players"
           />
@@ -177,16 +216,32 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
         <Section label="Account">
           <div className="rounded border border-border bg-background p-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
             {[
-              ['Level', bot.track_info?.level],
-              ['Grow ID', bot.track_info?.grow_id],
-              ['Awesomeness', bot.track_info?.awesomeness],
-              ['Playtime', bot.track_info ? `${Math.floor(bot.track_info.global_playtime / 3600)}h` : null],
-              ['Install Date', bot.track_info ? new Date(bot.track_info.install_date * 1000).toLocaleDateString() : null],
+              ["Level", bot.track_info?.level],
+              ["Grow ID", bot.track_info?.grow_id],
+              ["Awesomeness", bot.track_info?.awesomeness],
+              [
+                "Playtime",
+                bot.track_info
+                  ? `${Math.floor(bot.track_info.global_playtime / 3600)}h`
+                  : null,
+              ],
+              [
+                "Install Date",
+                bot.track_info
+                  ? new Date(
+                      bot.track_info.install_date * 1000,
+                    ).toLocaleDateString()
+                  : null,
+              ],
             ].map(([label, val]) => (
-              <>
-                <span key={`${label}-k`} className="text-muted-foreground">{label}</span>
-                <span key={`${label}-v`} className="text-foreground">{val ?? '—'}</span>
-              </>
+              <Fragment key={label}>
+                <span className="text-muted-foreground">
+                  {label}
+                </span>
+                <span className="text-foreground">
+                  {val ?? "—"}
+                </span>
+              </Fragment>
             ))}
           </div>
         </Section>
@@ -202,15 +257,19 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
         </Section>
 
         <Section
-            label="Inventory"
-            hint={bot.inventory_slots > 0 ? `${bot.inventory.length} / ${bot.inventory_slots} slots` : undefined}
-          >
-          <InventoryTable botId={bot.id} inventory={bot.inventory} itemLabel={itemLabel} />
+          label="Inventory"
+          hint={bot.inventory_slots > 0 ? `${bot.inventory.length} / ${bot.inventory_slots} slots` : undefined}
+        >
+          <InventoryTable
+            botId={bot.id}
+            inventory={bot.inventory}
+            itemLabel={itemLabel}
+          />
         </Section>
 
         <Section label="Floating Objects">
           <DataTable
-            columns={['Item', 'Amt', 'Pos', 'UID']}
+            columns={["Item", "Amt", "Pos", "UID"]}
             rows={bot.objects.map((o) => [
               itemLabel(o.item_id),
               String(o.count),
@@ -222,7 +281,7 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
         </Section>
       </div>
     </div>
-  )
+  );
 }
 
 // ── Overview: auto-collect range + blacklist ────────────────────────────────
@@ -404,11 +463,11 @@ function AutoCollectRangePanel({
 // ── Console tab ─────────────────────────────────────────────────────────────
 
 function ConsoleTab({ lines }: { lines: string[] }) {
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [lines])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [lines]);
 
   return (
     <ScrollArea className="flex-1 min-h-0 rounded border border-border bg-background p-3 font-mono text-[12px] leading-relaxed">
@@ -425,30 +484,30 @@ function ConsoleTab({ lines }: { lines: string[] }) {
       )}
       <div ref={bottomRef} />
     </ScrollArea>
-  )
+  );
 }
 
 // ── Script tab ──────────────────────────────────────────────────────────────
 
 function ScriptTab({ botId }: { botId: number }) {
-  const [script, setScript] = useState('')
-  const [status, setStatus] = useState('')
+  const [script, setScript] = useState("");
+  const [status, setStatus] = useState("");
 
   async function run() {
     try {
-      await api.sendCmd(botId, { type: 'run_script', content: script })
-      setStatus('Running…')
+      await api.sendCmd(botId, { type: "run_script", content: script });
+      setStatus("Running…");
     } catch {
-      setStatus('Error')
+      setStatus("Error");
     }
   }
 
   async function stop() {
     try {
-      await api.sendCmd(botId, { type: 'stop_script' })
-      setStatus('Stopped')
+      await api.sendCmd(botId, { type: "stop_script" });
+      setStatus("Stopped");
     } catch {
-      setStatus('Error')
+      setStatus("Error");
     }
   }
 
@@ -459,15 +518,26 @@ function ScriptTab({ botId }: { botId: number }) {
         onChange={(e) => setScript(e.target.value)}
         spellCheck={false}
         className="flex-1 font-mono text-[13px] bg-background border border-border rounded p-3 text-foreground resize-none outline-none leading-relaxed focus:border-ring transition-colors"
-        placeholder={"-- Lua script\nbot:warp(\"START\")\nsleep(500)"}
+        placeholder={'-- Lua script\nbot:warp("START")\nsleep(500)'}
       />
       <div className="shrink-0 flex items-center gap-2">
-        <Button size="sm" variant="default" className="text-xs" onClick={run}>Run</Button>
-        <Button size="sm" variant="destructive" className="text-xs" onClick={stop}>Stop</Button>
-        {status && <span className="text-xs text-muted-foreground">{status}</span>}
+        <Button size="sm" variant="default" className="text-xs" onClick={run}>
+          Run
+        </Button>
+        <Button
+          size="sm"
+          variant="destructive"
+          className="text-xs"
+          onClick={stop}
+        >
+          Stop
+        </Button>
+        {status && (
+          <span className="text-xs text-muted-foreground">{status}</span>
+        )}
       </div>
     </>
-  )
+  );
 }
 
 // ── Config tab ──────────────────────────────────────────────────────────────
@@ -477,41 +547,57 @@ function ConfigTab({
   delays,
   autoCollect,
 }: {
-  botId: number
-  delays: { place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
-  autoCollect: boolean
+  botId: number;
+  delays: {
+    place_ms: number;
+    walk_ms: number;
+    twofa_secs: number;
+    server_overload_secs: number;
+    too_many_logins_secs: number;
+  };
+  autoCollect: boolean;
 }) {
-  const [placeMs, setPlaceMs] = useState(String(delays.place_ms))
-  const [walkMs, setWalkMs] = useState(String(delays.walk_ms))
-  const [twofaSecs, setTwofaSecs] = useState(String(delays.twofa_secs))
-  const [serverOverloadSecs, setServerOverloadSecs] = useState(String(delays.server_overload_secs))
-  const [tooManyLoginsSecs, setTooManyLoginsSecs] = useState(String(delays.too_many_logins_secs))
-  const [status, setStatus] = useState('')
-  const setBots = useSetAtom(botsAtom)
+  const [placeMs, setPlaceMs] = useState(String(delays.place_ms));
+  const [walkMs, setWalkMs] = useState(String(delays.walk_ms));
+  const [twofaSecs, setTwofaSecs] = useState(String(delays.twofa_secs));
+  const [serverOverloadSecs, setServerOverloadSecs] = useState(
+    String(delays.server_overload_secs),
+  );
+  const [tooManyLoginsSecs, setTooManyLoginsSecs] = useState(
+    String(delays.too_many_logins_secs),
+  );
+  const [status, setStatus] = useState("");
+  const setBots = useSetAtom(botsAtom);
 
   // sync when bot prop changes
   useEffect(() => {
-    setPlaceMs(String(delays.place_ms))
-    setWalkMs(String(delays.walk_ms))
-    setTwofaSecs(String(delays.twofa_secs))
-    setServerOverloadSecs(String(delays.server_overload_secs))
-    setTooManyLoginsSecs(String(delays.too_many_logins_secs))
-  }, [delays.place_ms, delays.walk_ms, delays.twofa_secs, delays.server_overload_secs, delays.too_many_logins_secs])
+    setPlaceMs(String(delays.place_ms));
+    setWalkMs(String(delays.walk_ms));
+    setTwofaSecs(String(delays.twofa_secs));
+    setServerOverloadSecs(String(delays.server_overload_secs));
+    setTooManyLoginsSecs(String(delays.too_many_logins_secs));
+  }, [
+    delays.place_ms,
+    delays.walk_ms,
+    delays.twofa_secs,
+    delays.server_overload_secs,
+    delays.too_many_logins_secs,
+  ]);
 
   async function save() {
     try {
       await api.sendCmd(botId, {
-        type: 'set_delays',
+        type: "set_delays",
         place_ms: parseInt(placeMs, 10),
         walk_ms: parseInt(walkMs, 10),
         twofa_secs: parseInt(twofaSecs, 10),
         server_overload_secs: parseInt(serverOverloadSecs, 10),
         too_many_logins_secs: parseInt(tooManyLoginsSecs, 10),
-      })
-      setStatus('Saved')
-      setTimeout(() => setStatus(''), 2000)
+      });
+      setStatus("Saved");
+      setTimeout(() => setStatus(""), 2000);
     } catch {
-      setStatus('Error')
+      setStatus("Error");
     }
   }
 
@@ -522,7 +608,9 @@ function ConfigTab({
       </p>
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Place / Punch (ms)</span>
+          <span className="text-xs text-muted-foreground">
+            Place / Punch (ms)
+          </span>
           <Input
             type="number"
             min={0}
@@ -533,7 +621,9 @@ function ConfigTab({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Walk / Pathfind (ms)</span>
+          <span className="text-xs text-muted-foreground">
+            Walk / Pathfind (ms)
+          </span>
           <Input
             type="number"
             min={0}
@@ -549,7 +639,9 @@ function ConfigTab({
       </p>
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">2FA / Account Protection (s)</span>
+          <span className="text-xs text-muted-foreground">
+            2FA / Account Protection (s)
+          </span>
           <Input
             type="number"
             min={1}
@@ -560,7 +652,9 @@ function ConfigTab({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Server Overloaded (s)</span>
+          <span className="text-xs text-muted-foreground">
+            Server Overloaded (s)
+          </span>
           <Input
             type="number"
             min={1}
@@ -571,7 +665,9 @@ function ConfigTab({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Too Many Logins (s)</span>
+          <span className="text-xs text-muted-foreground">
+            Too Many Logins (s)
+          </span>
           <Input
             type="number"
             min={1}
@@ -583,8 +679,12 @@ function ConfigTab({
         </label>
       </div>
       <div className="flex items-center gap-2">
-        <Button size="sm" className="text-xs" onClick={save}>Save</Button>
-        {status && <span className="text-xs text-muted-foreground">{status}</span>}
+        <Button size="sm" className="text-xs" onClick={save}>
+          Save
+        </Button>
+        {status && (
+          <span className="text-xs text-muted-foreground">{status}</span>
+        )}
       </div>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Behaviour
@@ -595,23 +695,30 @@ function ConfigTab({
           checked={autoCollect}
           onCheckedChange={(enabled) => {
             setBots((m) => {
-              const bot = m.get(botId)
-              if (!bot) return m
-              return new Map(m).set(botId, { ...bot, auto_collect: enabled })
-            })
-            api.sendCmd(botId, { type: 'set_auto_collect', enabled }).catch(() => {
-              setBots((m) => {
-                const bot = m.get(botId)
-                if (!bot) return m
-                return new Map(m).set(botId, { ...bot, auto_collect: !enabled })
-              })
-            })
+              const bot = m.get(botId);
+              if (!bot) return m;
+              return new Map(m).set(botId, { ...bot, auto_collect: enabled });
+            });
+            api
+              .sendCmd(botId, { type: "set_auto_collect", enabled })
+              .catch(() => {
+                setBots((m) => {
+                  const bot = m.get(botId);
+                  if (!bot) return m;
+                  return new Map(m).set(botId, {
+                    ...bot,
+                    auto_collect: !enabled,
+                  });
+                });
+              });
           }}
         />
-        <span className="text-xs text-muted-foreground">Auto-collect dropped items</span>
+        <span className="text-xs text-muted-foreground">
+          Auto-collect dropped items
+        </span>
       </label>
     </div>
-  )
+  );
 }
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -621,34 +728,38 @@ function Section({
   hint,
   children,
 }: {
-  label: string
-  hint?: string
-  children: React.ReactNode
+  label: string;
+  hint?: string;
+  children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
-        {hint && <span className="font-normal normal-case tracking-normal text-muted-foreground/50 ml-1">— {hint}</span>}
+        {hint && (
+          <span className="font-normal normal-case tracking-normal text-muted-foreground/50 ml-1">
+            — {hint}
+          </span>
+        )}
       </p>
       {children}
     </div>
-  )
+  );
 }
 
 function DataTable({
   columns,
   rows,
   empty,
-  maxH = 'max-h-40',
+  maxH = "max-h-40",
 }: {
-  columns: string[]
-  rows: string[][]
-  empty: string
-  maxH?: string
+  columns: string[];
+  rows: string[][];
+  empty: string;
+  maxH?: string;
 }) {
   return (
-    <ScrollArea className={cn('rounded border border-border', maxH)}>
+    <ScrollArea className={cn("rounded border border-border", maxH)}>
       <Table className="text-xs">
         <TableHeader className="sticky top-0 bg-card">
           <TableRow className="border-b border-border">
@@ -660,7 +771,10 @@ function DataTable({
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={columns.length} className="py-2 text-center text-muted-foreground">
+              <TableCell
+                colSpan={columns.length}
+                className="py-2 text-center text-muted-foreground"
+              >
                 {empty}
               </TableCell>
             </TableRow>
@@ -676,7 +790,7 @@ function DataTable({
         </TableBody>
       </Table>
     </ScrollArea>
-  )
+  );
 }
 
 function InventoryTable({
@@ -684,12 +798,16 @@ function InventoryTable({
   inventory,
   itemLabel,
 }: {
-  botId: number
-  inventory: import('@/lib/api').InventoryItem[]
-  itemLabel: (id: number) => string
+  botId: number;
+  inventory: import("@/lib/api").InventoryItem[];
+  itemLabel: (id: number) => string;
 }) {
   async function cmd(type: string, item_id: number, count?: number) {
-    await api.sendCmd(botId, { type, item_id, ...(count !== undefined ? { count } : {}) } as never)
+    await api.sendCmd(botId, {
+      type,
+      item_id,
+      ...(count !== undefined ? { count } : {}),
+    } as never);
   }
 
   return (
@@ -705,97 +823,132 @@ function InventoryTable({
         <TableBody>
           {inventory.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={3} className="py-2 text-center text-muted-foreground">
+              <TableCell
+                colSpan={3}
+                className="py-2 text-center text-muted-foreground"
+              >
                 Empty
               </TableCell>
             </TableRow>
-          ) : [...inventory].sort((a, b) => b.amount - a.amount).map((i) => (
-            <TableRow key={i.item_id}>
-              <TableCell>
-                {i.is_active && <span className="text-primary mr-1">●</span>}
-                {itemLabel(i.item_id)}
-              </TableCell>
-              <TableCell>{i.amount}</TableCell>
-              <TableCell className="px-2 py-1">
-                <div className="flex gap-1 flex-wrap">
-                  {i.action_type === 20 && (
-                    i.is_active
-                      ? <Btn onClick={() => cmd('unwear', i.item_id)} variant="active">Unwear</Btn>
-                      : <Btn onClick={() => cmd('wear', i.item_id)}>Wear</Btn>
-                  )}
-                  <Btn onClick={() => cmd('drop', i.item_id, 1)}>Drop</Btn>
-                  <Btn onClick={() => cmd('drop', i.item_id, i.amount)}>Drop All</Btn>
-                  <Btn onClick={() => cmd('trash', i.item_id, 1)} variant="danger">Trash</Btn>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+          ) : (
+            [...inventory]
+              .sort((a, b) => b.amount - a.amount)
+              .map((i) => (
+                <TableRow key={i.item_id}>
+                  <TableCell>
+                    {i.is_active && (
+                      <span className="text-primary mr-1">●</span>
+                    )}
+                    {itemLabel(i.item_id)}
+                  </TableCell>
+                  <TableCell>{i.amount}</TableCell>
+                  <TableCell className="px-2 py-1">
+                    <div className="flex gap-1 flex-wrap">
+                      {i.action_type === 20 &&
+                        (i.is_active ? (
+                          <Btn
+                            onClick={() => cmd("unwear", i.item_id)}
+                            variant="active"
+                          >
+                            Unwear
+                          </Btn>
+                        ) : (
+                          <Btn onClick={() => cmd("wear", i.item_id)}>Wear</Btn>
+                        ))}
+                      <Btn onClick={() => cmd("drop", i.item_id, 1)}>Drop</Btn>
+                      <Btn onClick={() => cmd("drop", i.item_id, i.amount)}>
+                        Drop All
+                      </Btn>
+                      <Btn
+                        onClick={() => cmd("trash", i.item_id, 1)}
+                        variant="danger"
+                      >
+                        Trash
+                      </Btn>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+          )}
         </TableBody>
       </Table>
     </ScrollArea>
-  )
+  );
 }
 
 function TilesTable({
   tiles,
   itemLabel,
 }: {
-  tiles: { fg: number; bg: number; flags: number; tile_type: unknown }[]
-  itemLabel: (id: number) => string
+  tiles: { fg: number; bg: number; flags: number; tile_type: unknown }[];
+  itemLabel: (id: number) => string;
 }) {
-  const counts = new Map<number, number>()
+  const counts = new Map<number, number>();
   for (const t of tiles) {
-    if (t.fg !== 0) counts.set(t.fg, (counts.get(t.fg) ?? 0) + 1)
+    if (t.fg !== 0) counts.set(t.fg, (counts.get(t.fg) ?? 0) + 1);
   }
   const rows = [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([id, count]) => [itemLabel(id), count.toLocaleString()])
-  return <DataTable columns={['Tile', 'Count']} rows={rows} empty="No tiles" />
+    .map(([id, count]) => [itemLabel(id), count.toLocaleString()]);
+  return <DataTable columns={["Tile", "Count"]} rows={rows} empty="No tiles" />;
 }
 
 function DPad({ botId }: { botId: number }) {
-  const move = (x: number, y: number) => api.sendCmd(botId, { type: 'move', x, y }).catch(() => {})
+  const move = (x: number, y: number) =>
+    api.sendCmd(botId, { type: "move", x, y }).catch(() => {});
 
   return (
     <div className="grid grid-cols-3 gap-1 w-fit mx-auto">
       <div />
-      <button onClick={() => move(0, -1)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+      <button
+        onClick={() => move(0, -1)}
+        className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors"
+      >
         <ChevronUp className="w-4 h-4" />
       </button>
       <div />
-      <button onClick={() => move(-1, 0)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+      <button
+        onClick={() => move(-1, 0)}
+        className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors"
+      >
         <ChevronLeft className="w-4 h-4" />
       </button>
-      <button onClick={() => move(0, 1)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+      <button
+        onClick={() => move(0, 1)}
+        className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors"
+      >
         <ChevronDown className="w-4 h-4" />
       </button>
-      <button onClick={() => move(1, 0)} className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors">
+      <button
+        onClick={() => move(1, 0)}
+        className="flex items-center justify-center w-8 h-8 rounded bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors"
+      >
         <ChevronRight className="w-4 h-4" />
       </button>
     </div>
-  )
+  );
 }
 
 function Btn({
   onClick,
-  variant = 'default',
+  variant = "default",
   children,
 }: {
-  onClick: () => void
-  variant?: 'default' | 'active' | 'danger'
-  children: React.ReactNode
+  onClick: () => void;
+  variant?: "default" | "active" | "danger";
+  children: ReactNode;
 }) {
   const cls = {
-    default: 'bg-secondary hover:bg-secondary/80 text-secondary-foreground',
-    active:  'bg-primary/20 hover:bg-primary/30 text-primary',
-    danger:  'bg-destructive/20 hover:bg-destructive/30 text-destructive',
-  }[variant]
+    default: "bg-secondary hover:bg-secondary/80 text-secondary-foreground",
+    active: "bg-primary/20 hover:bg-primary/30 text-primary",
+    danger: "bg-destructive/20 hover:bg-destructive/30 text-destructive",
+  }[variant];
   return (
     <button
       onClick={onClick}
-      className={cn('px-1.5 py-0.5 rounded text-[10px] transition-colors', cls)}
+      className={cn("px-1.5 py-0.5 rounded text-[10px] transition-colors", cls)}
     >
       {children}
     </button>
-  )
+  );
 }
