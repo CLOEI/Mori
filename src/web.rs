@@ -3,7 +3,7 @@ use axum::{
     body::Body,
     extract::{Path, Query, Request, State, WebSocketUpgrade},
     extract::ws::{Message, WebSocket},
-    http::{StatusCode, HeaderValue, Method},
+    http::{StatusCode, Method},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
@@ -447,7 +447,7 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
     let state = AppState { manager, ws_tx, auth };
 
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+        .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST, Method::DELETE])
         .allow_headers(Any);
 
