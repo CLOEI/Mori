@@ -104,7 +104,7 @@ impl Default for BotDelays {
     }
 }
 
-#[derive(Default, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct BotState {
     pub status:          BotStatus,
     pub username:        String,
@@ -119,6 +119,8 @@ pub struct BotState {
     pub objects:         Vec<WorldObjectInfo>,
     pub players:         Vec<PlayerInfo>,
     pub inventory:       Vec<InvSlot>,
+    /// Maximum number of inventory slots the bot has (from SendInventoryState).
+    pub inventory_size:  u32,
     pub gems:            i32,
     pub console:         Vec<String>,
     /// Round-trip time in milliseconds from ENet, updated every run loop tick.
@@ -128,6 +130,38 @@ pub struct BotState {
     pub track_info: Option<TrackInfo>,
     /// Whether the run loop should auto-collect nearby dropped items.
     pub auto_collect: bool,
+    /// Auto-collect half-extent in tiles (1–5): axis-aligned square |Δx|,|Δy| ≤ tiles×32 px.
+    pub collect_radius_tiles: u8,
+    /// Item IDs to skip when auto-collecting (sorted, unique in API responses).
+    pub collect_blacklist: Vec<u16>,
+}
+
+impl Default for BotState {
+    fn default() -> Self {
+        Self {
+            status: BotStatus::default(),
+            username: String::new(),
+            mac: String::new(),
+            world_name: String::new(),
+            pos_x: 0.0,
+            pos_y: 0.0,
+            world_width: 0,
+            world_height: 0,
+            tiles: Vec::new(),
+            objects: Vec::new(),
+            players: Vec::new(),
+            inventory: Vec::new(),
+            inventory_size: 0,
+            gems: 0,
+            console: Vec::new(),
+            ping_ms: 0,
+            delays: BotDelays::default(),
+            track_info: None,
+            auto_collect: true,
+            collect_radius_tiles: 3,
+            collect_blacklist: Vec::new(),
+        }
+    }
 }
 
 pub enum BotCommand {
@@ -150,6 +184,10 @@ pub enum BotCommand {
     FindPath { x: u32, y: u32 },
     SetDelays(BotDelays),
     SetAutoCollect { enabled: bool },
+    SetCollectConfig {
+        radius_tiles: u8,
+        blacklist: Vec<u16>,
+    },
 }
 
 pub type CmdSender   = mpsc::Sender<BotCommand>;

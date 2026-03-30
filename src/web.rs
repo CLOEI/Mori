@@ -124,12 +124,19 @@ enum CmdRequest {
     Trash { item_id: u32, count: u32 },
     SetDelays(BotDelays),
     SetAutoCollect { enabled: bool },
+    SetCollectConfig {
+        radius_tiles: u8,
+        #[serde(default)]
+        blacklist: Vec<u16>,
+    },
 }
 
 #[derive(Deserialize)]
 struct ItemsQuery {
-    page: Option<usize>,
-    q:    Option<String>,
+    page:      Option<usize>,
+    q:         Option<String>,
+    #[serde(rename = "get-items")]
+    get_items: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -145,8 +152,21 @@ const ITEMS_PAGE_SIZE: usize = 50;
 async fn list_items(
     State(s): State<AppState>,
     Query(params): Query<ItemsQuery>,
-) -> Json<ItemsResponse> {
+) -> axum::response::Response {
     let mgr = s.manager.lock().unwrap();
+
+    if let Some(ids_str) = params.get_items {
+        let ids: std::collections::HashSet<u32> = ids_str
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        let items: Vec<ItemInfo> = mgr.items_dat.items.iter()
+            .filter(|i| ids.contains(&i.id))
+            .cloned()
+            .collect();
+        return Json(items).into_response();
+    }
+
     let q = params.q.as_deref().unwrap_or("").to_lowercase();
     let page = params.page.unwrap_or(1).max(1);
 
@@ -160,7 +180,7 @@ async fn list_items(
     let start = (page - 1) * ITEMS_PAGE_SIZE;
     let items = filtered.into_iter().skip(start).take(ITEMS_PAGE_SIZE).cloned().collect();
 
-    Json(ItemsResponse { items, total, page, page_size: ITEMS_PAGE_SIZE })
+    Json(ItemsResponse { items, total, page, page_size: ITEMS_PAGE_SIZE }).into_response()
 }
 
 async fn item_names(State(s): State<AppState>) -> Json<std::collections::HashMap<u32, String>> {
@@ -206,6 +226,13 @@ async fn bot_cmd(
         CmdRequest::Trash { item_id, count } => BotCommand::Trash { item_id, count },
         CmdRequest::SetDelays(d) => BotCommand::SetDelays(d),
         CmdRequest::SetAutoCollect { enabled } => BotCommand::SetAutoCollect { enabled },
+        CmdRequest::SetCollectConfig {
+            radius_tiles,
+            blacklist,
+        } => BotCommand::SetCollectConfig {
+            radius_tiles,
+            blacklist,
+        },
     };
     if s.manager.lock().unwrap().send_cmd(id, cmd) {
         StatusCode::NO_CONTENT

@@ -149,6 +149,7 @@ Returns the full state of a bot.
       "action_type": 0
     }
   ],
+  "inventory_size": 18,
   "gems": 0,
   "console": ["string"],
   "ping_ms": 0,
@@ -369,7 +370,7 @@ Keys are item IDs as strings (standard JSON object key behaviour). No query para
 
 ### GET `/items`
 
-Paginated search through the item database.
+Paginated search through the item database, or bulk fetch by ID.
 
 **Query Parameters**
 
@@ -377,8 +378,10 @@ Paginated search through the item database.
 |-------|------|---------|-------------|
 | `page` | integer | `1` | Page number (1-indexed) |
 | `q` | string | `""` | Search by item ID (exact) or name (substring, case-insensitive) |
+| `get-items` | string | — | Comma-separated item IDs to fetch. When present, returns an array directly (bypasses pagination). |
 
-**Response**
+#### Paginated response (default)
+
 ```json
 {
   "items": [
@@ -407,6 +410,32 @@ Paginated search through the item database.
 ```
 
 50 items per page.
+
+#### Bulk fetch response (`?get-items=2,4,6,8`)
+
+Returns a flat array containing only the items whose IDs were requested. Items not found in the database are silently omitted.
+
+```json
+[
+  {
+    "id": 2,
+    "name": "string",
+    "flags": 0,
+    "action_type": 0,
+    "material": 0,
+    "texture_file_name": "string",
+    "texture_hash": 0,
+    "visual_effect": 0,
+    "collision_type": 0,
+    "rarity": 0,
+    "max_item": 0,
+    "grow_time": 0,
+    "base_color": 0,
+    "overlay_color": 0,
+    "clothing_type": 0
+  }
+]
+```
 
 ---
 
@@ -686,6 +715,7 @@ Bot inventory changed.
   "data": {
     "bot_id": 1,
     "gems": 0,
+    "inventory_size": 18,
     "items": [
       {
         "item_id": 0,

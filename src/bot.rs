@@ -17,6 +17,7 @@ use crate::socks5::Socks5UdpSocket;
 use crate::variant::VariantList;
 use crate::world::{TileType, World, WorldObject};
 use rusty_enet as enet;
+use std::collections::HashSet;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -185,6 +186,10 @@ pub struct Bot {
     pub temporary_data: TemporaryData,
     /// Whether the run loop should auto-collect nearby dropped items.
     pub auto_collect: bool,
+    /// Auto-collect range in tiles (1–5); pixel radius is `tiles × 32`.
+    collect_radius_tiles: u8,
+    /// Item IDs excluded from auto-collect.
+    collect_blacklist: HashSet<u16>,
     /// Tracks when collect() was last run.
     collect_timer: std::time::Instant,
     /// A* pathfinder, re-used across find_path calls.
@@ -323,6 +328,12 @@ fn fetch_credentials(
     }
 }
 
+fn sorted_blacklist_vec(set: &HashSet<u16>) -> Vec<u16> {
+    let mut v: Vec<u16> = set.iter().copied().collect();
+    v.sort_unstable();
+    v
+}
+
 impl Bot {
     pub fn new(
         username: &str,
@@ -389,6 +400,8 @@ impl Bot {
             cmd_rx,
             temporary_data: TemporaryData::default(),
             auto_collect: true,
+            collect_radius_tiles: 3,
+            collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
             astar: AStar::new(),
             delays: BotDelays::default(),
@@ -413,6 +426,8 @@ impl Bot {
             let mut s = bot.state.write().unwrap();
             s.username = username.to_string();
             s.mac = bot.mac.clone();
+            s.collect_radius_tiles = bot.collect_radius_tiles;
+            s.collect_blacklist = sorted_blacklist_vec(&bot.collect_blacklist);
         }
         bot.host.connect(creds.addr, 2, 0);
         bot
@@ -537,6 +552,8 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             cmd_rx,
             temporary_data: TemporaryData::default(),
             auto_collect: true,
+            collect_radius_tiles: 3,
+            collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
             astar: AStar::new(),
             delays: BotDelays::default(),
@@ -560,6 +577,8 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
         {
             let mut s = bot.state.write().unwrap();
             s.mac = bot.mac.clone();
+            s.collect_radius_tiles = bot.collect_radius_tiles;
+            s.collect_blacklist = sorted_blacklist_vec(&bot.collect_blacklist);
         }
         bot.host.connect(addr, 2, 0);
         bot
@@ -1011,7 +1030,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                                         .unwrap_or(0),
                                                 })
                                                 .collect();
-                                            self.state.write().unwrap().inventory = slots;
+                                            {
+                                                let mut s = self.state.write().unwrap();
+                                                s.inventory = slots;
+                                                s.inventory_size = inv.size;
+                                            }
                                             let ws_items: Vec<WsInvItem> = inv
                                                 .items
                                                 .values()
@@ -1029,6 +1052,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                             self.emit(WsEvent::InventoryUpdate {
                                                 bot_id: self.bot_id,
                                                 gems: inv.gems,
+                                                inventory_size: inv.size,
                                                 items: ws_items,
                                             });
                                         }
@@ -1541,7 +1565,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                     .unwrap_or(0),
                             })
                             .collect();
-                        self.state.write().unwrap().inventory = slots;
+                        {
+                            let mut s = self.state.write().unwrap();
+                            s.inventory = slots;
+                            s.inventory_size = self.inventory.size;
+                        }
                         let ws_items: Vec<WsInvItem> = self
                             .inventory
                             .items
@@ -1560,6 +1588,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         self.emit(WsEvent::InventoryUpdate {
                             bot_id: self.bot_id,
                             gems: self.inventory.gems,
+                            inventory_size: self.inventory.size,
                             items: ws_items,
                         });
                     }
@@ -1829,7 +1858,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     .unwrap_or(0),
             })
             .collect();
-        self.state.write().unwrap().inventory = slots;
+        {
+            let mut s = self.state.write().unwrap();
+            s.inventory = slots;
+            s.inventory_size = self.inventory.size;
+        }
         let ws_items: Vec<WsInvItem> = self
             .inventory
             .items
@@ -1848,6 +1881,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         self.emit(WsEvent::InventoryUpdate {
             bot_id: self.bot_id,
             gems: self.inventory.gems,
+            inventory_size: self.inventory.size,
             items: ws_items,
         });
     }
@@ -2005,7 +2039,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                     .unwrap_or(0),
                             })
                             .collect();
-                        self.state.write().unwrap().inventory = slots;
+                        {
+                            let mut s = self.state.write().unwrap();
+                            s.inventory = slots;
+                            s.inventory_size = self.inventory.size;
+                        }
                         let ws_items: Vec<WsInvItem> = self
                             .inventory
                             .items
@@ -2024,6 +2062,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         self.emit(WsEvent::InventoryUpdate {
                             bot_id: self.bot_id,
                             gems: self.inventory.gems,
+                            inventory_size: self.inventory.size,
                             items: ws_items,
                         });
                     }
@@ -2225,23 +2264,25 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         let pos_x = self.pos_x;
         let pos_y = self.pos_y;
 
-        const RADIUS_SQ: f32 = 96.0 * 96.0; // 3-tile collect radius
+        let radius_tiles = self.collect_radius_tiles.clamp(1, 5);
+        let r_px = radius_tiles as f32 * 32.0;
         const MAX_PER_TICK: usize = 32; // cap packets per call
 
-        // Snapshot nearby items (releases world borrow before we touch inventory/send)
         let nearby: Vec<(u32, f32, f32, u16)> = {
             let objects = &self.world.as_ref().unwrap().objects;
             let mut v: Vec<(f32, u32, f32, f32, u16)> = objects
                 .iter()
                 .filter_map(|obj| {
+                    if self.collect_blacklist.contains(&obj.item_id) {
+                        return None;
+                    }
                     let dx = pos_x - obj.x;
                     let dy = pos_y - obj.y;
-                    let dist_sq = dx * dx + dy * dy;
-                    if dist_sq <= RADIUS_SQ {
-                        Some((dist_sq, obj.uid, obj.x, obj.y, obj.item_id))
-                    } else {
-                        None
+                    if dx.abs() > r_px || dy.abs() > r_px {
+                        return None;
                     }
+                    let ring = dx.abs().max(dy.abs());
+                    Some((ring, obj.uid, obj.x, obj.y, obj.item_id))
                 })
                 .collect();
             v.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -2649,6 +2690,16 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             BotCommand::SetAutoCollect { enabled } => {
                 self.auto_collect = enabled;
                 self.state.write().unwrap().auto_collect = enabled;
+            }
+            BotCommand::SetCollectConfig {
+                radius_tiles,
+                blacklist,
+            } => {
+                self.collect_radius_tiles = radius_tiles.clamp(1, 5);
+                self.collect_blacklist = blacklist.into_iter().collect();
+                let mut st = self.state.write().unwrap();
+                st.collect_radius_tiles = self.collect_radius_tiles;
+                st.collect_blacklist = sorted_blacklist_vec(&self.collect_blacklist);
             }
         }
     }

@@ -55,12 +55,15 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
           players,
           objects: s.objects,
           inventory: s.inventory,
+          inventory_slots: s.inventory_slots,
           gems: s.gems,
           console: s.console,
           ping_ms: s.ping_ms,
           delays: s.delays,
           track_info: s.track_info,
           auto_collect: s.auto_collect,
+          collect_radius_tiles: s.collect_radius_tiles,
+          collect_blacklist: s.collect_blacklist,
         })
       })
     }).catch(() => {})
@@ -188,11 +191,20 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
           </div>
         </Section>
 
+        <AutoCollectRangePanel
+          botId={bot.id}
+          collectRadiusTiles={bot.collect_radius_tiles}
+          collectBlacklist={bot.collect_blacklist}
+        />
+
         <Section label="Movement">
           <DPad botId={bot.id} />
         </Section>
 
-        <Section label="Inventory">
+        <Section
+            label="Inventory"
+            hint={bot.inventory_slots > 0 ? `${bot.inventory.length} / ${bot.inventory_slots} slots` : undefined}
+          >
           <InventoryTable botId={bot.id} inventory={bot.inventory} itemLabel={itemLabel} />
         </Section>
 
@@ -210,6 +222,182 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
         </Section>
       </div>
     </div>
+  )
+}
+
+// ── Overview: auto-collect range + blacklist ────────────────────────────────
+
+/** 9×9 so Chebyshev distance from center runs 0..4 → clickable radius 1..5 (was 5×5 → max 3). */
+const COLLECT_GRID = 9
+const COLLECT_MID = (COLLECT_GRID - 1) / 2
+
+function collectChebyshev(row: number, col: number) {
+  return Math.max(Math.abs(row - COLLECT_MID), Math.abs(col - COLLECT_MID))
+}
+
+function collectRadiusFromCell(row: number, col: number) {
+  return Math.min(5, Math.max(1, collectChebyshev(row, col) + 1))
+}
+
+function cellInsideCollectRadius(row: number, col: number, radiusTiles: number) {
+  return collectChebyshev(row, col) < radiusTiles
+}
+
+function AutoCollectRangePanel({
+  botId,
+  collectRadiusTiles,
+  collectBlacklist,
+}: {
+  botId: number
+  collectRadiusTiles: number
+  collectBlacklist: number[]
+}) {
+  const [collectRadius, setCollectRadius] = useState(collectRadiusTiles)
+  const [blacklist, setBlacklist] = useState<number[]>(() => [...collectBlacklist])
+  const [blacklistInput, setBlacklistInput] = useState('')
+  const setBots = useSetAtom(botsAtom)
+  const itemNames = useAtomValue(itemNamesAtom)
+
+  useEffect(() => {
+    setCollectRadius(collectRadiusTiles)
+    setBlacklist([...collectBlacklist].sort((a, b) => a - b))
+  }, [collectRadiusTiles, collectBlacklist.join(',')])
+
+  const itemLabel = (id: number) => {
+    const name = itemNames[String(id)]
+    return name ? `${name} (${id})` : String(id)
+  }
+
+  async function sendCollectConfig(nextRadius: number, nextBlacklist: number[]) {
+    const prevRadius = collectRadius
+    const prevBlacklist = blacklist
+    setCollectRadius(nextRadius)
+    setBlacklist(nextBlacklist)
+    setBots((m) => {
+      const b = m.get(botId)
+      if (!b) return m
+      return new Map(m).set(botId, {
+        ...b,
+        collect_radius_tiles: nextRadius,
+        collect_blacklist: [...nextBlacklist].sort((a, b) => a - b),
+      })
+    })
+    try {
+      await api.sendCmd(botId, {
+        type: 'set_collect_config',
+        radius_tiles: nextRadius,
+        blacklist: nextBlacklist,
+      })
+    } catch {
+      setCollectRadius(prevRadius)
+      setBlacklist(prevBlacklist)
+      setBots((m) => {
+        const b = m.get(botId)
+        if (!b) return m
+        return new Map(m).set(botId, {
+          ...b,
+          collect_radius_tiles: prevRadius,
+          collect_blacklist: [...prevBlacklist].sort((a, b) => a - b),
+        })
+      })
+    }
+  }
+
+  function onCollectCellClick(row: number, col: number) {
+    const next = collectRadiusFromCell(row, col)
+    void sendCollectConfig(next, blacklist)
+  }
+
+  function addBlacklistId() {
+    const id = parseInt(blacklistInput.trim(), 10)
+    if (!Number.isFinite(id) || id < 0 || id > 65535) return
+    if (blacklist.includes(id)) return
+    const next = [...blacklist, id].sort((a, b) => a - b)
+    setBlacklistInput('')
+    void sendCollectConfig(collectRadius, next)
+  }
+
+  function removeBlacklistId(id: number) {
+    const next = blacklist.filter((x) => x !== id)
+    void sendCollectConfig(collectRadius, next)
+  }
+
+  return (
+    <>
+      <Section
+        label="Auto-collect range"
+        hint="square in tiles"
+      >
+        <div className="flex flex-col items-center gap-2 w-full">
+          <div
+            className="grid gap-0.5 w-fit shrink-0 p-1 rounded border border-border bg-muted/30"
+            style={{ gridTemplateColumns: `repeat(${COLLECT_GRID}, minmax(0, 1fr))` }}
+          >
+            {Array.from({ length: COLLECT_GRID * COLLECT_GRID }, (_, i) => {
+              const row = Math.floor(i / COLLECT_GRID)
+              const col = i % COLLECT_GRID
+              const inRange = cellInsideCollectRadius(row, col, collectRadius)
+              const isCenter = row === COLLECT_MID && col === COLLECT_MID
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  title={`Set radius ${collectRadiusFromCell(row, col)}`}
+                  onClick={() => onCollectCellClick(row, col)}
+                  className={cn(
+                    'w-6 h-6 rounded-sm border text-[9px] font-medium transition-colors',
+                    inRange
+                      ? 'bg-primary/35 border-primary/50 text-foreground'
+                      : 'bg-background/80 border-border text-muted-foreground',
+                    isCenter && 'ring-1 ring-primary ring-inset',
+                  )}
+                >
+                  {isCenter ? '●' : ''}
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Radius: <span className="text-foreground font-medium tabular-nums">{collectRadius}</span> tile{collectRadius === 1 ? '' : 's'}
+          </p>
+        </div>
+      </Section>
+      <Section label="Do not auto-collect" hint="item IDs">
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            min={0}
+            max={65535}
+            placeholder="Item ID"
+            value={blacklistInput}
+            onChange={(e) => setBlacklistInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addBlacklistId()}
+            className="h-7 text-xs"
+          />
+          <Button size="sm" variant="secondary" className="text-xs shrink-0 h-7" type="button" onClick={addBlacklistId}>
+            Add
+          </Button>
+        </div>
+        <ul className="max-h-32 overflow-y-auto rounded border border-border bg-background divide-y divide-border text-xs">
+          {blacklist.length === 0 ? (
+            <li className="px-2 py-2 text-muted-foreground text-center">No blacklisted items</li>
+          ) : (
+            blacklist.map((id) => (
+              <li key={id} className="flex items-center justify-between gap-2 px-2 py-1.5">
+                <span className="truncate">{itemLabel(id)}</span>
+                <button
+                  type="button"
+                  onClick={() => removeBlacklistId(id)}
+                  className="shrink-0 text-muted-foreground hover:text-destructive text-[10px] uppercase tracking-wide"
+                >
+                  Remove
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </Section>
+    </>
   )
 }
 

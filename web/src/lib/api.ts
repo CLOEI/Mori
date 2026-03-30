@@ -67,12 +67,17 @@ export interface BotState {
   players: Player[]
   objects: WorldObject[]
   inventory: InventoryItem[]
+  inventory_slots: number
   gems: number
   console: string[]
   ping_ms: number
   delays: { place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
   track_info: { level: number; grow_id: number; install_date: number; global_playtime: number; awesomeness: number } | null
   auto_collect: boolean
+  /** Auto-collect half-extent in tiles (1–5); square box, not a circle. */
+  collect_radius_tiles: number
+  /** Item IDs excluded from auto-collect. */
+  collect_blacklist: number[]
 }
 
 export interface SpawnBotBody {
@@ -103,6 +108,7 @@ export type BotCmd =
   | { type: 'trash'; item_id: number; count: number }
   | { type: 'set_delays'; place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
   | { type: 'set_auto_collect'; enabled: boolean }
+  | { type: 'set_collect_config'; radius_tiles: number; blacklist: number[] }
 
 export interface ProxyTestRequest {
   proxy_host: string
