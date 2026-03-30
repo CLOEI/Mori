@@ -56,7 +56,7 @@ pub enum WsEvent {
     /// The full set of dropped world objects changed.
     ObjectsUpdate { bot_id: u32, objects: Vec<WsObject> },
     /// Bot inventory updated.
-    InventoryUpdate { bot_id: u32, gems: i32, items: Vec<WsInvItem> },
+    InventoryUpdate { bot_id: u32, gems: i32, inventory_size: u32, items: Vec<WsInvItem> },
     /// A new console message arrived.
     Console { bot_id: u32, message: String },
     /// Account info extracted from the Track packet (sent once per login).

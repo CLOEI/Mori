@@ -67,6 +67,7 @@ export interface BotState {
   players: Player[]
   objects: WorldObject[]
   inventory: InventoryItem[]
+  inventory_slots: number
   gems: number
   console: string[]
   ping_ms: number

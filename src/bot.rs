@@ -1011,7 +1011,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                                         .unwrap_or(0),
                                                 })
                                                 .collect();
-                                            self.state.write().unwrap().inventory = slots;
+                                            {
+                                                let mut s = self.state.write().unwrap();
+                                                s.inventory = slots;
+                                                s.inventory_size = inv.size;
+                                            }
                                             let ws_items: Vec<WsInvItem> = inv
                                                 .items
                                                 .values()
@@ -1029,6 +1033,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                             self.emit(WsEvent::InventoryUpdate {
                                                 bot_id: self.bot_id,
                                                 gems: inv.gems,
+                                                inventory_size: inv.size,
                                                 items: ws_items,
                                             });
                                         }
@@ -1541,7 +1546,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                     .unwrap_or(0),
                             })
                             .collect();
-                        self.state.write().unwrap().inventory = slots;
+                        {
+                            let mut s = self.state.write().unwrap();
+                            s.inventory = slots;
+                            s.inventory_size = self.inventory.size;
+                        }
                         let ws_items: Vec<WsInvItem> = self
                             .inventory
                             .items
@@ -1560,6 +1569,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         self.emit(WsEvent::InventoryUpdate {
                             bot_id: self.bot_id,
                             gems: self.inventory.gems,
+                            inventory_size: self.inventory.size,
                             items: ws_items,
                         });
                     }
@@ -1829,7 +1839,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     .unwrap_or(0),
             })
             .collect();
-        self.state.write().unwrap().inventory = slots;
+        {
+            let mut s = self.state.write().unwrap();
+            s.inventory = slots;
+            s.inventory_size = self.inventory.size;
+        }
         let ws_items: Vec<WsInvItem> = self
             .inventory
             .items
@@ -1848,6 +1862,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         self.emit(WsEvent::InventoryUpdate {
             bot_id: self.bot_id,
             gems: self.inventory.gems,
+            inventory_size: self.inventory.size,
             items: ws_items,
         });
     }
@@ -2005,7 +2020,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                     .unwrap_or(0),
                             })
                             .collect();
-                        self.state.write().unwrap().inventory = slots;
+                        {
+                            let mut s = self.state.write().unwrap();
+                            s.inventory = slots;
+                            s.inventory_size = self.inventory.size;
+                        }
                         let ws_items: Vec<WsInvItem> = self
                             .inventory
                             .items
@@ -2024,6 +2043,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         self.emit(WsEvent::InventoryUpdate {
                             bot_id: self.bot_id,
                             gems: self.inventory.gems,
+                            inventory_size: self.inventory.size,
                             items: ws_items,
                         });
                     }

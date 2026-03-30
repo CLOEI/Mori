@@ -149,6 +149,7 @@ Returns the full state of a bot.
       "action_type": 0
     }
   ],
+  "inventory_size": 18,
   "gems": 0,
   "console": ["string"],
   "ping_ms": 0,
@@ -686,6 +687,7 @@ Bot inventory changed.
   "data": {
     "bot_id": 1,
     "gems": 0,
+    "inventory_size": 18,
     "items": [
       {
         "item_id": 0,

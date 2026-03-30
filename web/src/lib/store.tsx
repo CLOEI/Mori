@@ -29,6 +29,7 @@ export interface LiveBot {
   players: Map<number, Player>
   objects: WorldObject[]
   inventory: InventoryItem[]
+  inventory_slots: number
   console: string[]
   delays: { place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number }
   track_info: TrackInfo | null
@@ -43,7 +44,7 @@ export function makeBot(id: number, username: string): LiveBot {
     gems: 0, ping_ms: 0,
     world_width: 100, world_height: 60,
     tiles: [], players: new Map(),
-    objects: [], inventory: [], console: [],
+    objects: [], inventory: [], inventory_slots: 0, console: [],
     delays: { place_ms: 500, walk_ms: 500, twofa_secs: 120, server_overload_secs: 30, too_many_logins_secs: 5 },
     track_info: null,
     auto_collect: true,
@@ -185,8 +186,8 @@ export function useMoriStore() {
       ['ObjectsUpdate', (d: { bot_id: number; objects: WorldObject[] }) =>
         setBots((m) => patchBot(m, d.bot_id, { objects: d.objects }))],
 
-      ['InventoryUpdate', (d: { bot_id: number; gems: number; items: InventoryItem[] }) =>
-        setBots((m) => patchBot(m, d.bot_id, { gems: d.gems, inventory: d.items }))],
+      ['InventoryUpdate', (d: { bot_id: number; gems: number; inventory_size: number; items: InventoryItem[] }) =>
+        setBots((m) => patchBot(m, d.bot_id, { gems: d.gems, inventory: d.items, inventory_slots: d.inventory_size }))],
 
       ['BotUsername', (d: { bot_id: number; username: string }) =>
         setBots((m) => patchBot(m, d.bot_id, { username: d.username }))],

@@ -55,6 +55,7 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
           players,
           objects: s.objects,
           inventory: s.inventory,
+          inventory_slots: s.inventory_slots,
           gems: s.gems,
           console: s.console,
           ping_ms: s.ping_ms,
@@ -192,7 +193,10 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
           <DPad botId={bot.id} />
         </Section>
 
-        <Section label="Inventory">
+        <Section
+            label="Inventory"
+            hint={bot.inventory_slots > 0 ? `${bot.inventory.length} / ${bot.inventory_slots} slots` : undefined}
+          >
           <InventoryTable botId={bot.id} inventory={bot.inventory} itemLabel={itemLabel} />
         </Section>
 

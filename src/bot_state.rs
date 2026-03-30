@@ -119,6 +119,8 @@ pub struct BotState {
     pub objects:         Vec<WorldObjectInfo>,
     pub players:         Vec<PlayerInfo>,
     pub inventory:       Vec<InvSlot>,
+    /// Maximum number of inventory slots the bot has (from SendInventoryState).
+    pub inventory_size:  u32,
     pub gems:            i32,
     pub console:         Vec<String>,
     /// Round-trip time in milliseconds from ENet, updated every run loop tick.
