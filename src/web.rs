@@ -124,6 +124,11 @@ enum CmdRequest {
     Trash { item_id: u32, count: u32 },
     SetDelays(BotDelays),
     SetAutoCollect { enabled: bool },
+    SetCollectConfig {
+        radius_tiles: u8,
+        #[serde(default)]
+        blacklist: Vec<u16>,
+    },
 }
 
 #[derive(Deserialize)]
@@ -206,6 +211,13 @@ async fn bot_cmd(
         CmdRequest::Trash { item_id, count } => BotCommand::Trash { item_id, count },
         CmdRequest::SetDelays(d) => BotCommand::SetDelays(d),
         CmdRequest::SetAutoCollect { enabled } => BotCommand::SetAutoCollect { enabled },
+        CmdRequest::SetCollectConfig {
+            radius_tiles,
+            blacklist,
+        } => BotCommand::SetCollectConfig {
+            radius_tiles,
+            blacklist,
+        },
     };
     if s.manager.lock().unwrap().send_cmd(id, cmd) {
         StatusCode::NO_CONTENT

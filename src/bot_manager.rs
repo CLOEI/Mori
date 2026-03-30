@@ -50,7 +50,6 @@ impl BotManager {
 
         let state = Arc::new(RwLock::new(BotState {
             status: BotStatus::Connecting,
-            auto_collect: true,
             ..Default::default()
         }));
         let state_clone = state.clone();
@@ -84,7 +83,6 @@ impl BotManager {
 
         let state = Arc::new(RwLock::new(BotState {
             status: BotStatus::Connecting,
-            auto_collect: true,
             ..Default::default()
         }));
         let state_clone = state.clone();
