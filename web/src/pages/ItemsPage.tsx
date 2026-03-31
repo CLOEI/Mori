@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { api, type ItemsPage, type ItemRecord } from "@/lib/api";
 import { Input } from "@/components/ui/input";
@@ -6,51 +6,22 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TextureImage } from "@/components/texture-image";
-import { textureCacheManager } from "@/lib/texture-cache";
-
-// Helper to calculate sprite coords for items
-function getIsolatedSpriteCoords(item: ItemRecord): { x: number; y: number } {
-  // Reuse the logic from texture-image.tsx
-  return { x: item.texture_x, y: item.texture_y };
-}
 
 export function ItemsPage() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ItemsPage | null>(null);
   const [loading, setLoading] = useState(false);
-  const [texturesLoaded, setTexturesLoaded] = useState(0);
   const [selectedItem, setSelectedItem] = useState<ItemRecord | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchItems = useCallback(async (p: number, query: string) => {
     setLoading(true);
-    setTexturesLoaded(0);
     try {
       const result = await api.getItems(p, query);
       setData(result);
-      
-      // Batch preload all textures for better performance
-      if (result.items.length > 0) {
-        const textureRequests = result.items.map(item => {
-          const coords = getIsolatedSpriteCoords(item);
-          return {
-            textureFileName: item.texture_file_name,
-            textureX: coords.x,
-            textureY: coords.y
-          };
-        });
-
-        // Load all textures in parallel with progress tracking
-        textureCacheManager.batchLoadTiles(textureRequests, (loaded, total) => {
-          setTexturesLoaded(loaded);
-        }).catch(err => {
-          console.error('Failed to batch load textures:', err);
-        });
-      }
     } catch {
-      // ignore
     } finally {
       setLoading(false);
     }
@@ -98,7 +69,13 @@ export function ItemsPage() {
       </div>
 
       <ScrollArea className="flex-1 min-h-0">
-        <div className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 relative">
+        <div 
+          className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4"
+          style={{ 
+            contentVisibility: 'auto',
+            contain: 'layout style paint'
+          }}
+        >
           {data?.items.map((item) => (
             <ItemCard 
               key={item.id} 
@@ -112,21 +89,6 @@ export function ItemsPage() {
           {!loading && data?.items.length === 0 && (
             <div className="col-span-full py-12 text-center text-muted-foreground">
               No items found.
-            </div>
-          )}
-
-          {/* Loading progress overlay */}
-          {(loading || (data && texturesLoaded < data.items.length)) && (
-            <div className="absolute inset-0 bg-black/40 rounded flex flex-col items-center justify-center gap-3 pointer-events-none z-10">
-              <div className="w-48 h-2 bg-background border border-border rounded overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${data ? (texturesLoaded / data.items.length) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="text-sm text-foreground font-medium">
-                {loading ? 'Fetching items...' : `Loading textures: ${texturesLoaded} / ${data?.items.length ?? 0}`}
-              </div>
             </div>
           )}
         </div>
@@ -158,7 +120,6 @@ export function ItemsPage() {
         </Button>
       </div>
 
-      {/* Item Details Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -286,7 +247,6 @@ export function ItemsPage() {
   );
 }
 
-// Memoized item card component to prevent unnecessary re-renders
 const ItemCard = memo(function ItemCard({ 
   item, 
   onClick 
@@ -294,17 +254,52 @@ const ItemCard = memo(function ItemCard({
   item: ItemRecord; 
   onClick: () => void;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.disconnect();
+          }
+        });
+      },
+      { rootMargin: '200px' }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
+      ref={cardRef}
       className="p-3 border rounded bg-card hover:shadow-md transition-shadow cursor-pointer"
+      style={{ 
+        willChange: 'transform',
+        contain: 'layout style paint'
+      }}
       onClick={onClick}
     >
-      {/* Image Section - Fixed aspect ratio */}
       <div className="flex items-center justify-center w-full aspect-square bg-muted rounded overflow-hidden mb-3">
-        <TextureImage item={item} />
+        {isVisible ? (
+          <TextureImage item={item} />
+        ) : (
+          <div 
+            className="w-full h-full flex items-center justify-center text-muted-foreground text-xs"
+            style={{ minHeight: '128px' }}
+          >
+            ...
+          </div>
+        )}
       </div>
 
-      {/* Item Info */}
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground">
