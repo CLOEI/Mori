@@ -21,6 +21,7 @@ struct UserRecord {
 fn user_path() -> PathBuf {
     std::env::current_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
+        .join("data")
         .join("user.json")
 }
 
@@ -32,6 +33,9 @@ fn load_user() -> Option<UserRecord> {
 
 fn save_user(record: &UserRecord) -> anyhow::Result<()> {
     let path = user_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     let data = serde_json::to_string_pretty(record)?;
     std::fs::write(path, data)?;
     Ok(())
