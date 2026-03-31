@@ -1,7 +1,7 @@
 services:
   mori:
     build: .
-volumes:
+    volumes:
       - mori-data:/app/data
 
 volumes:
