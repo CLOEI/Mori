@@ -1506,14 +1506,14 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
             "OnRequestWorldSelectMenu" => {
                 self.world = None;
-                {
+                let removed = {
                     let mut s = self.state.write().unwrap();
                     s.world_name = "EXIT".to_string();
                     s.status = BotStatus::InGame;
-                    if self.inventory.remove_temp_items() {
-                        // something is removed
-                        self.emit_inventory_update();
-                    }
+                    self.inventory.remove_temp_items()
+                };
+                if removed {
+                    self.emit_inventory_update();
                 }
                 self.emit(WsEvent::BotStatus {
                     bot_id: self.bot_id,
