@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Application, Graphics, Container, Sprite, Assets } from 'pixi.js'
+import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { itemNamesAtom, itemColorsAtom, itemsMapAtom, type LiveBot } from '@/lib/store'
 import { api, type ItemRecord } from '@/lib/api'
 import type { TileData } from '@/lib/ws'
 import { TileManager, type WorldData, type TileData as TileManagerData } from '@/lib/tile-manager'
 import { textureCacheManager } from '@/lib/texture-cache'
+import { Progress } from '@/components/ui/progress'
+import { Color } from '@/lib/color'
 
 const TILE_FLAGS: [number, string][] = [
   [0x0002, 'has_parent'], [0x0004, 'spliced'], [0x0008, 'spawns_seeds'],
@@ -14,6 +16,107 @@ const TILE_FLAGS: [number, string][] = [
   [0x0400, 'wet'], [0x0800, 'glued'], [0x1000, 'on_fire'],
   [0x2000, 'painted_red'], [0x4000, 'painted_green'], [0x8000, 'painted_blue'],
 ]
+
+async function createCompositeTreeTexture(
+  baseUrl: string,
+  overlayUrl: string,
+  baseColor?: Color,
+  overlayColor?: Color
+): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    if (!ctx) {
+      reject(new Error('Could not get canvas context'));
+      return;
+    }
+
+    const baseImg = new Image();
+    const overlayImg = new Image();
+
+    let baseLoaded = false;
+    let overlayLoaded = false;
+
+    const tryRender = () => {
+      if (!baseLoaded || !overlayLoaded) return;
+
+      ctx.clearRect(0, 0, 32, 32);
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 32;
+      tempCanvas.height = 32;
+      const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+
+      if (!tempCtx) {
+        reject(new Error('Could not get temp canvas context'));
+        return;
+      }
+
+      tempCtx.drawImage(baseImg, 0, 0, 32, 32);
+      if (baseColor) {
+        const imageData = tempCtx.getImageData(0, 0, 32, 32);
+        const data = imageData.data;
+        const r = baseColor.getRed() / 255;
+        const g = baseColor.getGreen() / 255;
+        const b = baseColor.getBlue() / 255;
+
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] > 0) {
+            data[i] = Math.floor(data[i] * r);
+            data[i + 1] = Math.floor(data[i + 1] * g);
+            data[i + 2] = Math.floor(data[i + 2] * b);
+          }
+        }
+        tempCtx.putImageData(imageData, 0, 0);
+      }
+      ctx.drawImage(tempCanvas, 0, 0);
+
+      // Apply overlay with overlay color
+      tempCtx.clearRect(0, 0, 32, 32);
+      tempCtx.drawImage(overlayImg, 0, 0, 32, 32);
+      
+      if (overlayColor && overlayColor.getUint() !== 0xFFFFFFFF) {
+        const overlayData = tempCtx.getImageData(0, 0, 32, 32);
+        const data = overlayData.data;
+        const r = overlayColor.getRed() / 255;
+        const g = overlayColor.getGreen() / 255;
+        const b = overlayColor.getBlue() / 255;
+
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] > 0) {
+            data[i] = Math.floor(data[i] * r);
+            data[i + 1] = Math.floor(data[i + 1] * g);
+            data[i + 2] = Math.floor(data[i + 2] * b);
+          }
+        }
+        tempCtx.putImageData(overlayData, 0, 0);
+      }
+      
+      ctx.drawImage(tempCanvas, 0, 0);
+
+      resolve(canvas);
+    };
+
+    baseImg.onload = () => {
+      baseLoaded = true;
+      tryRender();
+    };
+    baseImg.onerror = () => reject(new Error('Failed to load base image'));
+
+    overlayImg.onload = () => {
+      overlayLoaded = true;
+      tryRender();
+    };
+    overlayImg.onerror = () => reject(new Error('Failed to load overlay image'));
+
+    baseImg.src = baseUrl;
+    overlayImg.src = overlayUrl;
+  });
+}
+
 
 function activeFlags(flags: number): string[] {
   return TILE_FLAGS.filter(([bit]) => flags & bit).map(([, name]) => name)
@@ -59,7 +162,7 @@ interface TooltipState {
 const TILE_PX = 4
 const CHAR_PX = 2
 const MIN_ZOOM = 0.5
-const MAX_ZOOM = 4
+const MAX_ZOOM = 20
 
 
 function clampOffset(
@@ -89,6 +192,8 @@ export function Minimap({ bot }: { bot: LiveBot }) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [items, setItems] = useState<ItemRecord[]>([])
   const [useTileManager, setUseTileManager] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState<{ current: number; total: number; stage: 'loading' | 'decoding' } | null>(null)
+  const [currentZoom, setCurrentZoom] = useState(3)
   const appRef = useRef<Application | null>(null)
   const layersRef = useRef<{
     tiles: Container
@@ -116,20 +221,20 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       return
     }
 
-    console.log('[Minimap] Loading items for world...')
-    
     async function loadWorldItems() {
       try {
         // Collect unique item IDs from world tiles
         const uniqueItemIds = new Set<number>()
         for (const tile of bot.tiles) {
-          if (tile.fg !== 0) uniqueItemIds.add(tile.fg)
+          if (tile.fg !== 0) {
+            uniqueItemIds.add(tile.fg)
+            if (tile.fg % 2 === 1) {
+              uniqueItemIds.add(tile.fg + 1)
+            }
+          }
           if (tile.bg !== 0) uniqueItemIds.add(tile.bg)
         }
         
-        console.log('[Minimap] Found', uniqueItemIds.size, 'unique items in world')
-        
-        // Check which items we already have cached
         const missingIds: number[] = []
         const cachedItems: ItemRecord[] = []
         
@@ -142,16 +247,12 @@ export function Minimap({ bot }: { bot: LiveBot }) {
           }
         }
         
-        console.log('[Minimap] Using', cachedItems.length, 'cached items, fetching', missingIds.length, 'new items')
-        
-        // Fetch missing items using bulk get-items query
         const newItems: ItemRecord[] = []
         if (missingIds.length > 0) {
           try {
             const items = await api.getItemsByIds(missingIds)
             newItems.push(...items)
           } catch (err) {
-            console.warn('[Minimap] Failed to fetch items:', err)
           }
           
           // Update cache with new items
@@ -167,11 +268,9 @@ export function Minimap({ bot }: { bot: LiveBot }) {
         }
         
         const allItems = [...cachedItems, ...newItems]
-        console.log('[Minimap] Loaded', allItems.length, 'items total')
         setItems(allItems)
         
       } catch (err) {
-        console.error('[Minimap] Failed to load items:', err)
         setItems([])
       }
     }
@@ -198,16 +297,10 @@ export function Minimap({ bot }: { bot: LiveBot }) {
   }
 
   async function renderTilesWithTileManager(container: Container, b: LiveBot, items: ItemRecord[]) {
-    console.log('[Minimap] Starting TileManager render...', { 
-      tileCount: b.tiles.length, 
-      itemCount: items.length,
-      worldSize: `${b.world_width}x${b.world_height}` 
-    })
     
     container.removeChildren()
     
     if (items.length === 0 || b.tiles.length === 0) {
-      console.warn('[Minimap] Cannot render: missing items or tiles')
       return
     }
 
@@ -226,23 +319,31 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       tiles
     }
 
-    // Create or update tile manager
     if (!tileManagerRef.current) {
       tileManagerRef.current = new TileManager(worldData, items)
-      console.log('[Minimap] Created new TileManager')
     } else {
       tileManagerRef.current.updateWorldData(worldData)
       tileManagerRef.current.updateItems(items)
-      console.log('[Minimap] Updated existing TileManager')
     }
 
     const tileManager = tileManagerRef.current
     const itemMap = new Map(items.map(item => [item.id, item]))
 
-    // Pre-load all unique textures we'll need
-    const texturePromises: Promise<void>[] = []
-    const textureCache = new Map<string, HTMLImageElement>()
-    let textureCount = 0
+    // Collect all texture requests needed
+    const textureRequests: Array<{
+      textureFileName: string
+      textureX: number
+      textureY: number
+      x: number
+      y: number
+      isBg: boolean
+      isTree?: boolean
+      treeOverlayY?: number
+      treeOverlayX?: number
+      baseColor?: number
+      overlayColor?: number
+      item?: ItemRecord
+    }> = []
 
     for (let y = 0; y < b.world_height; y++) {
       for (let x = 0; x < b.world_width; x++) {
@@ -254,30 +355,14 @@ export function Minimap({ bot }: { bot: LiveBot }) {
           const item = itemMap.get(tile.bgItemId)
           if (item) {
             const coords = tileManager.getSpriteCoords(tile, true)
-            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
-            if (!textureCache.has(key)) {
-              textureCount++
-              texturePromises.push(
-                textureCacheManager.getCroppedTile(item.texture_file_name, coords.x, coords.y)
-                  .then(url => {
-                    const img = new Image()
-                    img.src = url
-                    return new Promise<void>((resolve) => {
-                      img.onload = () => {
-                        textureCache.set(key, img)
-                        resolve()
-                      }
-                      img.onerror = (err) => {
-                        console.error('[Minimap] Failed to load texture:', key, err)
-                        resolve()
-                      }
-                    })
-                  })
-                  .catch((err) => {
-                    console.error('[Minimap] Failed to get cropped tile:', key, err)
-                  })
-              )
-            }
+            textureRequests.push({
+              textureFileName: item.texture_file_name,
+              textureX: coords.x,
+              textureY: coords.y,
+              x,
+              y,
+              isBg: true
+            })
           }
         }
 
@@ -285,110 +370,172 @@ export function Minimap({ bot }: { bot: LiveBot }) {
         if (tile.fgItemId !== 0) {
           const item = itemMap.get(tile.fgItemId)
           if (item) {
-            const coords = tileManager.getSpriteCoords(tile, false)
-            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
-            if (!textureCache.has(key)) {
-              textureCount++
-              texturePromises.push(
-                textureCacheManager.getCroppedTile(item.texture_file_name, coords.x, coords.y)
-                  .then(url => {
-                    const img = new Image()
-                    img.src = url
-                    return new Promise<void>((resolve) => {
-                      img.onload = () => {
-                        textureCache.set(key, img)
-                        resolve()
-                      }
-                      img.onerror = (err) => {
-                        console.error('[Minimap] Failed to load texture:', key, err)
-                        resolve()
-                      }
-                    })
-                  })
-                  .catch((err) => {
-                    console.error('[Minimap] Failed to get cropped tile:', key, err)
-                  })
-              )
+            const isSeed = tile.fgItemId % 2 === 1;
+            
+            if (isSeed) {
+              const treeItemId = tile.fgItemId + 1;
+              const treeItem = itemMap.get(treeItemId);
+              
+              if (treeItem) {
+                // Convert seed's base_color and overlay_color to Color objects
+                const baseColor = item.base_color ? new Color(item.base_color) : new Color(0xFFFFFFFF);
+                const overlayColor = item.overlay_color ? new Color(item.overlay_color) : new Color(0xFFFFFFFF);
+                
+                // Debug: Log complete seed item data (tree sprites are in the seed item, not tree item)
+                
+                textureRequests.push({
+                  textureFileName: "tiles_page1.rttex",
+                  textureX: item.tree_base_sprite,
+                  textureY: 19,  // Row 19 is the trunk (bottom part)
+                  x,
+                  y,
+                  isBg: false,
+                  isTree: true,
+                  treeOverlayY: 18,  // Row 18 is the leaves (top part)
+                  treeOverlayX: item.tree_overlay_sprite,
+                  baseColor: baseColor.getUint(),
+                  overlayColor: overlayColor.getUint(),
+                  item: treeItem
+                })
+              } else {
+                const coords = tileManager.getSpriteCoords(tile, false)
+                textureRequests.push({
+                  textureFileName: item.texture_file_name,
+                  textureX: coords.x,
+                  textureY: coords.y,
+                  x,
+                  y,
+                  isBg: false
+                })
+              }
+            } else {
+              const coords = tileManager.getSpriteCoords(tile, false)
+              textureRequests.push({
+                textureFileName: item.texture_file_name,
+                textureX: coords.x,
+                textureY: coords.y,
+                x,
+                y,
+                isBg: false
+              })
             }
           }
         }
       }
     }
 
-    console.log(`[Minimap] Loading ${textureCount} unique textures...`)
-    
-    // Wait for all textures to load
-    await Promise.all(texturePromises)
-    
-    console.log(`[Minimap] Textures loaded: ${textureCache.size}/${textureCount}`)
-
-    // Now render all tiles using loaded textures
+    const CHUNK_SIZE = 200
     const bgContainer = new Container()
     const fgContainer = new Container()
-    let bgSpriteCount = 0
-    let fgSpriteCount = 0
+    const textureCache = new Map<string, Texture>()
     
-    for (let y = 0; y < b.world_height; y++) {
-      for (let x = 0; x < b.world_width; x++) {
-        const tile = tileManager.getTile(x, y)
-        if (!tile) continue
+    for (let chunkStart = 0; chunkStart < textureRequests.length; chunkStart += CHUNK_SIZE) {
+      const chunk = textureRequests.slice(chunkStart, chunkStart + CHUNK_SIZE)
+      
+      // Batch load this chunk
+      const chunkTextureReqs = chunk.map(req => ({
+        textureFileName: req.textureFileName,
+        textureX: req.textureX,
+        textureY: req.textureY
+      }))
+      
+      const urls = await textureCacheManager.batchLoadTiles(chunkTextureReqs, (loaded) => {
+        const overallProgress = chunkStart + loaded
+        setLoadingProgress({ 
+          current: overallProgress, 
+          total: textureRequests.length, 
+          stage: 'loading' 
+        })
+      })
+      
+      // Convert loaded images to textures and create sprites
+      setLoadingProgress({ 
+        current: chunkStart, 
+        total: textureRequests.length, 
+        stage: 'decoding' 
+      })
+      
+      for (let i = 0; i < chunk.length; i++) {
+        const req = chunk[i]
+        const url = urls[i]
+        if (!url) continue
+        
+        if (req.isTree && req.treeOverlayY !== undefined && req.treeOverlayX !== undefined) {
+          try {
+            const overlayUrl = await textureCacheManager.getCroppedTile(
+              "tiles_page1.rttex",
+              req.treeOverlayX,
+              req.treeOverlayY
+            );
 
-        // Render background
-        if (tile.bgItemId !== 0) {
-          const item = itemMap.get(tile.bgItemId)
-          if (item) {
-            const coords = tileManager.getSpriteCoords(tile, true)
-            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
-            const img = textureCache.get(key)
-            if (img) {
-              try {
-                const texture = await Assets.load(img.src)
-                const sprite = new Sprite(texture)
-                sprite.x = x * TILE_PX
-                sprite.y = y * TILE_PX
-                sprite.width = TILE_PX
-                sprite.height = TILE_PX
-                bgContainer.addChild(sprite)
-                bgSpriteCount++
-              } catch (e) {
-                console.error('[Minimap] Error creating bg sprite:', e)
-              }
+            const baseColor = req.baseColor && req.baseColor !== 0 ? new Color(req.baseColor) : undefined;
+            const overlayColor = req.overlayColor && req.overlayColor !== 0 ? new Color(req.overlayColor) : undefined;
+            const compositeCanvas = await createCompositeTreeTexture(url, overlayUrl, baseColor, overlayColor);
+            
+            const texture = Texture.from(compositeCanvas);
+            const sprite = new Sprite(texture);
+            sprite.x = req.x * TILE_PX;
+            sprite.y = req.y * TILE_PX;
+            sprite.width = TILE_PX;
+            sprite.height = TILE_PX;
+            fgContainer.addChild(sprite);
+          } catch (e) {
+          }
+          continue;
+        }
+        
+        const key = `${req.textureFileName}_${req.textureX}_${req.textureY}`
+        
+        let texture = textureCache.get(key)
+        if (!texture) {
+          try {
+            const img = new Image()
+            img.src = url
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve()
+              img.onerror = reject
+              setTimeout(() => reject(new Error('Image load timeout')), 5000)
+            })
+            
+            const canvas = document.createElement('canvas')
+            canvas.width = img.width
+            canvas.height = img.height
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(img, 0, 0)
+              texture = Texture.from(canvas)
+              textureCache.set(key, texture)
             }
+          } catch (e) {
+            continue
           }
         }
-
-        // Render foreground
-        if (tile.fgItemId !== 0) {
-          const item = itemMap.get(tile.fgItemId)
-          if (item) {
-            const coords = tileManager.getSpriteCoords(tile, false)
-            const key = `${item.texture_file_name}_${coords.x}_${coords.y}`
-            const img = textureCache.get(key)
-            if (img) {
-              try {
-                const texture = await Assets.load(img.src)
-                const sprite = new Sprite(texture)
-                sprite.x = x * TILE_PX
-                sprite.y = y * TILE_PX
-                sprite.width = TILE_PX
-                sprite.height = TILE_PX
-                fgContainer.addChild(sprite)
-                fgSpriteCount++
-              } catch (e) {
-                console.error('[Minimap] Error creating fg sprite:', e)
-              }
-            }
+        
+        if (texture) {
+          const sprite = new Sprite(texture)
+          sprite.x = req.x * TILE_PX
+          sprite.y = req.y * TILE_PX
+          sprite.width = TILE_PX
+          sprite.height = TILE_PX
+          
+          if (req.isBg) {
+            bgContainer.addChild(sprite)
+          } else {
+            fgContainer.addChild(sprite)
           }
         }
       }
+      
+      // Yield to main thread between chunks
+      if (chunkStart + CHUNK_SIZE < textureRequests.length) {
+        await new Promise(resolve => setTimeout(resolve, 0))
+      }
     }
-
-    console.log(`[Minimap] Rendered ${bgSpriteCount} BG sprites, ${fgSpriteCount} FG sprites`)
 
     container.addChild(bgContainer)
     container.addChild(fgContainer)
     
-    console.log('[Minimap] TileManager render complete!')
+    setLoadingProgress(null)
   }
 
   function getWorldScreenSize() {
@@ -484,24 +631,12 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     const layers = layersRef.current
     if (!layers || bot.tiles.length === 0) return
     
-    console.log('[Minimap Effect] State:', { 
-      useTileManager, 
-      itemsLoaded: items.length,
-      tilesCount: bot.tiles.length,
-      willUseTileManager: useTileManager && items.length > 0
-    })
-    
     if (useTileManager && items.length > 0) {
-      console.log('[Minimap Effect] Triggering TileManager render')
-      // Use TileManager for accurate sprite rendering
       renderTilesWithTileManager(layers.tiles, bot, items)
         .then(() => {
-          console.log('[Minimap Effect] Render completed successfully')
           centerOnBot()
         })
-        .catch((err) => {
-          console.error('[Minimap Effect] Render failed:', err)
-          // Fall back to color mode on error
+        .catch(() => {
           layers.tiles.removeChildren()
           const g = new Graphics()
           for (let i = 0; i < bot.tiles.length; i++) {
@@ -515,10 +650,6 @@ export function Minimap({ bot }: { bot: LiveBot }) {
           layers.tiles.addChild(g)
         })
     } else {
-      console.log('[Minimap Effect] Using color mode', {
-        reason: !useTileManager ? 'toggle is off' : 'items not loaded'
-      })
-      // Use simple color-based rendering (faster for minimap)
       layers.tiles.removeChildren()
       const g = new Graphics()
       for (let i = 0; i < bot.tiles.length; i++) {
@@ -629,6 +760,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
 
     const oldZoom = zoom.current
     zoom.current = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.current * (e.deltaY < 0 ? 1.15 : 0.87)))
+    setCurrentZoom(Math.round(zoom.current * 100) / 100)
     const ratio = zoom.current / oldZoom
 
     const raw = {
@@ -641,7 +773,28 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     applyTransform()
   }, [])
 
-  // Attach wheel event with passive: false to allow preventDefault
+  const handleZoomChange = useCallback((delta: number) => {
+    const app = appRef.current
+    if (!app) return
+
+    const oldZoom = zoom.current
+    zoom.current = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.current + delta))
+    setCurrentZoom(Math.round(zoom.current * 100) / 100)
+    const ratio = zoom.current / oldZoom
+
+    const centerX = app.screen.width / 2
+    const centerY = app.screen.height / 2
+
+    const raw = {
+      x: centerX - (centerX - offset.current.x) * ratio,
+      y: centerY - (centerY - offset.current.y) * ratio,
+    }
+    const dims = getWorldScreenSize()
+    if (!dims) return
+    offset.current = clampOffset(raw.x, raw.y, dims.worldW, dims.worldH, dims.screenW, dims.screenH)
+    applyTransform()
+  }, [])
+
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -663,10 +816,25 @@ export function Minimap({ bot }: { bot: LiveBot }) {
         onMouseLeave={() => setTooltip(null)}
       />
 
-      {/* Toggle button for TileManager rendering */}
+      {loadingProgress && (
+        <div className="absolute inset-0 bg-black/50 rounded flex flex-col items-center justify-center gap-3 pointer-events-none">
+          <div className="w-48">
+            <Progress 
+              value={(loadingProgress.current / loadingProgress.total) * 100}
+              className="h-2"
+            />
+          </div>
+          <div className="text-sm text-foreground font-medium">
+            {loadingProgress.stage === 'loading' 
+              ? `Loading textures: ${loadingProgress.current} / ${loadingProgress.total}`
+              : `Decoding textures: ${loadingProgress.current} / ${loadingProgress.total}`
+            }
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() => {
-          console.log('[Minimap] Button clicked! Current state:', useTileManager, '→ New state:', !useTileManager)
           setUseTileManager(!useTileManager)
         }}
         className="absolute top-2 right-2 px-2 py-1 text-xs bg-background border border-border rounded hover:bg-accent"
@@ -674,6 +842,28 @@ export function Minimap({ bot }: { bot: LiveBot }) {
       >
         {useTileManager ? '🎨 Sprites' : '🎨 Colors'}
       </button>
+
+      <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-background border border-border rounded p-1">
+        <button
+          onClick={() => handleZoomChange(-0.5)}
+          disabled={currentZoom <= MIN_ZOOM}
+          className="w-6 h-6 flex items-center justify-center text-xs hover:bg-accent rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Zoom out"
+        >
+          −
+        </button>
+        <span className="px-2 text-xs font-mono min-w-[3.5rem] text-center">
+          {Math.round(currentZoom * 100)}%
+        </span>
+        <button
+          onClick={() => handleZoomChange(0.5)}
+          disabled={currentZoom >= MAX_ZOOM}
+          className="w-6 h-6 flex items-center justify-center text-xs hover:bg-accent rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Zoom in"
+        >
+          +
+        </button>
+      </div>
 
       {tooltip && (
         <div

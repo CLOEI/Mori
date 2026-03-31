@@ -66,8 +66,8 @@ class TextureCacheManager {
       const arrayBuffer = await rttexBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const pngData = await RTTEX.decode(uint8Array);
-      // @ts-expect-error something is wrong with the types, but it works
-      pngBlob = new Blob([pngData], { type: "image/png" });
+      // @ts-expect-error idk but it works
+      pngBlob = new Blob([pngData.buffer], { type: "image/png" });
 
       await cache.put(cacheKey, new Response(pngBlob.slice()));
     }
@@ -158,6 +158,49 @@ class TextureCacheManager {
     const cache = await this.getCacheApi();
     const keys = await cache.keys();
     await Promise.all(keys.map((key) => cache.delete(key)));
+  }
+
+  async batchLoadTiles(
+    requests: Array<{ textureFileName: string; textureX: number; textureY: number }>,
+    onProgress?: (loaded: number, total: number) => void
+  ): Promise<string[]> {
+    const results: string[] = new Array(requests.length);
+    let loadedCount = 0;
+
+    const byTexture = new Map<string, Array<{ index: number; x: number; y: number }>>();
+    
+    requests.forEach((req, index) => {
+      const key = req.textureFileName;
+      if (!byTexture.has(key)) {
+        byTexture.set(key, []);
+      }
+      byTexture.get(key)!.push({ index, x: req.textureX, y: req.textureY });
+    });
+
+    const texturePromises = Array.from(byTexture.entries()).map(async ([textureFileName, tiles]) => {
+      
+      const tilePromises = tiles.map(async ({ index, x, y }) => {
+        try {
+          const url = await this.getCroppedTile(textureFileName, x, y);
+          results[index] = url;
+        } catch (error) {
+          results[index] = '';
+        }
+        
+        loadedCount++;
+        onProgress?.(loadedCount, requests.length);
+      });
+
+      await Promise.all(tilePromises);
+    });
+
+    await Promise.all(texturePromises);
+    return results;
+  }
+
+  async preloadTextures(textureFileNames: string[]): Promise<void> {
+    const promises = textureFileNames.map(fileName => this.getTexture(fileName));
+    await Promise.all(promises);
   }
 }
 

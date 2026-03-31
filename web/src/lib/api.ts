@@ -1,6 +1,6 @@
 import { authStore } from './auth'
 
-const BASE = window.location.origin;
+const BASE = "http://localhost:3000";
 
 async function req<T>(
   method: string,
@@ -237,13 +237,10 @@ export interface ItemsPage {
 }
 
 export const api = {
-  // Auth
   authStatus: () => fetch(`${BASE}/auth/status`).then(r => r.json()) as Promise<{ registered: boolean }>,
   authSetup: (password: string) => fetch(`${BASE}/auth/setup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }),
   authLogin: (password: string) => fetch(`${BASE}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }),
   authLogout: () => req<void>('POST', '/auth/logout'),
-
-  // Bots
   getBots: () => req<BotSummary[]>("GET", "/bots"),
   spawnBot: (body: SpawnBotBody) => req<{ id: number }>("POST", "/bots", body),
   spawnLtokenBot: (body: SpawnLtokenBody) =>

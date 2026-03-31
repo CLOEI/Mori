@@ -106,7 +106,6 @@ export class ExtendBuffer {
 
   public async writeString(str: string, be = false) {
     const bytes = str.split("").map((char) => char.charCodeAt(0));
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     be ? this.writeBE(str.length, 2) : this.write(str.length, 2);
     for (const byte of bytes) {
       this.data[this.mempos++] = byte;
@@ -152,11 +151,9 @@ export async function cropTileFromAtlas(
           return;
         }
 
-        // Calculate pixel coordinates
         const sourceX = tileX * TILE_SIZE;
         const sourceY = tileY * TILE_SIZE;
 
-        // Draw the specific tile onto the canvas
         ctx.drawImage(
           img,
           sourceX,
@@ -169,7 +166,6 @@ export async function cropTileFromAtlas(
           TILE_SIZE,
         );
 
-        // Convert to data URL
         const dataUrl = canvas.toDataURL("image/png");
         resolve(dataUrl);
       } catch (error) {
@@ -185,8 +181,6 @@ export async function cropTileFromAtlas(
   });
 }
 
-// The 47 fundamental visual states. 
-// These are the core textures where all diagonals legally connect to their neighbors.
 const CORE_TEXTURE_STATES: Record<number, number> = {
     0: 12, 2: 11, 8: 29, 10: 43, 14: 7, 32: 10, 34: 9, 40: 45, 
     42: 33, 46: 32, 56: 5, 58: 31, 62: 3, 128: 30, 130: 44, 131: 8, 
@@ -202,16 +196,11 @@ export function generate8BitLUT() {
     for (let i = 0; i < 256; i++) {
         let bit = i;
 
-        // THE DIAGONAL FILTER
-        // Bits: TL=1, T=2, TR=4, R=8, BR=16, B=32, BL=64, L=128
-        // If a diagonal exists, but the adjacent flat sides do not, we strip the diagonal bit out.
-        
-        if (!(bit & 2) || !(bit & 128)) bit &= ~1;   // Top-Left (1) requires Top (2) & Left (128)
-        if (!(bit & 2) || !(bit & 8))   bit &= ~4;   // Top-Right (4) requires Top (2) & Right (8)
-        if (!(bit & 32) || !(bit & 8))  bit &= ~16;  // Bot-Right (16) requires Bot (32) & Right (8)
-        if (!(bit & 32) || !(bit & 128)) bit &= ~64; // Bot-Left (64) requires Bot (32) & Left (128)
+        if (!(bit & 2) || !(bit & 128)) bit &= ~1;
+        if (!(bit & 2) || !(bit & 8))   bit &= ~4;
+        if (!(bit & 32) || !(bit & 8))  bit &= ~16;
+        if (!(bit & 32) || !(bit & 128)) bit &= ~64;
 
-        // Map the filtered mask to the core state (Fallback to 12 / isolated block for safety)
         lut[i] = CORE_TEXTURE_STATES[bit] !== undefined ? CORE_TEXTURE_STATES[bit] : 12;
     }
 

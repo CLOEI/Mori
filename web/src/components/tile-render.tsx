@@ -31,15 +31,11 @@ export function TileRender({
           return;
         }
 
-        // Get sprite coordinates from tile manager
         const coords = tileManager.getSpriteCoords(tile, isBackground);
         
-        // Get the item data to know which texture file to use
         const tileData = tileManager.getTile(tile.x, tile.y);
         if (!tileData) return;
 
-        // You'll need to get the item from somewhere - perhaps pass it or have TileManager expose it
-        // For now, we'll use a simple approach
         const itemsData = await api.getItemsByIds([itemId]);
         const itemRecord = itemsData[0];
         
@@ -57,7 +53,6 @@ export function TileRender({
           setSrc(croppedUrl);
         }
       } catch (error) {
-        console.error("Failed to load tile texture:", error);
       }
     }
 
