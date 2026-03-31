@@ -2722,7 +2722,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
     pub fn warp(&mut self, name: &str, id: &str) {
         self.send_game_message(&format!(
-            "action|join_request\nname|{name}\ninvitedWorld|{id}\n"
+            "action|join_request\nname|{name}|{id}\ninvitedWorld|0\n"
         ));
     }
 
