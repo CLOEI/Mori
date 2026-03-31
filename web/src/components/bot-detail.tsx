@@ -585,14 +585,19 @@ function ConfigTab({
   ]);
 
   async function save() {
+    const newDelays = {
+      place_ms: parseInt(placeMs, 10),
+      walk_ms: parseInt(walkMs, 10),
+      twofa_secs: parseInt(twofaSecs, 10),
+      server_overload_secs: parseInt(serverOverloadSecs, 10),
+      too_many_logins_secs: parseInt(tooManyLoginsSecs, 10),
+    };
     try {
-      await api.sendCmd(botId, {
-        type: "set_delays",
-        place_ms: parseInt(placeMs, 10),
-        walk_ms: parseInt(walkMs, 10),
-        twofa_secs: parseInt(twofaSecs, 10),
-        server_overload_secs: parseInt(serverOverloadSecs, 10),
-        too_many_logins_secs: parseInt(tooManyLoginsSecs, 10),
+      await api.sendCmd(botId, { type: "set_delays", ...newDelays });
+      setBots((m) => {
+        const bot = m.get(botId);
+        if (!bot) return m;
+        return new Map(m).set(botId, { ...bot, delays: newDelays });
       });
       setStatus("Saved");
       setTimeout(() => setStatus(""), 2000);
