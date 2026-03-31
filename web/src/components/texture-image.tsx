@@ -97,7 +97,9 @@ export const TextureImage = memo(function TextureImage({ item, flags = 0, onLoad
           onLoad?.();
         }
       } catch (error) {
-        console.error("Failed to load texture:", error);
+        if (!cancelled) {
+          setSrc(null);
+        }
       }
     }
 
@@ -105,14 +107,8 @@ export const TextureImage = memo(function TextureImage({ item, flags = 0, onLoad
     
     return () => {
       cancelled = true;
-      const coords = getIsolatedSpriteCoords(item, flags);
-      textureCacheManager.releaseTile(
-        item.texture_file_name,
-        coords.x,
-        coords.y
-      );
     };
-  }, [item.id, item.texture_file_name, item.texture_x, item.texture_y, flags]);
+  }, [item.id, item.texture_file_name, item.texture_x, item.texture_y, item.render_type, flags, onLoad]);
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-muted rounded">

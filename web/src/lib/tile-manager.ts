@@ -122,7 +122,6 @@ export class TileManager {
       }
 
       case TILE_RENDER_TYPE.ATTACH_TO_WALL_5: {
-        // This would require checking for solid tiles below
         break;
       }
 
@@ -180,7 +179,6 @@ export class TileManager {
       }
 
       case TILE_RENDER_TYPE.CAVE_PLAT: {
-        // STORAGE_SMART_EDGE_HORIZ_CAVE - Similar to horizontal but different context
         const right = this.isSameTile(tile, tileX + 1, tileY, isBackground);
         const left = this.isSameTile(tile, tileX - 1, tileY, isBackground);
 
@@ -197,7 +195,6 @@ export class TileManager {
       }
 
       case TILE_RENDER_TYPE.ATTACH_TO_WALL_4: {
-        // STORAGE_SMART_CLING2 - Similar to DIRECT4 but for items that attach to walls
         const top = (tileY > 0) 
           ? this.isSameTile(tile, tileX, tileY - 1, isBackground) : false;
         const left = (tileX > 0) 
@@ -253,5 +250,42 @@ export class TileManager {
 
   public updateItems(items: ItemRecord[]): void {
     this.itemsDatabase = new Map(items.map((item) => [item.id, item]));
+  }
+
+  public needsCompositeRendering(itemId: number): boolean {
+    const item = this.itemsDatabase.get(itemId);
+    if (!item) return false;
+
+    const isSeed = itemId % 2 === 1;
+    if (isSeed) return true;
+
+    const hasTree = item.tree_base_sprite !== 0 || item.tree_overlay_sprite !== 0;
+    return hasTree;
+  }
+
+  public getSeedRenderInfo(itemId: number): { baseSprite: number; overlaySprite: number; baseColor: number; overlayColor: number } | null {
+    const item = this.itemsDatabase.get(itemId);
+    if (!item || itemId % 2 !== 1) return null;
+
+    return {
+      baseSprite: item.seed_base_sprite,
+      overlaySprite: item.seed_overlay_sprite,
+      baseColor: item.base_color,
+      overlayColor: item.overlay_color
+    };
+  }
+
+  public getTreeRenderInfo(itemId: number): { baseSprite: number; overlaySprite: number; baseColor: number } | null {
+    const item = this.itemsDatabase.get(itemId);
+    if (!item || itemId % 2 === 1) return null;
+
+    const hasTree = item.tree_base_sprite !== 0 || item.tree_overlay_sprite !== 0;
+    if (!hasTree) return null;
+
+    return {
+      baseSprite: item.tree_base_sprite,
+      overlaySprite: item.tree_overlay_sprite,
+      baseColor: item.base_color
+    };
   }
 }

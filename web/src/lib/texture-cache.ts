@@ -66,8 +66,8 @@ class TextureCacheManager {
       const arrayBuffer = await rttexBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const pngData = await RTTEX.decode(uint8Array);
-      // @ts-expect-error something is wrong with the types, but it works
-      pngBlob = new Blob([pngData], { type: "image/png" });
+      // @ts-expect-error idk but it works
+      pngBlob = new Blob([pngData.buffer], { type: "image/png" });
 
       await cache.put(cacheKey, new Response(pngBlob.slice()));
     }
@@ -178,14 +178,12 @@ class TextureCacheManager {
     });
 
     const texturePromises = Array.from(byTexture.entries()).map(async ([textureFileName, tiles]) => {
-      const textureEntry = await this.getTexture(textureFileName);
       
       const tilePromises = tiles.map(async ({ index, x, y }) => {
         try {
           const url = await this.getCroppedTile(textureFileName, x, y);
           results[index] = url;
         } catch (error) {
-          console.error(`Failed to load tile ${textureFileName}:${x}:${y}`, error);
           results[index] = '';
         }
         
