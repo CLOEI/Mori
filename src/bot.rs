@@ -1016,45 +1016,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                                 inv.item_count
                                             ));
                                             self.inventory = inv.clone();
-                                            let slots: Vec<InvSlot> = inv
-                                                .items
-                                                .values()
-                                                .map(|i| InvSlot {
-                                                    item_id: i.id,
-                                                    amount: i.amount,
-                                                    is_active: i.flag & 1 != 0,
-                                                    action_type: self
-                                                        .items_dat
-                                                        .find_by_id(i.id as u32)
-                                                        .map(|info| info.action_type)
-                                                        .unwrap_or(0),
-                                                })
-                                                .collect();
-                                            {
-                                                let mut s = self.state.write().unwrap();
-                                                s.inventory = slots;
-                                                s.inventory_size = inv.size;
-                                            }
-                                            let ws_items: Vec<WsInvItem> = inv
-                                                .items
-                                                .values()
-                                                .map(|i| WsInvItem {
-                                                    item_id: i.id,
-                                                    amount: i.amount,
-                                                    is_active: i.flag & 1 != 0,
-                                                    action_type: self
-                                                        .items_dat
-                                                        .find_by_id(i.id as u32)
-                                                        .map(|info| info.action_type)
-                                                        .unwrap_or(0),
-                                                })
-                                                .collect();
-                                            self.emit(WsEvent::InventoryUpdate {
-                                                bot_id: self.bot_id,
-                                                gems: inv.gems,
-                                                inventory_size: inv.size,
-                                                items: ws_items,
-                                            });
+                                            self.emit_inventory_update();
                                         }
                                         Err(e) => self.log_console(format!(
                                             "[Bot] Inventory parse error: {e}"
@@ -1550,47 +1512,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     s.status = BotStatus::InGame;
                     if self.inventory.remove_temp_items() {
                         // something is removed
-                        let slots: Vec<InvSlot> = self
-                            .inventory
-                            .items
-                            .values()
-                            .map(|i| InvSlot {
-                                item_id: i.id,
-                                amount: i.amount,
-                                is_active: i.flag & 1 != 0,
-                                action_type: self
-                                    .items_dat
-                                    .find_by_id(i.id as u32)
-                                    .map(|info| info.action_type)
-                                    .unwrap_or(0),
-                            })
-                            .collect();
-                        {
-                            let mut s = self.state.write().unwrap();
-                            s.inventory = slots;
-                            s.inventory_size = self.inventory.size;
-                        }
-                        let ws_items: Vec<WsInvItem> = self
-                            .inventory
-                            .items
-                            .values()
-                            .map(|i| WsInvItem {
-                                item_id: i.id,
-                                amount: i.amount,
-                                is_active: i.flag & 1 != 0,
-                                action_type: self
-                                    .items_dat
-                                    .find_by_id(i.id as u32)
-                                    .map(|info| info.action_type)
-                                    .unwrap_or(0),
-                            })
-                            .collect();
-                        self.emit(WsEvent::InventoryUpdate {
-                            bot_id: self.bot_id,
-                            gems: self.inventory.gems,
-                            inventory_size: self.inventory.size,
-                            items: ws_items,
-                        });
+                        self.emit_inventory_update();
                     }
                 }
                 self.emit(WsEvent::BotStatus {
@@ -1843,6 +1765,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 "[Bot] ModifyItemInventory item={item_id} +{amount}"
             ));
         }
+        self.emit_inventory_update();
+    }
+
+    fn emit_inventory_update(&mut self) {
         let slots: Vec<InvSlot> = self
             .inventory
             .items
@@ -2024,47 +1950,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                             "[Bot] ItemCollect id={} count={}",
                             item.item_id, item.count
                         ));
-                        let slots: Vec<InvSlot> = self
-                            .inventory
-                            .items
-                            .values()
-                            .map(|i| InvSlot {
-                                item_id: i.id,
-                                amount: i.amount,
-                                is_active: i.flag & 1 != 0,
-                                action_type: self
-                                    .items_dat
-                                    .find_by_id(i.id as u32)
-                                    .map(|info| info.action_type)
-                                    .unwrap_or(0),
-                            })
-                            .collect();
-                        {
-                            let mut s = self.state.write().unwrap();
-                            s.inventory = slots;
-                            s.inventory_size = self.inventory.size;
-                        }
-                        let ws_items: Vec<WsInvItem> = self
-                            .inventory
-                            .items
-                            .values()
-                            .map(|i| WsInvItem {
-                                item_id: i.id,
-                                amount: i.amount,
-                                is_active: i.flag & 1 != 0,
-                                action_type: self
-                                    .items_dat
-                                    .find_by_id(i.id as u32)
-                                    .map(|info| info.action_type)
-                                    .unwrap_or(0),
-                            })
-                            .collect();
-                        self.emit(WsEvent::InventoryUpdate {
-                            bot_id: self.bot_id,
-                            gems: self.inventory.gems,
-                            inventory_size: self.inventory.size,
-                            items: ws_items,
-                        });
+                        self.emit_inventory_update();
                     }
                 }
             }
@@ -2182,6 +2068,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         pkt.flags = flags;
         self.send_game_packet(&pkt, true);
         self.sleep_ms(self.delays.place_ms);
+
+        if !is_punch && item_id != 18 && item_id != 32 {
+            self.inventory.sub_item(item_id as u16, 1);
+            self.emit_inventory_update();
+        }
     }
 
     pub fn punch(&mut self, offset_x: i32, offset_y: i32) {
