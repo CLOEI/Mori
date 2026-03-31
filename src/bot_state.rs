@@ -9,7 +9,7 @@ pub enum BotStatus {
     #[default]
     Connecting,
     Connected,
-    InWorld,
+    InGame,
     /// Blocked by 2FA (Advanced Account Protection). Retrying after 120 s.
     TwoFactorAuth,
     /// Server overloaded. Retrying after 30 s.
@@ -25,7 +25,7 @@ impl fmt::Display for BotStatus {
         match self {
             BotStatus::Connecting    => write!(f, "connecting"),
             BotStatus::Connected     => write!(f, "connected"),
-            BotStatus::InWorld       => write!(f, "in_world"),
+            BotStatus::InGame        => write!(f, "in_game"),
             BotStatus::TwoFactorAuth    => write!(f, "two_factor_auth"),
             BotStatus::ServerOverloaded => write!(f, "server_overloaded"),
             BotStatus::TooManyLogins    => write!(f, "too_many_logins"),

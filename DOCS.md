@@ -86,7 +86,7 @@ Returns a summary list of all running bots.
   {
     "id": 1,
     "username": "string",
-    "status": "in_world",
+    "status": "in_game",
     "world": "string",
     "pos_x": 0.0,
     "pos_y": 0.0,
@@ -167,7 +167,7 @@ Returns the full state of a bot.
 **Response**
 ```json
 {
-  "status": "in_world",
+  "status": "in_game",
   "world_name": "string",
   "pos_x": 0.0,
   "pos_y": 0.0,
@@ -540,7 +540,7 @@ Bot connection status changed.
   "event": "BotStatus",
   "data": {
     "bot_id": 1,
-    "status": "in_world"
+    "status": "in_game"
   }
 }
 ```
@@ -820,7 +820,7 @@ The bot's GrowID was resolved from the server. Fired after `SetHasGrowID` is rec
 |-------|-------------|
 | `connecting` | Initial state, attempting to connect |
 | `connected` | Connected to game server |
-| `in_world` | Logged in and inside a world |
+| `in_game` | In-game — world select screen or inside a world |
 | `two_factor_auth` | Blocked by 2FA — retries after `twofa_secs` |
 | `server_overloaded` | Server overloaded — retries after `server_overload_secs` |
 | `too_many_logins` | Too many concurrent logins — retries after `too_many_logins_secs` |

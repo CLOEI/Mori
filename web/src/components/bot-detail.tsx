@@ -37,7 +37,7 @@ import type { BotStatus } from "@/lib/api";
 const STATUS_DOT: Record<BotStatus, string> = {
   connecting: "bg-yellow-500",
   connected: "bg-blue-500",
-  in_world: "bg-emerald-500",
+  in_game: "bg-emerald-500",
   two_factor_auth: "bg-orange-500",
   server_overloaded: "bg-red-500",
   too_many_logins: "bg-purple-500",

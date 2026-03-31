@@ -51,7 +51,7 @@ async function external_req<T>(
 export type BotStatus =
   | "connecting"
   | "connected"
-  | "in_world"
+  | "in_game"
   | "two_factor_auth"
   | "server_overloaded"
   | "too_many_logins"

@@ -1103,7 +1103,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                             s.tiles = tiles;
                                             s.objects = objects;
                                             s.players = Vec::new();
-                                            s.status = BotStatus::InWorld;
+                                            s.status = BotStatus::InGame;
                                             // Emit world-loaded event with full tile data.
                                             let ws_tiles: Vec<WsTile> = world
                                                 .tile_map
@@ -1130,7 +1130,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                             drop(s);
                                             self.emit(WsEvent::BotStatus {
                                                 bot_id: self.bot_id,
-                                                status: "in_world".into(),
+                                                status: "in_game".into(),
                                             });
                                             self.emit(WsEvent::BotWorld {
                                                 bot_id: self.bot_id,
@@ -1384,11 +1384,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     ));
                     {
                         let mut s = self.state.write().unwrap();
-                        s.status = BotStatus::InWorld;
+                        s.status = BotStatus::InGame;
                     }
                     self.emit(WsEvent::BotStatus {
                         bot_id: self.bot_id,
-                        status: "in_world".into(),
+                        status: "in_game".into(),
                     });
                 } else {
                     let position = if let Some(pos_xy) = data.get("posXY") {
@@ -1547,7 +1547,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 {
                     let mut s = self.state.write().unwrap();
                     s.world_name = "EXIT".to_string();
-                    s.status = BotStatus::Connected;
+                    s.status = BotStatus::InGame;
                     if self.inventory.remove_temp_items() {
                         // something is removed
                         let slots: Vec<InvSlot> = self
@@ -1595,7 +1595,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 }
                 self.emit(WsEvent::BotStatus {
                     bot_id: self.bot_id,
-                    status: "connected".into(),
+                    status: "in_game".into(),
                 });
                 self.emit(WsEvent::BotWorld {
                     bot_id: self.bot_id,

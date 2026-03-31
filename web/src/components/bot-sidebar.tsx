@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 const STATUS_COLOR: Record<BotStatus, string> = {
   connecting: 'bg-yellow-500',
   connected: 'bg-blue-500',
-  in_world: 'bg-emerald-500',
+  in_game: 'bg-emerald-500',
   two_factor_auth: 'bg-orange-500',
   server_overloaded: 'bg-red-500',
   too_many_logins: 'bg-purple-500',
@@ -22,7 +22,7 @@ const STATUS_COLOR: Record<BotStatus, string> = {
 const STATUS_LABEL: Record<BotStatus, string> = {
   connecting: 'Connecting',
   connected: 'Connected',
-  in_world: 'In World',
+  in_game: 'In Game',
   two_factor_auth: '2FA',
   server_overloaded: 'Overloaded',
   too_many_logins: 'Too Many Logins',
