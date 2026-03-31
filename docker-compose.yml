@@ -1,9 +1,7 @@
 services:
   mori:
     build: .
-    ports:
-      - "3000:3000"
-    volumes:
+volumes:
       - mori-data:/app/data
 
 volumes:
