@@ -159,6 +159,65 @@ class TextureCacheManager {
     const keys = await cache.keys();
     await Promise.all(keys.map((key) => cache.delete(key)));
   }
+
+  /**
+   * Batch load multiple textures in parallel with progress tracking
+   * @param requests Array of texture requests { textureFileName, textureX, textureY }
+   * @param onProgress Optional callback for progress updates (loaded, total)
+   * @returns Promise resolving to array of cropped tile URLs in same order as requests
+   */
+  async batchLoadTiles(
+    requests: Array<{ textureFileName: string; textureX: number; textureY: number }>,
+    onProgress?: (loaded: number, total: number) => void
+  ): Promise<string[]> {
+    const results: string[] = new Array(requests.length);
+    let loadedCount = 0;
+
+    // Group requests by texture file to optimize loading
+    const byTexture = new Map<string, Array<{ index: number; x: number; y: number }>>();
+    
+    requests.forEach((req, index) => {
+      const key = req.textureFileName;
+      if (!byTexture.has(key)) {
+        byTexture.set(key, []);
+      }
+      byTexture.get(key)!.push({ index, x: req.textureX, y: req.textureY });
+    });
+
+    // Load textures in parallel with controlled concurrency
+    const texturePromises = Array.from(byTexture.entries()).map(async ([textureFileName, tiles]) => {
+      // Load the texture file once
+      const textureEntry = await this.getTexture(textureFileName);
+      
+      // Crop all tiles from this texture in parallel
+      const tilePromises = tiles.map(async ({ index, x, y }) => {
+        try {
+          const url = await this.getCroppedTile(textureFileName, x, y);
+          results[index] = url;
+        } catch (error) {
+          console.error(`Failed to load tile ${textureFileName}:${x}:${y}`, error);
+          results[index] = ''; // Empty string for failed loads
+        }
+        
+        loadedCount++;
+        onProgress?.(loadedCount, requests.length);
+      });
+
+      await Promise.all(tilePromises);
+    });
+
+    await Promise.all(texturePromises);
+    return results;
+  }
+
+  /**
+   * Pre-warm texture cache by loading texture files in background
+   * @param textureFileNames Array of texture file names to preload
+   */
+  async preloadTextures(textureFileNames: string[]): Promise<void> {
+    const promises = textureFileNames.map(fileName => this.getTexture(fileName));
+    await Promise.all(promises);
+  }
 }
 
 export const textureCacheManager = new TextureCacheManager();

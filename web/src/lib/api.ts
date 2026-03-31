@@ -1,6 +1,7 @@
 import { authStore } from './auth'
 
-const BASE = window.location.origin;
+// const BASE = window.location.origin;
+const BASE = "http://localhost:3000";
 
 async function req<T>(
   method: string,
