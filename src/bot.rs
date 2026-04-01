@@ -1873,7 +1873,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     bot_id: self.bot_id,
                     objects: ws_objs,
                 });
-                self.log_console(log_msg);
+                // self.log_console(log_msg);
             }
             net_id if net_id == u32::MAX - 2 => {
                 // Update count for an existing dropped item
