@@ -2186,8 +2186,44 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             return 0;
         }
 
+        {
+            let world = self.world.as_ref().unwrap();
+            let width = world.tile_map.width;
+            let height = world.tile_map.height;
+            let tiles: Vec<(u16, u8)> = world
+                .tile_map
+                .tiles
+                .iter()
+                .map(|t| {
+                    let ct = match &t.tile_type {
+                        TileType::Lock { .. } => 3,
+                        TileType::Door { .. } => 0,
+                        _ => self
+                            .items_dat
+                            .find_by_id(t.fg_item_id as u32)
+                            .map(|i| i.collision_type)
+                            .unwrap_or(if t.fg_item_id == 0 { 0 } else { 1 }),
+                    };
+                    (t.fg_item_id, ct)
+                })
+                .collect();
+            let _ = world;
+            self.astar.update_from_tiles(width, height, &tiles);
+        }
+
+        let from_x = (pos_x / 32.0) as u32;
+        let from_y = (pos_y / 32.0) as u32;
+        let has_access = self.has_access();
+
         let mut sent = 0;
         for (uid, x, y, item_id) in nearby.iter().take(MAX_PER_TICK) {
+            let tile_x = (*x / 32.0) as u32;
+            let tile_y = (*y / 32.0) as u32;
+            // Skip if there's no reachable path to the object's tile
+            if self.astar.find_path(from_x, from_y, tile_x, tile_y, has_access).is_none() {
+                continue;
+            }
+
             let can_collect = if *item_id == 112 {
                 // Gems always have room
                 true
