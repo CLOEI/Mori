@@ -234,6 +234,7 @@ enum CmdRequest {
         #[serde(default)]
         blacklist: Vec<u16>,
     },
+    AcceptAccess,
 }
 
 #[derive(Deserialize)]
@@ -338,6 +339,7 @@ async fn bot_cmd(
             radius_tiles,
             blacklist,
         },
+        CmdRequest::AcceptAccess => BotCommand::AcceptAccess,
     };
     if s.manager.lock().unwrap().send_cmd(id, cmd) {
         StatusCode::NO_CONTENT

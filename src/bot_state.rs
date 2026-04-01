@@ -188,6 +188,7 @@ pub enum BotCommand {
         radius_tiles: u8,
         blacklist: Vec<u16>,
     },
+    AcceptAccess,
 }
 
 pub type CmdSender   = mpsc::Sender<BotCommand>;

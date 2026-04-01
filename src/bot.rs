@@ -2628,6 +2628,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 st.collect_radius_tiles = self.collect_radius_tiles;
                 st.collect_blacklist = sorted_blacklist_vec(&self.collect_blacklist);
             }
+            BotCommand::AcceptAccess => self.accept_access(),
         }
     }
 

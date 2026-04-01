@@ -244,6 +244,12 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
               </Fragment>
             ))}
           </div>
+          <button
+            className="mt-2 w-full rounded border border-border bg-background px-2 py-1 text-xs hover:bg-accent"
+            onClick={() => api.sendCmd(bot.id, { type: "accept_access" })}
+          >
+            Accept Access
+          </button>
         </Section>
 
         <AutoCollectRangePanel

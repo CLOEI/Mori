@@ -316,6 +316,12 @@ Enable or disable automatic collection of nearby dropped items.
 { "type": "set_auto_collect", "enabled": true }
 ```
 
+#### `accept_access`
+Accept a world lock access request from the nearest player. Wrenches the player and confirms both dialogs in sequence.
+```json
+{ "type": "accept_access" }
+```
+
 ---
 
 ### GET `/growtopia-cdn/{*path}`
