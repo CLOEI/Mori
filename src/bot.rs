@@ -2590,6 +2590,13 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             BotCommand::Disconnect => {
                 self.disconnect();
             }
+            BotCommand::Reconnect => {
+                if self.peer_id.is_some() {
+                    self.disconnect();
+                } else {
+                    self.reconnect_main();
+                }
+            }
             BotCommand::Place { x, y, item } => {
                 self.place(x, y, item, false);
             }

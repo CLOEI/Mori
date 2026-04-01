@@ -323,6 +323,18 @@ Enable or disable automatic reconnection after a disconnect.
 { "type": "set_auto_reconnect", "enabled": true }
 ```
 
+#### `disconnect`
+Disconnect the bot from the current server. If auto-reconnect is enabled, the bot will reconnect automatically.
+```json
+{ "type": "disconnect" }
+```
+
+#### `reconnect`
+Force a reconnect. If the bot is currently connected, it disconnects first and reconnects via the normal disconnect handler. If already disconnected, reconnects immediately.
+```json
+{ "type": "reconnect" }
+```
+
 #### `accept_access`
 Accept a world lock access request from the nearest player. Wrenches the player and confirms both dialogs in sequence.
 ```json

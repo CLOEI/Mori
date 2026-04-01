@@ -3,6 +3,8 @@ import {
   X,
   Gem,
   Wifi,
+  PlugZap,
+  Unplug,
   ChevronUp,
   ChevronDown,
   ChevronLeft,
@@ -124,6 +126,20 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
             {bot.ping_ms}ms
           </span>
         )}
+        <button
+          title="Reconnect"
+          onClick={() => api.sendCmd(bot.id, { type: "reconnect" })}
+          className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <PlugZap className="w-3 h-3" />
+        </button>
+        <button
+          title="Disconnect"
+          onClick={() => api.sendCmd(bot.id, { type: "disconnect" })}
+          className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Unplug className="w-3 h-3" />
+        </button>
         <button
           onClick={() => setSelectedId(null)}
           className="ml-1 w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs transition-colors"

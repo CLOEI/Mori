@@ -175,6 +175,7 @@ pub enum BotCommand {
     Say { text: String },
     Warp { name: String, id: String },
     Disconnect,
+    Reconnect,
     Place { x: i32, y: i32, item: u32 },
     Hit { x: i32, y: i32 },
     Wrench { x: i32, y: i32 },

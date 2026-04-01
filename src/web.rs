@@ -235,6 +235,8 @@ enum CmdRequest {
         blacklist: Vec<u16>,
     },
     SetAutoReconnect { enabled: bool },
+    Disconnect,
+    Reconnect,
     AcceptAccess,
     Warp { name: String, id: String },
 }
@@ -342,6 +344,8 @@ async fn bot_cmd(
             blacklist,
         },
         CmdRequest::SetAutoReconnect { enabled } => BotCommand::SetAutoReconnect { enabled },
+        CmdRequest::Disconnect => BotCommand::Disconnect,
+        CmdRequest::Reconnect => BotCommand::Reconnect,
         CmdRequest::AcceptAccess => BotCommand::AcceptAccess,
         CmdRequest::Warp { name, id } => BotCommand::Warp { name, id },
     };
