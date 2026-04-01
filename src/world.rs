@@ -139,13 +139,6 @@ impl WorldTileMap {
             let pos_before = cur.pos();
             match Tile::parse(cur, map_version, x, y) {
                 Ok(t) => {
-                    let kind_name = format!("{:?}", std::mem::discriminant(&t.tile_type));
-                    if t.flags.contains(TileFlags::HAS_EXTRA_DATA) {
-                        eprintln!(
-                            "[tile {idx}] pos={pos_before} fg={} extra={kind_name}",
-                            t.fg_item_id
-                        );
-                    }
                     tiles.push(t);
                 }
                 Err(e) => {

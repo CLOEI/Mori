@@ -594,6 +594,7 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
     }
 
     fn reconnect_main(&mut self) {
+        self.host = Self::create_host(self.proxy.as_ref());
         self.refresh_token();
 
         let login_info = LoginInfo {
@@ -863,6 +864,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                             .parse()
                             .expect("Invalid redirect address");
                         self.log_console(format!("[Bot] Redirecting to {}:{}", r.server, r.port));
+                        self.host = Self::create_host(self.proxy.as_ref());
                         self.host.connect(addr, 2, 0);
                     } else if self.reconnect_after.is_some() {
                         // Delayed reconnect already scheduled (e.g. 2FA cooldown) — do nothing here.
@@ -1906,7 +1908,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         && o.x == pkt.vector_x.ceil()
                         && o.y == pkt.vector_y.ceil()
                 }) {
-                    obj.count += pkt.float_variable as u8;
+                    // TODO : check object count
+                    obj.count = pkt.float_variable as u8;
                 }
                 let ws_objs: Vec<WsObject> = world
                     .objects
