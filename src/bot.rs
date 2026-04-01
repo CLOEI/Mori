@@ -1841,10 +1841,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     flags: pkt.object_type,
                     uid: next_uid,
                 };
-                let log_msg = format!(
-                    "[Bot] ItemDrop id={} uid={} pos=({:.0},{:.0})",
-                    obj.item_id, obj.uid, obj.x, obj.y
-                );
+                // let log_msg = format!(
+                //     "[Bot] ItemDrop id={} uid={} count={} pos=({:.0},{:.0}) target_net_id={} object_type={} flags={:?}",
+                //     obj.item_id, obj.uid, obj.count, obj.x, obj.y,
+                //     pkt.target_net_id, pkt.object_type, pkt.flags
+                // );
                 world.objects.push(obj);
                 let ws_objs: Vec<WsObject> = world
                     .objects
@@ -1955,7 +1956,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         objects: ws_objs,
                     });
                     if pkt.net_id == self.local.net_id {
-                        self.inventory.add_item(item.item_id, item.count);
+                        let current = self.inventory.items
+                            .get(&item.item_id)
+                            .map(|i| i.amount)
+                            .unwrap_or(0);
+                        let to_add = item.count.min(200u8.saturating_sub(current));
+                        self.inventory.add_item(item.item_id, to_add);
                         self.log_console(format!(
                             "[Bot] ItemCollect id={} count={}",
                             item.item_id, item.count
