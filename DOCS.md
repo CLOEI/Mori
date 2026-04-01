@@ -322,6 +322,12 @@ Accept a world lock access request from the nearest player. Wrenches the player 
 { "type": "accept_access" }
 ```
 
+#### `warp`
+Warp the bot to a world by name. `id` is the door ID to enter through and defaults to an empty string (main door).
+```json
+{ "type": "warp", "name": "START", "id": "" }
+```
+
 ---
 
 ### GET `/growtopia-cdn/{*path}`

@@ -182,6 +182,39 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
 
 // ── Overview tab ────────────────────────────────────────────────────────────
 
+function WarpInput({ botId }: { botId: number }) {
+  const [worldName, setWorldName] = useState('')
+  const [doorId, setDoorId] = useState('')
+
+  const doWarp = () => {
+    const name = worldName.trim().toUpperCase()
+    if (!name) return
+    api.sendCmd(botId, { type: 'warp', name, id: doorId.trim() }).catch(() => {})
+  }
+
+  return (
+    <div className="flex gap-1 mb-2">
+      <Input
+        className="h-7 text-xs uppercase"
+        placeholder="World name"
+        value={worldName}
+        onChange={(e) => setWorldName(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && doWarp()}
+      />
+      <Input
+        className="h-7 text-xs w-16"
+        placeholder="Door"
+        value={doorId}
+        onChange={(e) => setDoorId(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && doWarp()}
+      />
+      <Button size="sm" className="h-7 text-xs px-2" onClick={doWarp}>
+        Warp
+      </Button>
+    </div>
+  )
+}
+
 function OverviewTab({ bot }: { bot: LiveBot }) {
   const players = [...bot.players.values()];
   const itemNames = useAtomValue(itemNamesAtom);
@@ -259,6 +292,7 @@ function OverviewTab({ bot }: { bot: LiveBot }) {
         />
 
         <Section label="Movement">
+          <WarpInput botId={bot.id} />
           <DPad botId={bot.id} />
         </Section>
 

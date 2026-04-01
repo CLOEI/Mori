@@ -235,6 +235,7 @@ enum CmdRequest {
         blacklist: Vec<u16>,
     },
     AcceptAccess,
+    Warp { name: String, id: String },
 }
 
 #[derive(Deserialize)]
@@ -340,6 +341,7 @@ async fn bot_cmd(
             blacklist,
         },
         CmdRequest::AcceptAccess => BotCommand::AcceptAccess,
+        CmdRequest::Warp { name, id } => BotCommand::Warp { name, id },
     };
     if s.manager.lock().unwrap().send_cmd(id, cmd) {
         StatusCode::NO_CONTENT

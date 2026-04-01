@@ -166,7 +166,8 @@ export type BotCmd =
     }
   | { type: "set_auto_collect"; enabled: boolean }
   | { type: "set_collect_config"; radius_tiles: number; blacklist: number[] }
-  | { type: "accept_access" };
+  | { type: "accept_access" }
+  | { type: "warp"; name: string; id: string };
 
 export interface ProxyTestRequest {
   proxy_host: string;
