@@ -225,7 +225,8 @@ Returns the full state of a bot.
     "global_playtime": 0,
     "awesomeness": 0
   },
-  "auto_collect": true
+  "auto_collect": true,
+  "auto_reconnect": true
 }
 ```
 
@@ -314,6 +315,12 @@ Configure action delays. `place_ms` and `walk_ms` are in milliseconds; the `*_se
 Enable or disable automatic collection of nearby dropped items.
 ```json
 { "type": "set_auto_collect", "enabled": true }
+```
+
+#### `set_auto_reconnect`
+Enable or disable automatic reconnection after a disconnect.
+```json
+{ "type": "set_auto_reconnect", "enabled": true }
 ```
 
 #### `accept_access`

@@ -82,6 +82,7 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
           auto_collect: s.auto_collect,
           collect_radius_tiles: s.collect_radius_tiles,
           collect_blacklist: s.collect_blacklist,
+          auto_reconnect: s.auto_reconnect,
         });
       });
     })
@@ -173,6 +174,7 @@ export function BotDetail({ bot }: { bot: LiveBot }) {
             botId={bot.id}
             delays={bot.delays}
             autoCollect={bot.auto_collect}
+            autoReconnect={bot.auto_reconnect}
           />
         </TabsContent>
       </Tabs>
@@ -586,6 +588,7 @@ function ConfigTab({
   botId,
   delays,
   autoCollect,
+  autoReconnect,
 }: {
   botId: number;
   delays: {
@@ -596,6 +599,7 @@ function ConfigTab({
     too_many_logins_secs: number;
   };
   autoCollect: boolean;
+  autoReconnect: boolean;
 }) {
   const [placeMs, setPlaceMs] = useState(String(delays.place_ms));
   const [walkMs, setWalkMs] = useState(String(delays.walk_ms));
@@ -760,6 +764,34 @@ function ConfigTab({
         />
         <span className="text-xs text-muted-foreground">
           Auto-collect dropped items
+        </span>
+      </label>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <Switch
+          size="sm"
+          checked={autoReconnect}
+          onCheckedChange={(enabled) => {
+            setBots((m) => {
+              const bot = m.get(botId);
+              if (!bot) return m;
+              return new Map(m).set(botId, { ...bot, auto_reconnect: enabled });
+            });
+            api
+              .sendCmd(botId, { type: "set_auto_reconnect", enabled })
+              .catch(() => {
+                setBots((m) => {
+                  const bot = m.get(botId);
+                  if (!bot) return m;
+                  return new Map(m).set(botId, {
+                    ...bot,
+                    auto_reconnect: !enabled,
+                  });
+                });
+              });
+          }}
+        />
+        <span className="text-xs text-muted-foreground">
+          Auto-reconnect on disconnect
         </span>
       </label>
     </div>

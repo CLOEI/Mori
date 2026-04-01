@@ -186,6 +186,8 @@ pub struct Bot {
     pub temporary_data: TemporaryData,
     /// Whether the run loop should auto-collect nearby dropped items.
     pub auto_collect: bool,
+    /// Whether the bot should automatically reconnect after a disconnect.
+    pub auto_reconnect: bool,
     /// Auto-collect range in tiles (1–5); pixel radius is `tiles × 32`.
     collect_radius_tiles: u8,
     /// Item IDs excluded from auto-collect.
@@ -400,6 +402,7 @@ impl Bot {
             cmd_rx,
             temporary_data: TemporaryData::default(),
             auto_collect: true,
+            auto_reconnect: true,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
@@ -552,6 +555,7 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             cmd_rx,
             temporary_data: TemporaryData::default(),
             auto_collect: true,
+            auto_reconnect: true,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
@@ -778,11 +782,13 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             if let Some(at) = self.reconnect_after {
                 if std::time::Instant::now() >= at {
                     self.reconnect_after = None;
-                    self.log_console(
-                        "[Bot] 2FA cooldown elapsed — re-fetching token and server data"
-                            .to_string(),
-                    );
-                    self.reconnect_main();
+                    if self.auto_reconnect {
+                        self.log_console(
+                            "[Bot] 2FA cooldown elapsed — re-fetching token and server data"
+                                .to_string(),
+                        );
+                        self.reconnect_main();
+                    }
                 }
             }
             while let Ok(cmd) = self.cmd_rx.try_recv() {
@@ -855,12 +861,16 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         self.host.connect(addr, 2, 0);
                     } else if self.reconnect_after.is_some() {
                         // Delayed reconnect already scheduled (e.g. 2FA cooldown) — do nothing here.
-                    } else {
+                    } else if self.auto_reconnect {
                         self.log_console(
                             "[Bot] Server disconnected — re-fetching token and server data"
                                 .to_string(),
                         );
                         self.reconnect_main();
+                    } else {
+                        self.log_console(
+                            "[Bot] Server disconnected — auto-reconnect is disabled".to_string(),
+                        );
                     }
                 }
 
@@ -2617,6 +2627,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             BotCommand::SetAutoCollect { enabled } => {
                 self.auto_collect = enabled;
                 self.state.write().unwrap().auto_collect = enabled;
+            }
+            BotCommand::SetAutoReconnect { enabled } => {
+                self.auto_reconnect = enabled;
+                self.state.write().unwrap().auto_reconnect = enabled;
             }
             BotCommand::SetCollectConfig {
                 radius_tiles,

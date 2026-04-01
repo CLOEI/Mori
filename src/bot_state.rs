@@ -134,6 +134,8 @@ pub struct BotState {
     pub collect_radius_tiles: u8,
     /// Item IDs to skip when auto-collecting (sorted, unique in API responses).
     pub collect_blacklist: Vec<u16>,
+    /// Whether the bot should automatically reconnect after a disconnect.
+    pub auto_reconnect: bool,
 }
 
 impl Default for BotState {
@@ -160,6 +162,7 @@ impl Default for BotState {
             auto_collect: true,
             collect_radius_tiles: 3,
             collect_blacklist: Vec::new(),
+            auto_reconnect: true,
         }
     }
 }
@@ -188,6 +191,7 @@ pub enum BotCommand {
         radius_tiles: u8,
         blacklist: Vec<u16>,
     },
+    SetAutoReconnect { enabled: bool },
     AcceptAccess,
 }
 

@@ -234,6 +234,7 @@ enum CmdRequest {
         #[serde(default)]
         blacklist: Vec<u16>,
     },
+    SetAutoReconnect { enabled: bool },
     AcceptAccess,
     Warp { name: String, id: String },
 }
@@ -340,6 +341,7 @@ async fn bot_cmd(
             radius_tiles,
             blacklist,
         },
+        CmdRequest::SetAutoReconnect { enabled } => BotCommand::SetAutoReconnect { enabled },
         CmdRequest::AcceptAccess => BotCommand::AcceptAccess,
         CmdRequest::Warp { name, id } => BotCommand::Warp { name, id },
     };

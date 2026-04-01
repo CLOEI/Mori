@@ -34,6 +34,7 @@ export interface LiveBot {
   auto_collect: boolean
   collect_radius_tiles: number
   collect_blacklist: number[]
+  auto_reconnect: boolean
 }
 
 export function makeBot(id: number, username: string): LiveBot {
@@ -50,6 +51,7 @@ export function makeBot(id: number, username: string): LiveBot {
     auto_collect: true,
     collect_radius_tiles: 3,
     collect_blacklist: [],
+    auto_reconnect: true,
   }
 }
 
