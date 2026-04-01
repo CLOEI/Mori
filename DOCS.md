@@ -843,6 +843,35 @@ The bot's GrowID was resolved from the server. Fired after `SetHasGrowID` is rec
 }
 ```
 
+#### `BotAutoCollect`
+Fired when the bot's auto-collect setting is changed — either via the HTTP API or from a Lua script.
+```json
+{
+  "event": "BotAutoCollect",
+  "data": {
+    "bot_id": 1,
+    "enabled": true
+  }
+}
+```
+
+#### `BotDelays`
+Fired when any delay value is changed — via the HTTP `set_delays` command or via `bot.place_delay` / `bot.walk_delay` from a Lua script. Always carries the full delays object.
+```json
+{
+  "event": "BotDelays",
+  "data": {
+    "bot_id": 1,
+    "place_ms": 500,
+    "walk_ms": 500,
+    "twofa_secs": 120,
+    "server_overload_secs": 30,
+    "too_many_logins_secs": 5,
+    "maintenance_secs": 600
+  }
+}
+```
+
 ---
 
 ## Reference

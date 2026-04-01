@@ -71,6 +71,20 @@ impl LuaUserData for BotProxy {
             p.request(Req::SetAutoCollect { enabled: v });
             Ok(())
         });
+        fields.add_field_method_get("place_delay", |_, p| {
+            match p.request(Req::GetPlaceDelay) { Rep::U32(v) => Ok(v), _ => Ok(500) }
+        });
+        fields.add_field_method_set("place_delay", |_, p, v: u64| {
+            p.request(Req::SetPlaceDelay { ms: v });
+            Ok(())
+        });
+        fields.add_field_method_get("walk_delay", |_, p| {
+            match p.request(Req::GetWalkDelay) { Rep::U32(v) => Ok(v), _ => Ok(500) }
+        });
+        fields.add_field_method_set("walk_delay", |_, p, v: u64| {
+            p.request(Req::SetWalkDelay { ms: v });
+            Ok(())
+        });
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {

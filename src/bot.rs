@@ -2503,6 +2503,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             }
             Req::SetAutoCollect { enabled } => {
                 self.auto_collect = enabled;
+                self.state.write().unwrap().auto_collect = enabled;
+                self.emit(WsEvent::BotAutoCollect { bot_id: self.bot_id, enabled });
                 Rep::Ack
             }
             Req::GetWorld => {
@@ -2542,6 +2544,36 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             Req::GetAutoCollect => Rep::Bool(self.auto_collect),
             Req::GetPing => Rep::U32(self.state.read().unwrap().ping_ms),
             Req::GetGems => Rep::I32(self.inventory.gems),
+            Req::SetPlaceDelay { ms } => {
+                self.delays.place_ms = ms;
+                self.state.write().unwrap().delays.place_ms = ms;
+                self.emit(WsEvent::BotDelays {
+                    bot_id: self.bot_id,
+                    place_ms: self.delays.place_ms,
+                    walk_ms: self.delays.walk_ms,
+                    twofa_secs: self.delays.twofa_secs,
+                    server_overload_secs: self.delays.server_overload_secs,
+                    too_many_logins_secs: self.delays.too_many_logins_secs,
+                    maintenance_secs: self.delays.maintenance_secs,
+                });
+                Rep::Ack
+            }
+            Req::SetWalkDelay { ms } => {
+                self.delays.walk_ms = ms;
+                self.state.write().unwrap().delays.walk_ms = ms;
+                self.emit(WsEvent::BotDelays {
+                    bot_id: self.bot_id,
+                    place_ms: self.delays.place_ms,
+                    walk_ms: self.delays.walk_ms,
+                    twofa_secs: self.delays.twofa_secs,
+                    server_overload_secs: self.delays.server_overload_secs,
+                    too_many_logins_secs: self.delays.too_many_logins_secs,
+                    maintenance_secs: self.delays.maintenance_secs,
+                });
+                Rep::Ack
+            }
+            Req::GetPlaceDelay => Rep::U32(self.delays.place_ms as u32),
+            Req::GetWalkDelay => Rep::U32(self.delays.walk_ms as u32),
         }
     }
 
@@ -2661,11 +2693,21 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             }
             BotCommand::SetDelays(d) => {
                 self.delays = d.clone();
-                self.state.write().unwrap().delays = d;
+                self.state.write().unwrap().delays = d.clone();
+                self.emit(WsEvent::BotDelays {
+                    bot_id: self.bot_id,
+                    place_ms: d.place_ms,
+                    walk_ms: d.walk_ms,
+                    twofa_secs: d.twofa_secs,
+                    server_overload_secs: d.server_overload_secs,
+                    too_many_logins_secs: d.too_many_logins_secs,
+                    maintenance_secs: d.maintenance_secs,
+                });
             }
             BotCommand::SetAutoCollect { enabled } => {
                 self.auto_collect = enabled;
                 self.state.write().unwrap().auto_collect = enabled;
+                self.emit(WsEvent::BotAutoCollect { bot_id: self.bot_id, enabled });
             }
             BotCommand::SetAutoReconnect { enabled } => {
                 self.auto_reconnect = enabled;

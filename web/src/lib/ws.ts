@@ -18,6 +18,8 @@ export type WsEventMap = {
   BotMove: { bot_id: number; x: number; y: number }
   BotGems: { bot_id: number; gems: number }
   BotPing: { bot_id: number; ping_ms: number }
+  BotAutoCollect: { bot_id: number; enabled: boolean }
+  BotDelays: { bot_id: number; place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number; maintenance_secs: number }
   BotTrackInfo: {
     bot_id: number
     level: number

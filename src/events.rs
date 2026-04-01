@@ -63,6 +63,10 @@ pub enum WsEvent {
     BotTrackInfo { bot_id: u32, level: u32, grow_id: u64, install_date: u64, global_playtime: u64, awesomeness: u32 },
     /// GrowID resolved from SetHasGrowID (useful when logged in via ltoken).
     BotUsername { bot_id: u32, username: String },
+    /// Bot auto-collect toggled.
+    BotAutoCollect { bot_id: u32, enabled: bool },
+    /// Bot delays updated.
+    BotDelays { bot_id: u32, place_ms: u64, walk_ms: u64, twofa_secs: u64, server_overload_secs: u64, too_many_logins_secs: u64, maintenance_secs: u64 },
 }
 
 pub type WsTx = tokio::sync::broadcast::Sender<WsEvent>;

@@ -125,6 +125,12 @@ export function useMoriStore() {
       ['BotPing', (d: { bot_id: number; ping_ms: number }) =>
         setBots((m) => patchBot(m, d.bot_id, { ping_ms: d.ping_ms }))],
 
+      ['BotAutoCollect', (d: { bot_id: number; enabled: boolean }) =>
+        setBots((m) => patchBot(m, d.bot_id, { auto_collect: d.enabled }))],
+
+      ['BotDelays', (d: { bot_id: number; place_ms: number; walk_ms: number; twofa_secs: number; server_overload_secs: number; too_many_logins_secs: number; maintenance_secs: number }) =>
+        setBots((m) => patchBot(m, d.bot_id, { delays: { place_ms: d.place_ms, walk_ms: d.walk_ms, twofa_secs: d.twofa_secs, server_overload_secs: d.server_overload_secs, too_many_logins_secs: d.too_many_logins_secs, maintenance_secs: d.maintenance_secs } }))],
+
       ['BotTrackInfo', (d: { bot_id: number; level: number; grow_id: number; install_date: number; global_playtime: number; awesomeness: number }) =>
         setBots((m) => patchBot(m, d.bot_id, {
           track_info: {

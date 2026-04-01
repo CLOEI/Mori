@@ -65,6 +65,8 @@ pub enum ScriptRequest {
     // State mutation
     SetMac { mac: String },
     SetAutoCollect { enabled: bool },
+    SetPlaceDelay { ms: u64 },
+    SetWalkDelay { ms: u64 },
 
     // Queries — bot replies with data
     GetWorld,
@@ -76,6 +78,8 @@ pub enum ScriptRequest {
     GetAutoCollect,
     GetPing,
     GetGems,
+    GetPlaceDelay,
+    GetWalkDelay,
 
 
 }
