@@ -216,7 +216,8 @@ Returns the full state of a bot.
     "walk_ms": 500,
     "twofa_secs": 120,
     "server_overload_secs": 30,
-    "too_many_logins_secs": 5
+    "too_many_logins_secs": 5,
+    "maintenance_secs": 600
   },
   "track_info": {
     "level": 0,
@@ -307,7 +308,8 @@ Configure action delays. `place_ms` and `walk_ms` are in milliseconds; the `*_se
   "walk_ms": 500,
   "twofa_secs": 120,
   "server_overload_secs": 30,
-  "too_many_logins_secs": 5
+  "too_many_logins_secs": 5,
+  "maintenance_secs": 600
 }
 ```
 
@@ -856,6 +858,7 @@ The bot's GrowID was resolved from the server. Fired after `SetHasGrowID` is rec
 | `server_overloaded` | Server overloaded — retries after `server_overload_secs` |
 | `too_many_logins` | Too many concurrent logins — retries after `too_many_logins_secs` |
 | `update_required` | Client update required — bot stops permanently |
+| `maintenance` | Server under maintenance — retries after `maintenance_secs` |
 
 ### Coordinates
 
@@ -870,3 +873,4 @@ All `x`/`y` values are in **tile coordinates** (pixels ÷ 32). The bot's positio
 | `twofa_secs` | 120s | Reconnect wait after 2FA block |
 | `server_overload_secs` | 30s | Reconnect wait after server overload |
 | `too_many_logins_secs` | 5s | Reconnect wait after too-many-logins rejection |
+| `maintenance_secs` | 600s | Reconnect wait after server maintenance rejection |

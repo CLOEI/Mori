@@ -225,6 +225,9 @@ pub struct Bot {
     /// Set when an `action|log` with "UPDATE REQUIRED" is received,
     /// so the subsequent `action|logon_fail` stops the bot entirely.
     pending_update_required: bool,
+    /// Set when an `action|log` with "undergoing maintenance" is received,
+    /// so the subsequent `action|logon_fail` knows to apply the 600 s cooldown.
+    pending_maintenance: bool,
     /// Set to true to make the `run` loop exit on the next iteration.
     stop_requested: bool,
     /// This bot's ID in the BotManager (used to tag WS events).
@@ -419,6 +422,7 @@ impl Bot {
             pending_server_overload: false,
             pending_too_many_logins: false,
             pending_update_required: false,
+            pending_maintenance: false,
             stop_requested: false,
             bot_id,
             ws_tx,
@@ -572,6 +576,7 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             pending_server_overload: false,
             pending_too_many_logins: false,
             pending_update_required: false,
+            pending_maintenance: false,
             stop_requested: false,
             bot_id,
             ws_tx,
@@ -917,6 +922,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                             if s.contains("action|log") && s.contains("UPDATE REQUIRED") {
                                 self.pending_update_required = true;
                             }
+                            if s.contains("action|log") && s.contains("undergoing maintenance") {
+                                self.pending_maintenance = true;
+                            }
                             if s.contains("action|logon_fail") {
                                 if self.pending_2fa {
                                     self.pending_2fa = false;
@@ -980,6 +988,21 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                         status: "update_required".into(),
                                     });
                                     self.stop_requested = true;
+                                } else if self.pending_maintenance {
+                                    self.pending_maintenance = false;
+                                    let secs = self.delays.maintenance_secs;
+                                    self.log_console(format!(
+                                        "[Bot] Logon failed — server maintenance. Retrying in {secs} s."
+                                    ));
+                                    self.state.write().unwrap().status = BotStatus::Maintenance;
+                                    self.reconnect_after = Some(
+                                        std::time::Instant::now()
+                                            + std::time::Duration::from_secs(secs),
+                                    );
+                                    self.emit(WsEvent::BotStatus {
+                                        bot_id: self.bot_id,
+                                        status: "maintenance".into(),
+                                    });
                                 } else {
                                     self.log_console(
                                         "[Bot] Logon failed — disconnecting to re-fetch token"

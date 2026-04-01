@@ -17,6 +17,7 @@ const STATUS_COLOR: Record<BotStatus, string> = {
   server_overloaded: 'bg-red-500',
   too_many_logins: 'bg-purple-500',
   update_required: 'bg-gray-500',
+  maintenance: 'bg-amber-500',
 }
 
 const STATUS_LABEL: Record<BotStatus, string> = {
@@ -27,6 +28,7 @@ const STATUS_LABEL: Record<BotStatus, string> = {
   server_overloaded: 'Overloaded',
   too_many_logins: 'Too Many Logins',
   update_required: 'Update Required',
+  maintenance: 'Maintenance',
 }
 
 export function BotSidebar({ onClose }: { onClose?: () => void }) {

@@ -18,6 +18,8 @@ pub enum BotStatus {
     TooManyLogins,
     /// Client is outdated — server requires an update. Bot stopped.
     UpdateRequired,
+    /// Server is under maintenance. Retrying after 600 s.
+    Maintenance,
 }
 
 impl fmt::Display for BotStatus {
@@ -30,6 +32,7 @@ impl fmt::Display for BotStatus {
             BotStatus::ServerOverloaded => write!(f, "server_overloaded"),
             BotStatus::TooManyLogins    => write!(f, "too_many_logins"),
             BotStatus::UpdateRequired   => write!(f, "update_required"),
+            BotStatus::Maintenance      => write!(f, "maintenance"),
         }
     }
 }
@@ -90,6 +93,7 @@ pub struct BotDelays {
     pub twofa_secs:           u64,
     pub server_overload_secs: u64,
     pub too_many_logins_secs: u64,
+    pub maintenance_secs:     u64,
 }
 
 impl Default for BotDelays {
@@ -100,6 +104,7 @@ impl Default for BotDelays {
             twofa_secs:           120,
             server_overload_secs: 30,
             too_many_logins_secs: 5,
+            maintenance_secs:     600,
         }
     }
 }

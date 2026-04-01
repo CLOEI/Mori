@@ -55,7 +55,8 @@ export type BotStatus =
   | "two_factor_auth"
   | "server_overloaded"
   | "too_many_logins"
-  | "update_required";
+  | "update_required"
+  | "maintenance";
 
 export interface BotSummary {
   id: number;
@@ -117,6 +118,7 @@ export interface BotState {
     twofa_secs: number;
     server_overload_secs: number;
     too_many_logins_secs: number;
+    maintenance_secs: number;
   };
   track_info: {
     level: number;
@@ -164,6 +166,7 @@ export type BotCmd =
       twofa_secs: number;
       server_overload_secs: number;
       too_many_logins_secs: number;
+      maintenance_secs: number;
     }
   | { type: "set_auto_collect"; enabled: boolean }
   | { type: "set_auto_reconnect"; enabled: boolean }

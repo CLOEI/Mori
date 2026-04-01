@@ -44,6 +44,7 @@ const STATUS_DOT: Record<BotStatus, string> = {
   server_overloaded: "bg-red-500",
   too_many_logins: "bg-purple-500",
   update_required: "bg-gray-500",
+  maintenance: "bg-amber-500",
 };
 
 export function BotDetail({ bot }: { bot: LiveBot }) {
@@ -613,6 +614,7 @@ function ConfigTab({
     twofa_secs: number;
     server_overload_secs: number;
     too_many_logins_secs: number;
+    maintenance_secs: number;
   };
   autoCollect: boolean;
   autoReconnect: boolean;
@@ -626,6 +628,9 @@ function ConfigTab({
   const [tooManyLoginsSecs, setTooManyLoginsSecs] = useState(
     String(delays.too_many_logins_secs),
   );
+  const [maintenanceSecs, setMaintenanceSecs] = useState(
+    String(delays.maintenance_secs),
+  );
   const [status, setStatus] = useState("");
   const setBots = useSetAtom(botsAtom);
 
@@ -636,12 +641,14 @@ function ConfigTab({
     setTwofaSecs(String(delays.twofa_secs));
     setServerOverloadSecs(String(delays.server_overload_secs));
     setTooManyLoginsSecs(String(delays.too_many_logins_secs));
+    setMaintenanceSecs(String(delays.maintenance_secs));
   }, [
     delays.place_ms,
     delays.walk_ms,
     delays.twofa_secs,
     delays.server_overload_secs,
     delays.too_many_logins_secs,
+    delays.maintenance_secs,
   ]);
 
   async function save() {
@@ -651,6 +658,7 @@ function ConfigTab({
       twofa_secs: parseInt(twofaSecs, 10),
       server_overload_secs: parseInt(serverOverloadSecs, 10),
       too_many_logins_secs: parseInt(tooManyLoginsSecs, 10),
+      maintenance_secs: parseInt(maintenanceSecs, 10),
     };
     try {
       await api.sendCmd(botId, { type: "set_delays", ...newDelays });
@@ -739,6 +747,19 @@ function ConfigTab({
             step={1}
             value={tooManyLoginsSecs}
             onChange={(e) => setTooManyLoginsSecs(e.target.value)}
+            className="h-7 text-xs"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">
+            Maintenance (s)
+          </span>
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={maintenanceSecs}
+            onChange={(e) => setMaintenanceSecs(e.target.value)}
             className="h-7 text-xs"
           />
         </label>
