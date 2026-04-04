@@ -196,6 +196,10 @@ pub struct Bot {
     collect_timer: std::time::Instant,
     /// A* pathfinder, re-used across find_path calls.
     astar: AStar,
+    /// While `Some`, we are routing to this tile; `OnSetPos` triggers replanning from server position.
+    pathfind_target: Option<(u32, u32)>,
+    /// Set during pathfinding when the server sends `OnSetPos` so we abandon the current segment and replan.
+    pathfind_recalc: bool,
     /// Configurable delays for bot actions.
     pub delays: BotDelays,
     /// Item database for collision-type lookups.
@@ -410,6 +414,8 @@ impl Bot {
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
             astar: AStar::new(),
+            pathfind_target: None,
+            pathfind_recalc: false,
             delays: BotDelays::default(),
             items_dat,
             event_tx: None,
@@ -564,6 +570,8 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
             astar: AStar::new(),
+            pathfind_target: None,
+            pathfind_recalc: false,
             delays: BotDelays::default(),
             items_dat,
             event_tx: None,
@@ -843,6 +851,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
                 enet::EventNoRef::Disconnect { peer: id, .. } => {
                     self.peer_id = None;
+                    self.pathfind_target = None;
+                    self.pathfind_recalc = false;
                     self.log_console(format!("[Bot] Disconnected: peer {}", id.0));
                     {
                         let mut s = self.state.write().unwrap();
@@ -1465,6 +1475,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 let (x, y) = vl.get(1).map(|v| v.as_vec2()).unwrap_or((0.0, 0.0));
                 self.pos_x = x;
                 self.pos_y = y;
+                if self.pathfind_target.is_some() {
+                    self.pathfind_recalc = true;
+                }
                 {
                     let mut s = self.state.write().unwrap();
                     s.pos_x = x / 32.0;
@@ -1541,6 +1554,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
             "OnRequestWorldSelectMenu" => {
                 self.world = None;
+                self.pathfind_target = None;
+                self.pathfind_recalc = false;
                 let removed = {
                     let mut s = self.state.write().unwrap();
                     s.world_name = "EXIT".to_string();
@@ -2316,44 +2331,85 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
     }
 
     pub fn find_path(&mut self, to_x: u32, to_y: u32) {
-        let world = match &self.world {
-            Some(w) => w,
-            None => return,
-        };
+        self.pathfind_target = Some((to_x, to_y));
+        self.pathfind_recalc = false;
 
-        let width = world.tile_map.width;
-        let height = world.tile_map.height;
+        while self.pathfind_target.is_some() {
+            let (goal_x, goal_y) = match self.pathfind_target {
+                Some(g) => g,
+                None => break,
+            };
 
-        // Build (fg_item_id, collision_type) pairs for the grid
-        let tiles: Vec<(u16, u8)> = world
-            .tile_map
-            .tiles
-            .iter()
-            .map(|t| {
-                let ct = match &t.tile_type {
-                    TileType::Door { .. } => 0, // doors are always passable
-                    _ => self
-                        .items_dat
-                        .find_by_id(t.fg_item_id as u32)
-                        .map(|i| i.collision_type)
-                        .unwrap_or(if t.fg_item_id == 0 { 0 } else { 1 }),
-                };
-                (t.fg_item_id, ct)
-            })
-            .collect();
+            let world = match &self.world {
+                Some(w) => w,
+                None => {
+                    self.pathfind_target = None;
+                    return;
+                }
+            };
 
-        self.astar.update_from_tiles(width, height, &tiles);
+            let width = world.tile_map.width;
+            let height = world.tile_map.height;
 
-        let from_x = (self.pos_x / 32.0) as u32;
-        let from_y = (self.pos_y / 32.0) as u32;
-        let has_access = self.has_access();
+            // Build (fg_item_id, collision_type) pairs for the grid
+            let tiles: Vec<(u16, u8)> = world
+                .tile_map
+                .tiles
+                .iter()
+                .map(|t| {
+                    let ct = match &t.tile_type {
+                        TileType::Door { .. } => 0, // doors are always passable
+                        _ => self
+                            .items_dat
+                            .find_by_id(t.fg_item_id as u32)
+                            .map(|i| i.collision_type)
+                            .unwrap_or(if t.fg_item_id == 0 { 0 } else { 1 }),
+                    };
+                    (t.fg_item_id, ct)
+                })
+                .collect();
 
-        let path = self.astar.find_path(from_x, from_y, to_x, to_y, has_access);
+            self.astar.update_from_tiles(width, height, &tiles);
 
-        if let Some(nodes) = path {
-            for node in nodes {
-                self.walk(node.x as i32, node.y as i32);
+            let from_x = (self.pos_x / 32.0) as u32;
+            let from_y = (self.pos_y / 32.0) as u32;
+            let has_access = self.has_access();
+
+            if from_x == goal_x && from_y == goal_y {
+                self.pathfind_target = None;
+                break;
             }
+
+            let path = self.astar.find_path(from_x, from_y, goal_x, goal_y, has_access);
+
+            let Some(nodes) = path else {
+                self.pathfind_target = None;
+                break;
+            };
+
+            self.pathfind_recalc = false;
+
+            for node in nodes {
+                let nx = node.x as u32;
+                let ny = node.y as u32;
+                let cx = (self.pos_x / 32.0) as u32;
+                let cy = (self.pos_y / 32.0) as u32;
+                if nx == cx && ny == cy {
+                    continue;
+                }
+
+                self.walk(node.x as i32, node.y as i32);
+
+                if self.pathfind_recalc {
+                    break;
+                }
+            }
+
+            if self.pathfind_recalc {
+                continue;
+            }
+
+            self.pathfind_target = None;
         }
     }
 
