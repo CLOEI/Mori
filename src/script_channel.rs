@@ -1,5 +1,5 @@
 use crate::inventory::Inventory;
-use crate::packet::GameUpdatePacket;
+use crate::protocol::packet::GameUpdatePacket;
 use crate::player::Player;
 use crate::world::World;
 

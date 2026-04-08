@@ -1,7 +1,7 @@
 use std::time::Duration;
 use scraper::{Html, Selector};
 use crate::constants::FHASH;
-use crate::crypto::{compute_klv, hash_string, generate_rid};
+use crate::protocol::crypto::{compute_klv, generate_rid, hash_string};
 use crate::server_data::LoginInfo;
 use serde_json;
 

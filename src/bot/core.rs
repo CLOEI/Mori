@@ -4,39 +4,25 @@ use crate::bot_state::{
     WorldObjectInfo,
 };
 use crate::constants::{FHASH, GAME_VER, PROTOCOL};
-use crate::crypto::{compute_klv, generate_rid, hash_string, random_hex, random_mac};
-use crate::dashboard::get_dashboard_proxied;
+use crate::protocol::crypto::{compute_klv, generate_rid, hash_string, random_hex, random_mac};
 use crate::events::{WsEvent, WsInvItem, WsObject, WsTile, WsTx};
 use crate::inventory::Inventory;
 use crate::items::ItemsDat;
-use crate::login::{LoginError, check_token, get_legacy_token_proxied};
-use crate::packet::{self, GamePacketType, GameUpdatePacket, IncomingPacket};
+use crate::login::check_token;
+use crate::protocol::packet::{self, GamePacketType, GameUpdatePacket, IncomingPacket};
 use crate::player::{LocalPlayer, Player, parse_pipe_map};
 use crate::server_data::{LoginInfo, get_server_data_proxied};
 use crate::socks5::Socks5UdpSocket;
-use crate::variant::VariantList;
+use crate::protocol::variant::VariantList;
 use crate::world::{TileType, World, WorldObject};
 use rusty_enet as enet;
 use std::collections::HashSet;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
-#[derive(Clone, Debug)]
-pub struct Socks5Config {
-    pub proxy_addr: SocketAddr,
-    pub username: Option<String>,
-    pub password: Option<String>,
-}
-
-impl Socks5Config {
-    pub fn to_url(&self) -> String {
-        match (&self.username, &self.password) {
-            (Some(u), Some(p)) => format!("socks5://{}:{}@{}", u, p, self.proxy_addr),
-            _ => format!("socks5://{}", self.proxy_addr),
-        }
-    }
-}
+use super::auth::fetch_credentials;
+use super::shared::{BotEventRaw, Socks5Config, TemporaryData};
 
 enum BotHost {
     Direct(enet::Host<UdpSocket>),
@@ -100,29 +86,6 @@ impl BotHost {
             Self::Socks5(h) => {
                 h.peer_mut(id).disconnect(data);
             }
-        }
-    }
-}
-
-/// Raw event pushed to `Bot::event_queue` by packet handlers.
-/// Drained by Lua's `listenEvents` loop to fire registered callbacks.
-pub enum BotEventRaw {
-    VariantList { vl: VariantList, net_id: u32 },
-    GameUpdate { pkt: GameUpdatePacket },
-    GameMessage { text: String },
-}
-
-/// Callback invoked on the next `OnDialogRequest`, then cleared.
-type DialogCallback = Box<dyn FnOnce(&mut Bot) + Send>;
-
-pub struct TemporaryData {
-    pub dialog_callback: Mutex<Option<DialogCallback>>,
-}
-
-impl Default for TemporaryData {
-    fn default() -> Self {
-        Self {
-            dialog_callback: Mutex::new(None),
         }
     }
 }
@@ -240,101 +203,6 @@ pub struct Bot {
     ws_tx: Option<WsTx>,
     /// Last broadcast ping value — used to suppress redundant BotPing events.
     last_ping: u32,
-}
-
-struct Credentials {
-    ltoken: String,
-    meta: String,
-    addr: SocketAddr,
-}
-
-fn fetch_credentials(
-    username: &str,
-    password: &str,
-    proxy: Option<&Socks5Config>,
-    log: &mut dyn FnMut(String),
-) -> Credentials {
-    let proxy_url = proxy.map(|p| p.to_url());
-    let proxy_url = proxy_url.as_deref();
-
-    let login_info = LoginInfo {
-        protocol: PROTOCOL,
-        game_version: GAME_VER.into(),
-    };
-
-    let mut alternate = false;
-    loop {
-        log(format!(
-            "[Bot] fetching server_data (alternate={alternate})..."
-        ));
-        let server_data = match get_server_data_proxied(alternate, &login_info, proxy_url) {
-            Ok(s) => s,
-            Err(e) => {
-                alternate = !alternate;
-                log(format!(
-                    "[Bot] fetch: server_data failed: {e} — retrying in 5s"
-                ));
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                continue;
-            }
-        };
-
-        let dashboard = match get_dashboard_proxied(
-            &server_data.loginurl,
-            &login_info,
-            &server_data.meta,
-            proxy_url,
-        ) {
-            Ok(d) => d,
-            Err(e) => {
-                log(format!(
-                    "[Bot] fetch: dashboard failed: {e} — retrying in 5s"
-                ));
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                continue;
-            }
-        };
-
-        let growtopia_url = match dashboard.growtopia {
-            Some(u) => u,
-            None => {
-                log(format!(
-                    "[Bot] fetch: no Growtopia URL in dashboard — retrying in 5s"
-                ));
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                continue;
-            }
-        };
-
-        let ltoken = match get_legacy_token_proxied(&growtopia_url, username, password, proxy_url) {
-            Ok(t) => t,
-            Err(e) => {
-                log(format!("[Bot] fetch: login failed: {e}"));
-                if matches!(e, LoginError::Exhausted) {
-                    log(format!("[Bot] login attempts exhausted — stopping"));
-                    panic!("[Bot] login attempts exhausted — stopping");
-                }
-                if matches!(e, LoginError::WrongCredentials) {
-                    log(format!("[Bot] wrong credentials — stopping"));
-                    panic!("[Bot] wrong credentials — stopping");
-                }
-                log(format!("[Bot] retrying in 5s"));
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                continue;
-            }
-        };
-
-        let addr: SocketAddr = format!("{}:{}", server_data.server, server_data.port)
-            .parse()
-            .expect("Invalid server address");
-
-        log(format!("[Bot] Got token: {ltoken}"));
-        return Credentials {
-            ltoken,
-            meta: server_data.meta,
-            addr,
-        };
-    }
 }
 
 fn sorted_blacklist_vec(set: &HashSet<u16>) -> Vec<u16> {
@@ -484,7 +352,7 @@ impl Bot {
         let log_state = Arc::clone(&state);
         let log_ws_tx = ws_tx.clone();
         let log_bot_id = bot_id;
-        let mut log_fn = move |msg: String| {
+        let log_fn = move |msg: String| {
             println!("{msg}");
             {
                 let mut s = log_state.write().unwrap();
@@ -2693,7 +2561,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 let username = self.username.clone();
 
                 std::thread::spawn(move || {
-                    crate::lua_api::run_script_threaded(
+                    crate::lua::run_script_threaded(
                         req_tx, reply_rx, event_rx, items, state, stop_flag, username, content,
                     );
                 });
@@ -2933,3 +2801,4 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             .collect()
     }
 }
+
