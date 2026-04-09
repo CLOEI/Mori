@@ -9,6 +9,15 @@
   "contributorsPerLine": 7,
   "contributors": [
     {
+      "login": "CLOEI",
+      "name": "Cendy",
+      "avatar_url": "https://avatars.githubusercontent.com/u/57063107?v=4",
+      "profile": "http://cendy.xyz",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
       "login": "badewen",
       "name": "badewen",
       "avatar_url": "https://avatars.githubusercontent.com/u/81739844?v=4",
