@@ -1,4 +1,4 @@
-# Web build stage - Run on build platform (native)
+# Web build stage
 FROM --platform=$BUILDPLATFORM oven/bun:1 AS web-builder
 
 WORKDIR /app
@@ -20,12 +20,16 @@ RUN apt-get update && apt-get install -y \
     lld \
     pkg-config \
     git \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETPLATFORM
 
 # Install cross-compilation dependencies for the target
 RUN xx-apt-get update && xx-apt-get install -y \
+    binutils \
+    gcc \
+    g++ \
     libc6-dev \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -35,13 +39,17 @@ WORKDIR /app
 # Cache dependencies
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-# xx-cargo automatically sets the correct target and linker
-RUN xx-cargo build --release && xx-verify target/$(xx-cargo --print-target-triple)/release/Mori
+
+# Use xx-cargo for cross-compilation
+RUN xx-cargo build --release && \
+    xx-verify target/$(xx-cargo --print-target-triple)/release/Mori
+
 RUN rm -rf src
 
 # Build the actual project
 COPY src ./src
-RUN touch src/main.rs && xx-cargo build --release && \
+RUN touch src/main.rs && \
+    xx-cargo build --release && \
     cp target/$(xx-cargo --print-target-triple)/release/Mori /app/Mori && \
     xx-verify /app/Mori
 
