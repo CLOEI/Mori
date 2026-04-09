@@ -91,6 +91,7 @@ Thanks to everyone who has contributed to Mori!
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="http://cendy.xyz"><img src="https://avatars.githubusercontent.com/u/57063107?v=4?s=100" width="100px;" alt="Cendy"/><br /><sub><b>Cendy</b></sub></a><br /><a href="#code-CLOEI" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/badewen"><img src="https://avatars.githubusercontent.com/u/81739844?v=4?s=100" width="100px;" alt="badewen"/><br /><sub><b>badewen</b></sub></a><br /><a href="#research-badewen" title="Research">🔬</a> <a href="#bug-badewen" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://jad.li"><img src="https://avatars.githubusercontent.com/u/48410066?v=4?s=100" width="100px;" alt="Hendra Gunawan"/><br /><sub><b>Hendra Gunawan</b></sub></a><br /><a href="#design-JadlionHD" title="Design">🎨</a></td>
     </tr>
   </tbody>
 </table>
