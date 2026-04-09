@@ -1,4 +1,22 @@
 {
   "projectName": "Mori",
-  "projectOwner": "Cendy"
+  "projectOwner": "CLOEI",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "badewen",
+      "name": "badewen",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81739844?v=4",
+      "profile": "https://github.com/badewen",
+      "contributions": [
+        "research",
+        "bug"
+      ]
+    }
+  ]
 }
