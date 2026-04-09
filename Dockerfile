@@ -41,9 +41,7 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Use xx-cargo for cross-compilation
-RUN xx-cargo build --release && \
-    xx-verify target/$(xx-cargo --print-target-triple)/release/Mori
-
+RUN xx-cargo build --release
 RUN rm -rf src
 
 # Build the actual project
