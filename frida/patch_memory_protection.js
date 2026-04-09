@@ -1,3 +1,5 @@
+// This script patches the ZwProtectVirtualMemory function in ntdll.dll to always return 0x50 (PAGE_EXECUTE_READWRITE).
+
 const module = Process.getModuleByName("ntdll.dll")
 const ZwProtectVirtualMemoryAddress = module.findExportByName("ZwProtectVirtualMemory");
 console.log("ZwProtectVirtualMemory address: " + ZwProtectVirtualMemoryAddress);
