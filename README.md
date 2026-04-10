@@ -111,6 +111,7 @@ Thanks to everyone who has contributed to Mori!
       <td align="center" valign="top" width="14.28%"><a href="https://jad.li"><img src="https://avatars.githubusercontent.com/u/48410066?v=4?s=100" width="100px;" alt="Hendra Gunawan"/><br /><sub><b>Hendra Gunawan</b></sub></a><br /><a href="#design-JadlionHD" title="Design">🎨</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ToyFarms"><img src="https://avatars.githubusercontent.com/u/121172018?v=4?s=100" width="100px;" alt="shafarrahman"/><br /><sub><b>shafarrahman</b></sub></a><br /><a href="#bug-ToyFarms" title="Bug reports">🐛</a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://zephrynis.me"><img src="https://avatars.githubusercontent.com/u/132010650?v=4?s=100" width="100px;" alt="Zephrynis"/><br /><sub><b>Zephrynis</b></sub></a><br /><a href="#code-zephrynis" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://portofolio-adipati-nuxt.vercel.app/"><img src="https://avatars.githubusercontent.com/u/43718266?v=4?s=100" width="100px;" alt="Muhammad Adipati Rezkya"/><br /><sub><b>Muhammad Adipati Rezkya</b></sub></a><br /><a href="#code-dipaadipati" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
