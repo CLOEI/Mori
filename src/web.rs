@@ -13,6 +13,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
+use std::net::{ToSocketAddrs, SocketAddr};
 
 use crate::auth::AuthState;
 use crate::bot::Socks5Config;
@@ -154,7 +155,16 @@ async fn spawn_bot(
 ) -> Json<serde_json::Value> {
     let proxy = match (req.proxy_host, req.proxy_port) {
         (Some(host), Some(port)) => {
-            let addr = format!("{}:{}", host, port).parse().ok();
+            let addr = format!("{}:{}", host, port)
+            .parse()
+            .or_else(|_| {
+                // Try to resolve the host if it's not a valid socket address
+                let mut addrs = format!("{}:{}", host, port)
+                    .to_socket_addrs()
+                    .map_err(|_| StatusCode::BAD_REQUEST)?;
+                addrs.next().ok_or(StatusCode::BAD_REQUEST)
+            })
+            .ok();
             addr.map(|proxy_addr| Socks5Config {
                 proxy_addr,
                 username: req.proxy_username,
@@ -371,7 +381,13 @@ async fn proxy_check(
 ) -> Result<Json<ProxyTestResult>, StatusCode> {
     let addr = format!("{}:{}", req.proxy_host, req.proxy_port)
         .parse()
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+        .or_else(|_| {
+            // Try to resolve the host if it's not a valid socket address
+            let mut addrs = format!("{}:{}", req.proxy_host, req.proxy_port)
+                .to_socket_addrs()
+                .map_err(|_| StatusCode::BAD_REQUEST)?;
+            addrs.next().ok_or(StatusCode::BAD_REQUEST)
+        })?;
 
     let cfg = Socks5Config {
         proxy_addr: addr,
