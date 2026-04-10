@@ -515,6 +515,7 @@ pub async fn serve(manager: SharedManager, ws_tx: WsTx) {
         .route("/bots/{id}", delete(stop_bot))
         .route("/bots/{id}/state", get(bot_state))
         .route("/bots/{id}/cmd", post(bot_cmd))
+        .route("/bots/{id}/script", get(bot_script))
         .route("/items", get(list_items))
         .route("/items/names", get(item_names))
         .route("/items/colors", get(item_colors))
