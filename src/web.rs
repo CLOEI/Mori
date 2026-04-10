@@ -359,10 +359,26 @@ async fn bot_cmd(
         CmdRequest::AcceptAccess => BotCommand::AcceptAccess,
         CmdRequest::Warp { name, id } => BotCommand::Warp { name, id },
     };
+    if let BotCommand::RunScript { content } = &cmd {
+        if let Err(e) = std::fs::write("script.lua", content) {
+            eprintln!("Failed to write script.lua: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    }
     if s.manager.lock().unwrap().send_cmd(id, cmd) {
         StatusCode::NO_CONTENT
     } else {
         StatusCode::NOT_FOUND
+    }
+}
+
+async fn bot_script(
+    State(s): State<AppState>,
+    Path(id): Path<u32>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    match std::fs::read_to_string("script.lua") {
+        Ok(content) => Ok(Json(serde_json::json!({ "content": content }))),
+        Err(_) => Err(StatusCode::NOT_FOUND),
     }
 }
 

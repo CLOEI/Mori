@@ -552,6 +552,14 @@ function ScriptTab({ botId }: { botId: number }) {
   const [script, setScript] = useState("");
   const [status, setStatus] = useState("");
 
+  useEffect(() => {
+    api.getBotScript(botId).then((s) => {
+      setScript(s.content);
+    }).catch(() => {
+      setScript("");
+    });
+  }, []);
+
   async function run() {
     try {
       await api.sendCmd(botId, { type: "run_script", content: script });

@@ -160,14 +160,14 @@ export type BotCmd =
   | { type: "drop"; item_id: number; count: number }
   | { type: "trash"; item_id: number; count: number }
   | {
-      type: "set_delays";
-      place_ms: number;
-      walk_ms: number;
-      twofa_secs: number;
-      server_overload_secs: number;
-      too_many_logins_secs: number;
-      maintenance_secs: number;
-    }
+    type: "set_delays";
+    place_ms: number;
+    walk_ms: number;
+    twofa_secs: number;
+    server_overload_secs: number;
+    too_many_logins_secs: number;
+    maintenance_secs: number;
+  }
   | { type: "set_auto_collect"; enabled: boolean }
   | { type: "set_auto_reconnect"; enabled: boolean }
   | { type: "disconnect" }
@@ -271,6 +271,7 @@ export const api = {
   getBotState: (id: number) => req<BotState>("GET", `/bots/${id}/state`),
   sendCmd: (id: number, cmd: BotCmd) =>
     req<void>("POST", `/bots/${id}/cmd`, cmd),
+  getBotScript: (id: number) => req<{ content: string }>("GET", `/bots/${id}/script`),
   getItemNames: () => req<Record<string, string>>("GET", "/items/names"),
   getItemColors: () => req<Record<string, number>>("GET", "/items/colors"),
   getItems: (page = 1, q = "") =>
