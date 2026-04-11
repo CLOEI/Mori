@@ -13,7 +13,7 @@ use super::http::register_http_client;
 use super::webhook::register_webhook;
 use super::types::{
     BotProxy, LuaConsole, LuaGameUpdatePacket, LuaInventory, LuaInventoryItem, LuaItemInfo,
-    LuaLogin, LuaNetObject, LuaPlayer, LuaTile, LuaVariant, LuaVariantList, LuaWorld,
+    LuaLogin, LuaNetObject, LuaNpc, LuaPlayer, LuaTile, LuaVariant, LuaVariantList, LuaWorld,
 };
 
 impl LuaUserData for BotProxy {
@@ -338,6 +338,13 @@ impl LuaUserData for LuaWorld {
             }
             Ok(t)
         });
+        fields.add_field_method_get("npcs", |lua, w| {
+            let t = lua.create_table()?;
+            for (i, n) in w.world.npcs.iter().enumerate() {
+                t.set(i + 1, LuaNpc(n.clone()))?;
+            }
+            Ok(t)
+        });
     }
 
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
@@ -425,6 +432,18 @@ impl LuaUserData for LuaWorld {
             }
             let idx = tile.0.parent_block as usize;
             Ok(w.world.tile_map.tiles.get(idx).cloned().map(LuaTile))
+        });
+
+        methods.add_method("getNPC", |_, w, id: u8| {
+            Ok(w.world.npcs.iter().find(|n| n.id == id).cloned().map(LuaNpc))
+        });
+
+        methods.add_method("getNPCs", |lua, w, ()| {
+            let t = lua.create_table()?;
+            for (i, n) in w.world.npcs.iter().enumerate() {
+                t.set(i + 1, LuaNpc(n.clone()))?;
+            }
+            Ok(t)
         });
 
         methods.add_method("hasAccess", |_, _w, ()| Ok(false));
@@ -600,6 +619,21 @@ impl LuaUserData for LuaNetObject {
         fields.add_field_method_get("count", |_, o| Ok(o.0.count));
         fields.add_field_method_get("flags", |_, o| Ok(o.0.flags));
         fields.add_field_method_get("oid",   |_, o| Ok(o.0.uid));
+    }
+}
+
+// ── LuaNpc ───────────────────────────────────────────────────────────────────
+
+impl LuaUserData for LuaNpc {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("type",  |_, n| Ok(n.0.npc_type));
+        fields.add_field_method_get("id",    |_, n| Ok(n.0.id));
+        fields.add_field_method_get("x",     |_, n| Ok(n.0.x));
+        fields.add_field_method_get("y",     |_, n| Ok(n.0.y));
+        fields.add_field_method_get("destx", |_, n| Ok(n.0.dest_x));
+        fields.add_field_method_get("desty", |_, n| Ok(n.0.dest_y));
+        fields.add_field_method_get("var",   |_, n| Ok(n.0.var));
+        fields.add_field_method_get("unk",   |_, n| Ok(n.0.unk1));
     }
 }
 
@@ -1050,9 +1084,13 @@ function getObjects()
     return {}
 end
 function getNPC(id)
+    local w = getBot():getWorld()
+    if w then return w:getNPC(id) end
     return nil
 end
 function getNPCs()
+    local w = getBot():getWorld()
+    if w then return w:getNPCs() end
     return {}
 end
 function hasAccess(x, y)

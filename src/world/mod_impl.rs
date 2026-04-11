@@ -11,6 +11,7 @@ pub struct World {
     pub flags: u32,
     pub tile_map: WorldTileMap,
     pub objects: Vec<WorldObject>,
+    pub npcs: Vec<WorldNpc>,
     pub next_object_uid: u32,
     pub base_weather: u16,
     pub current_weather: u16,
@@ -20,6 +21,18 @@ impl World {
     pub fn get_tile(&self, x: u32, y: u32) -> Option<&Tile> {
         let idx = (y as usize).checked_mul(self.tile_map.width as usize)?.checked_add(x as usize)?;
         self.tile_map.tiles.get(idx)
+    }
+
+    pub fn set_npc(&mut self, npc: WorldNpc) {
+        if let Some(existing) = self.npcs.iter_mut().find(|n| n.id == npc.id) {
+            *existing = npc;
+        } else {
+            self.npcs.push(npc);
+        }
+    }
+
+    pub fn remove_npc(&mut self, id: u8) {
+        self.npcs.retain(|n| n.id != id);
     }
 
     pub fn get_tile_mut(&mut self, x: u32, y: u32) -> Option<&mut Tile> {
@@ -83,6 +96,7 @@ impl World {
             flags,
             tile_map,
             objects,
+            npcs: Vec::new(),
             next_object_uid,
             base_weather,
             current_weather,
@@ -1275,6 +1289,58 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             Ok(TileType::Unknown { kind })
         }
     }
+}
+
+// ── WorldNpc ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum NpcAction {
+    FullState       = 0,
+    Delete          = 1,
+    Add             = 2,
+    MoveTo          = 3,
+    Sucked          = 4,
+    Burp            = 5,
+    Teleport        = 6,
+    Die             = 7,
+    Punch           = 8,
+    Ouch            = 9,
+    Attack          = 10,
+    PrepareToAttack = 11,
+}
+
+impl NpcAction {
+    pub fn from_u8(v: u8) -> Option<Self> {
+        match v {
+            0  => Some(Self::FullState),
+            1  => Some(Self::Delete),
+            2  => Some(Self::Add),
+            3  => Some(Self::MoveTo),
+            4  => Some(Self::Sucked),
+            5  => Some(Self::Burp),
+            6  => Some(Self::Teleport),
+            7  => Some(Self::Die),
+            8  => Some(Self::Punch),
+            9  => Some(Self::Ouch),
+            10 => Some(Self::Attack),
+            11 => Some(Self::PrepareToAttack),
+            _  => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WorldNpc {
+    pub npc_type: u8,
+    pub id:       u8,
+    pub x:        f32,
+    pub y:        f32,
+    pub dest_x:   f32,
+    pub dest_y:   f32,
+    pub unk1:     f32,
+    pub unk2:     f32,
+    pub var:      f32,
 }
 
 // ── WorldObject ───────────────────────────────────────────────────────────────
