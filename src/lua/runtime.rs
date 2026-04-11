@@ -872,7 +872,10 @@ fn run_script_inner(
     username:  String,
     script:    String,
 ) {
-    let lua = Lua::new();
+    let lua = Lua::new_with(
+        mlua::StdLib::TABLE | mlua::StdLib::STRING | mlua::StdLib::MATH | mlua::StdLib::IO,
+        mlua::LuaOptions::default(),
+    ).expect("lua init failed");
 
     let stop_hook = stop_flag.clone();
     let _ = lua.set_hook(
