@@ -9,7 +9,8 @@ use crate::script_channel::{ScriptRequest as Req, ScriptReply as Rep};
 use crate::protocol::variant::Variant;
 use crate::world::{TileFlags, TileType};
 
-use super::http::make_http_request;
+use super::http::register_http_client;
+use super::webhook::register_webhook;
 use super::types::{
     BotProxy, LuaConsole, LuaGameUpdatePacket, LuaInventory, LuaInventoryItem, LuaItemInfo,
     LuaLogin, LuaNetObject, LuaPlayer, LuaTile, LuaVariant, LuaVariantList, LuaWorld,
@@ -923,26 +924,11 @@ fn run_script_inner(
             })?)?;
         }
 
-        // ── http.get/post/put/delete ─────────────────────────────────────────
-        {
-            let http = lua.create_table()?;
-            http.set("request", lua.create_function(|lua, (method, url, opts): (String, String, Option<LuaTable>)| {
-                make_http_request(lua, &method, url, opts)
-            })?)?;
-            http.set("get", lua.create_function(|lua, (url, opts): (String, Option<LuaTable>)| {
-                make_http_request(lua, "GET", url, opts)
-            })?)?;
-            http.set("post", lua.create_function(|lua, (url, opts): (String, Option<LuaTable>)| {
-                make_http_request(lua, "POST", url, opts)
-            })?)?;
-            http.set("put", lua.create_function(|lua, (url, opts): (String, Option<LuaTable>)| {
-                make_http_request(lua, "PUT", url, opts)
-            })?)?;
-            http.set("delete", lua.create_function(|lua, (url, opts): (String, Option<LuaTable>)| {
-                make_http_request(lua, "DELETE", url, opts)
-            })?)?;
-            lua.globals().set("http", http)?;
-        }
+        // ── HttpClient.new() ─────────────────────────────────────────────────
+        register_http_client(&lua)?;
+
+        // ── Webhook.new() ─────────────────────────────────────────────────────
+        register_webhook(&lua)?;
 
         // ── Event helpers (pure Lua) ──────────────────────────────────────────
         lua.load(r#"
