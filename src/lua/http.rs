@@ -1,120 +1,175 @@
 use mlua::prelude::*;
 use std::time::Duration;
 
-#[derive(Default)]
-pub(super) struct LuaHttpOptions {
-    headers: Vec<(String, String)>,
-    body: Option<String>,
-    timeout_ms: Option<u64>,
+pub(super) struct LuaHttpClient {
+    pub url:          String,
+    pub method:       String,
+    pub content:      Option<String>,
+    pub proxy:        Option<String>,
+    pub headers_key:  LuaRegistryKey,
 }
 
-fn lua_http_options(opts: Option<LuaTable>) -> LuaResult<LuaHttpOptions> {
-    let Some(opts) = opts else {
-        return Ok(LuaHttpOptions::default());
-    };
+pub(super) struct LuaHttpResult {
+    pub body:       Vec<u8>,
+    pub status:     u16,
+    pub error_code: i32,
+    pub error_msg:  String,
+}
 
-    let body = match opts.get::<LuaValue>("body")? {
-        LuaValue::Nil => None,
-        LuaValue::String(s) => Some(s.to_str()?.to_string()),
-        LuaValue::Integer(n) => Some(n.to_string()),
-        LuaValue::Number(n) => Some(n.to_string()),
-        LuaValue::Boolean(v) => Some(v.to_string()),
-        _ => {
-            return Err(LuaError::runtime(
-                "http options.body must be a string, number, or boolean",
-            ));
-        }
-    };
+// ── LuaHttpResult ─────────────────────────────────────────────────────────────
 
-    let timeout_ms = opts.get::<Option<u64>>("timeout_ms")?;
-    let mut headers = Vec::new();
+impl LuaUserData for LuaHttpResult {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("body",   |lua, r| lua.create_string(&r.body));
+        fields.add_field_method_get("status", |_, r| Ok(r.status));
+        fields.add_field_method_get("error",  |_, r| Ok(r.error_code));
+    }
 
-    if let Some(header_table) = opts.get::<Option<LuaTable>>("headers")? {
-        for pair in header_table.pairs::<String, LuaValue>() {
-            let (name, value) = pair?;
-            let value = match value {
-                LuaValue::String(s) => s.to_str()?.to_string(),
-                LuaValue::Integer(n) => n.to_string(),
-                LuaValue::Number(n) => n.to_string(),
-                LuaValue::Boolean(v) => v.to_string(),
-                _ => {
-                    return Err(LuaError::runtime(
-                        "http options.headers values must be strings, numbers, or booleans",
-                    ));
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("getError", |_, r, ()| Ok(r.error_msg.clone()));
+    }
+}
+
+// ── LuaHttpClient ─────────────────────────────────────────────────────────────
+
+impl LuaUserData for LuaHttpClient {
+    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("url", |_, c| Ok(c.url.clone()));
+        fields.add_field_method_set("url", |_, c, v: String| { c.url = v; Ok(()) });
+
+        fields.add_field_method_get("method", |_, c| Ok(c.method.clone()));
+        fields.add_field_method_set("method", |_, c, v: String| {
+            c.method = v.to_uppercase();
+            Ok(())
+        });
+
+        fields.add_field_method_get("content", |_, c| Ok(c.content.clone().unwrap_or_default()));
+        fields.add_field_method_set("content", |_, c, v: String| {
+            c.content = if v.is_empty() { None } else { Some(v) };
+            Ok(())
+        });
+
+        // Returns the live Lua table — mutations (headers["key"] = "val") work directly.
+        fields.add_field_method_get("headers", |lua, c| {
+            lua.registry_value::<LuaTable>(&c.headers_key)
+        });
+    }
+
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method_mut("setMethod", |_, c, method: String| {
+            c.method = method.to_uppercase();
+            Ok(())
+        });
+
+        // setProxy(Proxy.socks5, "host:port")
+        methods.add_method_mut("setProxy", |_, c, (ptype, data): (LuaValue, String)| {
+            let scheme = match &ptype {
+                LuaValue::Integer(n) => match n {
+                    1 => "http",
+                    2 => "socks4",
+                    _ => "socks5",
+                },
+                _ => "socks5",
+            };
+            // Prepend scheme if not already present
+            let url = if data.contains("://") {
+                data
+            } else {
+                format!("{scheme}://{data}")
+            };
+            c.proxy = Some(url);
+            Ok(())
+        });
+
+        methods.add_method_mut("removeProxy", |_, c, ()| {
+            c.proxy = None;
+            Ok(())
+        });
+
+        methods.add_method("request", |lua, c, ()| {
+            let timeout = Duration::from_millis(10_000);
+
+            let mut builder = ureq::config::Config::builder()
+                .timeout_global(Some(timeout))
+                .http_status_as_error(false);
+
+            if let Some(proxy_url) = &c.proxy {
+                if let Ok(proxy) = ureq::Proxy::new(proxy_url) {
+                    builder = builder.proxy(Some(proxy));
+                }
+            }
+
+            let agent = ureq::Agent::new_with_config(builder.build());
+
+            let mut req_builder = ureq::http::Request::builder()
+                .method(c.method.as_str())
+                .uri(&c.url);
+
+            let headers_table = lua.registry_value::<LuaTable>(&c.headers_key)?;
+            for pair in headers_table.pairs::<String, String>() {
+                let (name, value) = pair?;
+                req_builder = req_builder.header(&name, &value);
+            }
+
+            let run_result = match &c.content {
+                Some(body) => {
+                    let req = req_builder
+                        .body(body.clone())
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+                    agent.run(req)
+                }
+                None => {
+                    let req = req_builder
+                        .body(())
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+                    agent.run(req)
                 }
             };
-            headers.push((name, value));
-        }
-    }
 
-    Ok(LuaHttpOptions {
-        headers,
-        body,
-        timeout_ms,
-    })
+            match run_result {
+                Ok(mut resp) => {
+                    let status = resp.status().as_u16();
+                    let body = resp
+                        .body_mut()
+                        .read_to_vec()
+                        .map_err(|e| LuaError::runtime(e.to_string()))?;
+                    Ok(LuaHttpResult { body, status, error_code: 0, error_msg: String::new() })
+                }
+                Err(e) => Ok(LuaHttpResult {
+                    body:       vec![],
+                    status:     0,
+                    error_code: 1,
+                    error_msg:  e.to_string(),
+                }),
+            }
+        });
+    }
 }
 
-pub(super) fn make_http_request<'lua>(
-    lua: &'lua Lua,
-    method: &str,
-    url: String,
-    opts: Option<LuaTable>,
-) -> LuaResult<LuaTable> {
-    let opts = lua_http_options(opts)?;
-    let timeout = Duration::from_millis(opts.timeout_ms.unwrap_or(10_000));
+// ── Registration ──────────────────────────────────────────────────────────────
 
-    let builder = ureq::config::Config::builder()
-        .timeout_global(Some(timeout))
-        .http_status_as_error(false);
-    let config = builder.build();
-    let agent = ureq::Agent::new_with_config(config);
+pub(super) fn register_http_client(lua: &Lua) -> LuaResult<()> {
+    // HttpClient.new()
+    let http_client = lua.create_table()?;
+    http_client.set("new", lua.create_function(|lua, ()| {
+        let headers = lua.create_table()?;
+        let headers_key = lua.create_registry_value(headers)?;
+        Ok(LuaHttpClient {
+            url:         String::new(),
+            method:      "GET".to_string(),
+            content:     None,
+            proxy:       None,
+            headers_key,
+        })
+    })?)?;
+    lua.globals().set("HttpClient", http_client)?;
 
-    let mut request = ureq::http::Request::builder().method(method).uri(&url);
-    for (name, value) in opts.headers {
-        request = request.header(&name, &value);
-    }
+    // Proxy enum
+    let proxy_enum = lua.create_table()?;
+    proxy_enum.set("http",   1i32)?;
+    proxy_enum.set("socks4", 2i32)?;
+    proxy_enum.set("socks5", 3i32)?;
+    lua.globals().set("Proxy", proxy_enum)?;
 
-    let mut response = match opts.body {
-        Some(body) => {
-            let request = request
-                .body(body)
-                .map_err(|e| LuaError::runtime(format!("http request build failed: {e}")))?;
-            agent
-                .run(request)
-                .map_err(|e| LuaError::runtime(format!("http request failed: {e}")))?
-        }
-        None => {
-            let request = request
-                .body(())
-                .map_err(|e| LuaError::runtime(format!("http request build failed: {e}")))?;
-            agent
-                .run(request)
-                .map_err(|e| LuaError::runtime(format!("http request failed: {e}")))?
-        }
-    };
-
-    let status = response.status().as_u16();
-    let status_text = response.status().canonical_reason().unwrap_or("").to_string();
-
-    let header_table = lua.create_table()?;
-    for (name, value) in response.headers() {
-        header_table.set(
-            name.as_str().to_ascii_lowercase(),
-            String::from_utf8_lossy(value.as_bytes()).to_string(),
-        )?;
-    }
-
-    let body = response
-        .body_mut()
-        .read_to_vec()
-        .map_err(|e| LuaError::runtime(format!("failed to read http response body: {e}")))?;
-
-    let result = lua.create_table()?;
-    result.set("ok", (200..300).contains(&status))?;
-    result.set("status", status)?;
-    result.set("status_text", status_text)?;
-    result.set("headers", header_table)?;
-    result.set("body", lua.create_string(&body)?)?;
-
-    Ok(result)
+    Ok(())
 }
