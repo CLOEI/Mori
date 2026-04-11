@@ -554,9 +554,7 @@ function ScriptTab({ botId }: { botId: number }) {
 
   useEffect(() => {
     const saved = localStorage.getItem(`bot_script_${botId}`);
-    if (saved) {
-      setScript(saved);
-    }
+    setScript(saved ?? "");
   }, [botId]);
 
   async function run() {
