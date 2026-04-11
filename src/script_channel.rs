@@ -69,6 +69,10 @@ pub enum ScriptRequest {
     GetIgnoreGems,
     SetIgnoreEssences { enabled: bool },
     GetIgnoreEssences,
+    SetAutoLeaveOnMod { enabled: bool },
+    GetAutoLeaveOnMod,
+    SetAutoBan { enabled: bool },
+    GetAutoBan,
     SetPlaceDelay { ms: u64 },
     SetWalkDelay { ms: u64 },
 

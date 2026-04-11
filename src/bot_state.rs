@@ -143,6 +143,10 @@ pub struct BotState {
     pub ignore_gems: bool,
     /// Skip essences (item IDs 5024/5026/5028/5030) during auto-collect when true.
     pub ignore_essences: bool,
+    /// Leave world automatically when a mod is detected via OnSpawn.
+    pub auto_leave_on_mod: bool,
+    /// Send `/ban <name>` when any non-local player spawns.
+    pub auto_ban: bool,
     /// Whether the bot should automatically reconnect after a disconnect.
     pub auto_reconnect: bool,
 }
@@ -173,6 +177,8 @@ impl Default for BotState {
             collect_blacklist: Vec::new(),
             ignore_gems: false,
             ignore_essences: false,
+            auto_leave_on_mod: false,
+            auto_ban: false,
             auto_reconnect: true,
         }
     }

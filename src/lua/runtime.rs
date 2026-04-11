@@ -48,6 +48,20 @@ impl LuaUserData for BotProxy {
             p.request(Req::SetIgnoreEssences { enabled: v });
             Ok(())
         });
+        fields.add_field_method_get("auto_leave_on_mod", |_, p| {
+            match p.request(Req::GetAutoLeaveOnMod) { Rep::Bool(v) => Ok(v), _ => Ok(false) }
+        });
+        fields.add_field_method_set("auto_leave_on_mod", |_, p, v: bool| {
+            p.request(Req::SetAutoLeaveOnMod { enabled: v });
+            Ok(())
+        });
+        fields.add_field_method_get("auto_ban", |_, p| {
+            match p.request(Req::GetAutoBan) { Rep::Bool(v) => Ok(v), _ => Ok(false) }
+        });
+        fields.add_field_method_set("auto_ban", |_, p, v: bool| {
+            p.request(Req::SetAutoBan { enabled: v });
+            Ok(())
+        });
         fields.add_field_method_get("place_delay", |_, p| {
             match p.request(Req::GetPlaceDelay) { Rep::U32(v) => Ok(v), _ => Ok(500) }
         });
@@ -114,6 +128,7 @@ impl LuaUserData for BotProxy {
                     col_rect:   String::new(),
                     title_icon: String::new(),
                     m_state:    0,
+                    sm_state:   0,
                     invisible:  false,
                 })),
                 _ => Err(LuaError::runtime("getLocal failed")),
@@ -289,6 +304,16 @@ impl LuaUserData for BotProxy {
             Ok(())
         });
 
+        methods.add_method("setAutoLeaveOnMod", |_, p, enabled: bool| {
+            p.request(Req::SetAutoLeaveOnMod { enabled });
+            Ok(())
+        });
+
+        methods.add_method("setAutoBan", |_, p, enabled: bool| {
+            p.request(Req::SetAutoBan { enabled });
+            Ok(())
+        });
+
         // ── Pathfinding ────────────────────────────────────────────────────────
         methods.add_method("getPath", |lua, p, (x, y): (u32, u32)| {
             let nodes = match p.request(Req::GetPath { x, y }) {
@@ -439,6 +464,7 @@ impl LuaUserData for LuaWorld {
                 col_rect:   String::new(),
                 title_icon: String::new(),
                 m_state:    0,
+                sm_state:   0,
                 invisible:  false,
             };
             Ok(LuaPlayer(fake))

@@ -153,6 +153,10 @@ pub struct Bot {
     pub ignore_gems: bool,
     /// Skip essences (item IDs 5024/5026/5028/5030) during auto-collect when true.
     pub ignore_essences: bool,
+    /// Leave world automatically when a mod is detected via OnSpawn.
+    pub auto_leave_on_mod: bool,
+    /// Send `/ban <name>` when any non-local player spawns.
+    pub auto_ban: bool,
     /// Whether the bot should automatically reconnect after a disconnect.
     pub auto_reconnect: bool,
     /// Auto-collect range in tiles (1–5); pixel radius is `tiles × 32`.
@@ -283,6 +287,8 @@ impl Bot {
             auto_collect: true,
             ignore_gems: false,
             ignore_essences: false,
+            auto_leave_on_mod: false,
+            auto_ban: false,
             auto_reconnect: true,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
@@ -441,6 +447,8 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             auto_collect: true,
             ignore_gems: false,
             ignore_essences: false,
+            auto_leave_on_mod: false,
+            auto_ban: false,
             auto_reconnect: true,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
@@ -1294,6 +1302,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         .get("mstate")
                         .and_then(|s| s.parse().ok())
                         .unwrap_or(0u32);
+                    let sm_state = data
+                        .get("smstate")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0u32);
                     let invisible = data
                         .get("invis")
                         .and_then(|s| s.parse::<u32>().ok())
@@ -1320,8 +1332,23 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                         col_rect: data.get("colrect").cloned().unwrap_or_default(),
                         title_icon: data.get("titleIcon").cloned().unwrap_or_default(),
                         m_state,
+                        sm_state,
                         invisible,
                     };
+
+                    let is_mod = m_state > 0 || sm_state > 0 || invisible;
+                    if net_id != self.local.net_id {
+                        if self.auto_leave_on_mod && is_mod {
+                            self.log_console(format!(
+                                "[Bot] Mod detected ({}): mstate={} smstate={} invis={} — leaving",
+                                player.name, m_state, sm_state, invisible
+                            ));
+                            self.leave_world();
+                        }
+                        if self.auto_ban {
+                            self.say(&format!("/ban {}", player.name));
+                        }
+                    }
 
                     self.players.insert(net_id, player.clone());
                     {
@@ -2493,6 +2520,18 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Ack
             }
             Req::GetIgnoreEssences => Rep::Bool(self.ignore_essences),
+            Req::SetAutoLeaveOnMod { enabled } => {
+                self.auto_leave_on_mod = enabled;
+                self.state.write().unwrap().auto_leave_on_mod = enabled;
+                Rep::Ack
+            }
+            Req::GetAutoLeaveOnMod => Rep::Bool(self.auto_leave_on_mod),
+            Req::SetAutoBan { enabled } => {
+                self.auto_ban = enabled;
+                self.state.write().unwrap().auto_ban = enabled;
+                Rep::Ack
+            }
+            Req::GetAutoBan => Rep::Bool(self.auto_ban),
             Req::GetPing => Rep::U32(self.state.read().unwrap().ping_ms),
             Req::GetGems => Rep::I32(self.inventory.gems),
             Req::SetPlaceDelay { ms } => {

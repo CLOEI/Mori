@@ -32,6 +32,7 @@ pub struct Player {
     pub col_rect:   String,
     pub title_icon: String,
     pub m_state:    u32,
+    pub sm_state:   u32,
     pub invisible:  bool,
 }
 
