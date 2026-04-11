@@ -4,7 +4,7 @@ use crate::items::ItemInfo;
 use crate::protocol::packet::GameUpdatePacket;
 use crate::player::Player;
 use crate::protocol::variant::{Variant, VariantList};
-use crate::world::{Tile, World, WorldObject};
+use crate::world::{Tile, World, WorldNpc, WorldObject};
 use std::sync::{Arc, RwLock};
 
 pub(super) struct BotProxy {
@@ -44,4 +44,5 @@ pub(super) struct LuaVariantList(pub VariantList);
 pub(super) struct LuaLogin {
     pub mac: String,
 }
+pub(super) struct LuaNpc(pub WorldNpc);
 pub(super) struct LuaConsole(pub Arc<RwLock<BotState>>);

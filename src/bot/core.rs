@@ -14,7 +14,7 @@ use crate::player::{LocalPlayer, Player, parse_pipe_map};
 use crate::server_data::{LoginInfo, get_server_data_proxied};
 use crate::socks5::Socks5UdpSocket;
 use crate::protocol::variant::VariantList;
-use crate::world::{TileType, World, WorldObject};
+use crate::world::{NpcAction, NpcType, TileType, World, WorldNpc, WorldObject};
 use rusty_enet as enet;
 use std::collections::HashSet;
 use std::net::{SocketAddr, UdpSocket};
@@ -1045,6 +1045,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                     self.on_item_change_object(&pkt)
                                 }
                                 GamePacketType::SendLock => self.on_send_lock(&pkt),
+                                GamePacketType::Npc => self.on_npc_packet(&pkt),
                                 _ => self.log_console(format!("[Bot] {pkt}")),
                             }
                         }
@@ -2799,6 +2800,63 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             .into_iter()
             .map(|n| (n.x, n.y))
             .collect()
+    }
+
+    // ── NPC packet ────────────────────────────────────────────────────────────
+
+    fn on_npc_packet(&mut self, pkt: &GameUpdatePacket) {
+        let world = match self.world.as_mut() {
+            Some(w) => w,
+            None    => return,
+        };
+
+        if !pkt.extra_data.is_empty() {
+            let data = &pkt.extra_data;
+            if data.is_empty() { return; }
+            let count = data[0] as usize;
+            let entry_size = 2 + 7 * 4; // 30 bytes
+            for i in 0..count {
+                let off = 1 + i * entry_size;
+                if off + entry_size > data.len() { break; }
+                let id       = data[off + 1];
+                let read_f32 = |o: usize| f32::from_le_bytes(data[o..o+4].try_into().unwrap_or([0;4]));
+                world.set_npc(WorldNpc {
+                    npc_type: NpcType::from_u8(data[off]),
+                    id,
+                    x:      read_f32(off + 2),
+                    y:      read_f32(off + 6),
+                    dest_x: read_f32(off + 10),
+                    dest_y: read_f32(off + 14),
+                    unk1:   read_f32(off + 18),
+                    unk2:   read_f32(off + 22),
+                    var:    read_f32(off + 26),
+                });
+            }
+            return;
+        }
+
+        // animation_type = NpcAction, object_type = NpcType, jump_count = NpcIndex
+        let id = pkt.jump_count;
+
+        match NpcAction::from_u8(pkt.animation_type) {
+            Some(NpcAction::Add | NpcAction::MoveTo) => {
+                world.set_npc(WorldNpc {
+                    npc_type: NpcType::from_u8(pkt.object_type),
+                    id,
+                    x:        pkt.vector_x,
+                    y:        pkt.vector_y,
+                    dest_x:   pkt.vector_x2,
+                    dest_y:   pkt.vector_y2,
+                    unk1:     0.0,
+                    unk2:     0.0,
+                    var:      pkt.float_variable,
+                });
+            }
+            Some(NpcAction::Delete | NpcAction::Sucked | NpcAction::Die) => {
+                world.remove_npc(id);
+            }
+            _ => {}
+        }
     }
 }
 
