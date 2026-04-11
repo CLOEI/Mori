@@ -34,6 +34,20 @@ impl LuaUserData for BotProxy {
             p.request(Req::SetAutoCollect { enabled: v });
             Ok(())
         });
+        fields.add_field_method_get("ignore_gems", |_, p| {
+            match p.request(Req::GetIgnoreGems) { Rep::Bool(v) => Ok(v), _ => Ok(false) }
+        });
+        fields.add_field_method_set("ignore_gems", |_, p, v: bool| {
+            p.request(Req::SetIgnoreGems { enabled: v });
+            Ok(())
+        });
+        fields.add_field_method_get("ignore_essences", |_, p| {
+            match p.request(Req::GetIgnoreEssences) { Rep::Bool(v) => Ok(v), _ => Ok(false) }
+        });
+        fields.add_field_method_set("ignore_essences", |_, p, v: bool| {
+            p.request(Req::SetIgnoreEssences { enabled: v });
+            Ok(())
+        });
         fields.add_field_method_get("place_delay", |_, p| {
             match p.request(Req::GetPlaceDelay) { Rep::U32(v) => Ok(v), _ => Ok(500) }
         });
@@ -262,6 +276,16 @@ impl LuaUserData for BotProxy {
 
         methods.add_method("setAutoCollect", |_, p, enabled: bool| {
             p.request(Req::SetAutoCollect { enabled });
+            Ok(())
+        });
+
+        methods.add_method("setIgnoreGems", |_, p, enabled: bool| {
+            p.request(Req::SetIgnoreGems { enabled });
+            Ok(())
+        });
+
+        methods.add_method("setIgnoreEssences", |_, p, enabled: bool| {
+            p.request(Req::SetIgnoreEssences { enabled });
             Ok(())
         });
 

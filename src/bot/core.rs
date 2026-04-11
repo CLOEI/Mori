@@ -149,6 +149,10 @@ pub struct Bot {
     pub temporary_data: TemporaryData,
     /// Whether the run loop should auto-collect nearby dropped items.
     pub auto_collect: bool,
+    /// Skip gems (item ID 112) during auto-collect when true.
+    pub ignore_gems: bool,
+    /// Skip essences (item IDs 5024/5026/5028/5030) during auto-collect when true.
+    pub ignore_essences: bool,
     /// Whether the bot should automatically reconnect after a disconnect.
     pub auto_reconnect: bool,
     /// Auto-collect range in tiles (1–5); pixel radius is `tiles × 32`.
@@ -277,6 +281,8 @@ impl Bot {
             cmd_rx,
             temporary_data: TemporaryData::default(),
             auto_collect: true,
+            ignore_gems: false,
+            ignore_essences: false,
             auto_reconnect: true,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
@@ -433,6 +439,8 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             cmd_rx,
             temporary_data: TemporaryData::default(),
             auto_collect: true,
+            ignore_gems: false,
+            ignore_essences: false,
             auto_reconnect: true,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
@@ -2093,6 +2101,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     if self.collect_blacklist.contains(&obj.item_id) {
                         return None;
                     }
+                    if self.ignore_gems && obj.item_id == 112 {
+                        return None;
+                    }
+                    if self.ignore_essences && matches!(obj.item_id, 5024 | 5026 | 5028 | 5030) {
+                        return None;
+                    }
                     let dx = pos_x - obj.x;
                     let dy = pos_y - obj.y;
                     if dx.abs() > r_px || dy.abs() > r_px {
@@ -2467,6 +2481,18 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Bool(cx == x && cy == y)
             }
             Req::GetAutoCollect => Rep::Bool(self.auto_collect),
+            Req::SetIgnoreGems { enabled } => {
+                self.ignore_gems = enabled;
+                self.state.write().unwrap().ignore_gems = enabled;
+                Rep::Ack
+            }
+            Req::GetIgnoreGems => Rep::Bool(self.ignore_gems),
+            Req::SetIgnoreEssences { enabled } => {
+                self.ignore_essences = enabled;
+                self.state.write().unwrap().ignore_essences = enabled;
+                Rep::Ack
+            }
+            Req::GetIgnoreEssences => Rep::Bool(self.ignore_essences),
             Req::GetPing => Rep::U32(self.state.read().unwrap().ping_ms),
             Req::GetGems => Rep::I32(self.inventory.gems),
             Req::SetPlaceDelay { ms } => {

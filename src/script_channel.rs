@@ -65,6 +65,10 @@ pub enum ScriptRequest {
     // State mutation
     SetMac { mac: String },
     SetAutoCollect { enabled: bool },
+    SetIgnoreGems { enabled: bool },
+    GetIgnoreGems,
+    SetIgnoreEssences { enabled: bool },
+    GetIgnoreEssences,
     SetPlaceDelay { ms: u64 },
     SetWalkDelay { ms: u64 },
 

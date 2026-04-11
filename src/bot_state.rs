@@ -139,6 +139,10 @@ pub struct BotState {
     pub collect_radius_tiles: u8,
     /// Item IDs to skip when auto-collecting (sorted, unique in API responses).
     pub collect_blacklist: Vec<u16>,
+    /// Skip gems (item ID 112) during auto-collect when true.
+    pub ignore_gems: bool,
+    /// Skip essences (item IDs 5024/5026/5028/5030) during auto-collect when true.
+    pub ignore_essences: bool,
     /// Whether the bot should automatically reconnect after a disconnect.
     pub auto_reconnect: bool,
 }
@@ -167,6 +171,8 @@ impl Default for BotState {
             auto_collect: true,
             collect_radius_tiles: 3,
             collect_blacklist: Vec::new(),
+            ignore_gems: false,
+            ignore_essences: false,
             auto_reconnect: true,
         }
     }
