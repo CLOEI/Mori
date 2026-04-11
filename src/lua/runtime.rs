@@ -821,7 +821,8 @@ fn run_script_inner(
     let proxy = BotProxy { req_tx, reply_rx, state: state.clone() };
 
     let setup = || -> LuaResult<()> {
-        lua.globals().set("bot", lua.create_userdata(proxy)?)?;
+        lua.globals().set("__bot", lua.create_userdata(proxy)?)?;
+        lua.load("function getBot() return __bot end").exec()?;
 
         // ── sleep(ms) ─────────────────────────────────────────────────────────
         {
@@ -1005,46 +1006,46 @@ end
         // ── Shortcut globals ───────────────────────────────────────────────────
         lua.load(r#"
 function getLocal()
-    return bot:getLocal()
+    return getBot():getLocal()
 end
 function getWorld()
-    return bot:getWorld()
+    return getBot():getWorld()
 end
 function getInventory()
-    return bot:getInventory()
+    return getBot():getInventory()
 end
 function getPlayer(key)
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:getPlayer(key) end
     return nil
 end
 function getPlayers()
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:getPlayers() end
     return {}
 end
 function getTile(x, y)
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:getTile(x, y) end
     return nil
 end
 function getTiles()
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:getTiles() end
     return {}
 end
 function getTilesSafe()
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:getTilesSafe() end
     return {}
 end
 function getObject(oid)
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:getObject(oid) end
     return nil
 end
 function getObjects()
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:getObjects() end
     return {}
 end
@@ -1055,7 +1056,7 @@ function getNPCs()
     return {}
 end
 function hasAccess(x, y)
-    local w = bot:getWorld()
+    local w = getBot():getWorld()
     if w then return w:hasAccess(x, y) end
     return false
 end
