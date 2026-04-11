@@ -553,16 +553,16 @@ function ScriptTab({ botId }: { botId: number }) {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    api.getBotScript(botId).then((s) => {
-      setScript(s.content);
-    }).catch(() => {
-      setScript("");
-    });
-  }, []);
+    const saved = localStorage.getItem(`bot_script_${botId}`);
+    if (saved) {
+      setScript(saved);
+    }
+  }, [botId]);
 
   async function run() {
     try {
       await api.sendCmd(botId, { type: "run_script", content: script });
+      localStorage.setItem(`bot_script_${botId}`, script);
       setStatus("Running…");
     } catch {
       setStatus("Error");

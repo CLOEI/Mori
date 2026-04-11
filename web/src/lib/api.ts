@@ -271,7 +271,6 @@ export const api = {
   getBotState: (id: number) => req<BotState>("GET", `/bots/${id}/state`),
   sendCmd: (id: number, cmd: BotCmd) =>
     req<void>("POST", `/bots/${id}/cmd`, cmd),
-  getBotScript: (id: number) => req<{ content: string }>("GET", `/bots/${id}/script`),
   getItemNames: () => req<Record<string, string>>("GET", "/items/names"),
   getItemColors: () => req<Record<string, number>>("GET", "/items/colors"),
   getItems: (page = 1, q = "") =>
