@@ -106,7 +106,8 @@ struct RedirectData {
     user: String,
     door_id: String,
     uuid: String,
-    aat: String,
+    lmode: String,
+    tank_id_name: String,
 }
 
 pub struct Bot {
@@ -124,6 +125,8 @@ pub struct Bot {
     hash2: i32,
     wk: String,
     rid: String,
+    last_redirect_token: Option<String>,
+    last_redirect_uuid: Option<String>,
     /// Set by `OnSendToServer`; consumed by the next ServerHello.
     redirect: Option<RedirectData>,
     /// When the bot connected — used for network time in ping replies.
@@ -278,6 +281,8 @@ impl Bot {
             hash2,
             wk,
             rid,
+            last_redirect_token: None,
+            last_redirect_uuid: None,
             redirect: None,
             peer_id: None,
             pos_x: 0.0,
@@ -441,6 +446,8 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             hash2,
             wk,
             rid,
+            last_redirect_token: None,
+            last_redirect_uuid: None,
             redirect: None,
             peer_id: None,
             pos_x: 0.0,
@@ -589,26 +596,41 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
 
     fn build_redirect_packet(&self, r: &RedirectData) -> String {
         let klv = compute_klv(GAME_VER, &PROTOCOL.to_string(), &self.rid, self.hash);
-
-        format!(
-            "UUIDToken|{}\nprotocol|{PROTOCOL}\nfhash|{FHASH}\nmac|{}\n\
-requestedName|\nhash2|{}\nfz|22243512\nf|1\nplayer_age|20\ngame_version|{GAME_VER}\n\
-lmode|1\ncbits|1024\nrid|{}\nGDPR|2\nhash|{}\ncategory|_-5100\n\
-token|{}\ntotal_playtime|0\ndoor_id|{}\nklv|{klv}\nmeta|{}\n\
-platformID|0,1,1\ndeviceVersion|0\nzf|31631978\ncountry|jp\n\
-user|{}\nwk|{}\naat|{}\n",
-            r.uuid,
-            self.mac,
-            self.hash2,
-            self.rid,
-            self.hash,
-            r.token,
-            r.door_id,
-            self.meta,
-            r.user,
-            self.wk,
-            r.aat,
-        )
+        let mut data = String::new();
+        data.push_str(&format!("tankIDName|{}\n", r.tank_id_name));
+        data.push_str("tankIDPass|\n");
+        data.push_str("requestedName|\n");
+        data.push_str("f|1\n");
+        data.push_str("protocol|211\n");
+        data.push_str(&format!("game_version|{}\n", GAME_VER));
+        data.push_str("fz|47142936\n");
+        data.push_str("cbits|1536\n");
+        data.push_str("player_age|18\n");
+        data.push_str("GDPR|1\n");
+        data.push_str("FCMToken|\n");
+        data.push_str("category|_-5100\n");
+        data.push_str("totalPlaytime|0\n");
+        data.push_str(&format!("klv|{klv}\n"));
+        data.push_str(&format!("hash2|{}\n", self.hash2));
+        data.push_str(&format!("meta|{}\n", self.meta));
+        data.push_str(&format!("fhash|{FHASH}\n"));
+        data.push_str(&format!("rid|{}\n", self.rid));
+        data.push_str("platformID|0,1,1\n");
+        data.push_str("deviceVersion|0\n");
+        data.push_str("country|ma\n");
+        data.push_str(&format!("hash|{}\n", self.hash));
+        data.push_str(&format!("mac|{}\n", self.mac));
+        data.push_str(&format!("wk|{}\n", self.wk));
+        data.push_str("zf|-821693372\n");
+        data.push_str(&format!("lmode|{}\n", r.lmode));
+        data.push_str(&format!("user|{}\n", r.user));
+        data.push_str(&format!("token|{}\n", r.token));
+        data.push_str(&format!("UUIDToken|{}\n", r.uuid));
+        if !r.door_id.is_empty() {
+            data.push_str(&format!("doorID|{}\n", r.door_id));
+        }
+        data.push_str("aat|2\n");
+        data
     }
 
     /// Builds the `clientData` string sent to the check-token endpoint.
@@ -1251,7 +1273,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 let token = vl.get(2).map(|v| v.as_int32()).unwrap_or(0);
                 let user_id = vl.get(3).map(|v| v.as_int32()).unwrap_or(0);
                 let server_str = vl.get(4).map(|v| v.as_string()).unwrap_or_default();
-                let aat = vl.get(5).map(|v| v.as_int32()).unwrap_or(0);
+                let lmode = vl.get(5).map(|v| v.as_int32()).unwrap_or(0);
+                let tank_id_name = vl.get(6).map(|v| v.as_string()).unwrap_or_default();
 
                 let parts: Vec<&str> = server_str.splitn(3, '|').collect();
                 let server = parts.first().copied().unwrap_or("").trim_end().to_string();
@@ -1262,7 +1285,30 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     .filter(|s| !s.is_empty())
                     .unwrap_or("0")
                     .to_string();
-                let uuid = parts.get(2).copied().unwrap_or("").trim_end().to_string();
+                let uuid_raw = parts.get(2).copied().unwrap_or("").trim_end().to_string();
+                let token_str = if token >= 0 {
+                    let s = token.to_string();
+                    self.last_redirect_token = Some(s.clone());
+                    s
+                } else if let Some(prev) = self.last_redirect_token.clone() {
+                    self.log_console(format!(
+                        "[Bot] OnSendToServer → reusing previous redirect token for lmode={lmode}"
+                    ));
+                    prev
+                } else {
+                    token.to_string()
+                };
+                let uuid = if !uuid_raw.is_empty() && uuid_raw != "-1" {
+                    self.last_redirect_uuid = Some(uuid_raw.clone());
+                    uuid_raw
+                } else if let Some(prev) = self.last_redirect_uuid.clone() {
+                    self.log_console(format!(
+                        "[Bot] OnSendToServer → reusing previous UUIDToken for lmode={lmode}"
+                    ));
+                    prev
+                } else {
+                    uuid_raw
+                };
 
                 self.log_console(format!(
                     "[Bot] OnSendToServer → {server}:{port} door={door_id}"
@@ -1271,11 +1317,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 self.redirect = Some(RedirectData {
                     server,
                     port: port as u16,
-                    token: token.to_string(),
+                    token: token_str,
                     user: user_id.to_string(),
                     door_id,
                     uuid,
-                    aat: aat.to_string(),
+                    lmode: lmode.to_string(),
+                    tank_id_name,
                 });
 
                 self.host.peer_disconnect(id, 0);
