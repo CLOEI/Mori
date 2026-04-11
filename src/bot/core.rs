@@ -168,7 +168,7 @@ pub struct Bot {
     /// Tracks when collect() was last run.
     collect_timer: std::time::Instant,
     /// Interval in ms between auto-collect ticks (default 500).
-    object_collect_delay: u64,
+    collect_interval: u64,
     /// Skip objects with no reachable A* path during auto-collect.
     pub collect_path_check: bool,
     /// A* pathfinder, re-used across find_path calls.
@@ -300,7 +300,7 @@ impl Bot {
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
-            object_collect_delay: 500,
+            collect_interval: 500,
             collect_path_check: true,
             astar: AStar::new(),
             pathfind_target: None,
@@ -463,7 +463,7 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
-            object_collect_delay: 500,
+            collect_interval: 500,
             collect_path_check: true,
             astar: AStar::new(),
             pathfind_target: None,
@@ -718,7 +718,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             self.service_once();
             self.drain_script_requests();
             if self.auto_collect
-                && self.collect_timer.elapsed() >= std::time::Duration::from_millis(self.object_collect_delay)
+                && self.collect_timer.elapsed() >= std::time::Duration::from_millis(self.collect_interval)
             {
                 self.collect_timer = std::time::Instant::now();
                 self.collect();
@@ -2557,11 +2557,16 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Ack
             }
             Req::GetAutoBan => Rep::Bool(self.auto_ban),
-            Req::SetObjectCollectDelay { ms } => {
-                self.object_collect_delay = ms;
+            Req::SetCollectInterval { ms } => {
+                self.collect_interval = ms;
                 Rep::Ack
             }
-            Req::GetObjectCollectDelay => Rep::U32(self.object_collect_delay as u32),
+            Req::GetCollectInterval => Rep::U32(self.collect_interval as u32),
+            Req::SetCollectRange { tiles } => {
+                self.collect_radius_tiles = tiles.clamp(1, 5);
+                Rep::Ack
+            }
+            Req::GetCollectRange => Rep::U32(self.collect_radius_tiles as u32),
             Req::SetCollectPathCheck { enabled } => {
                 self.collect_path_check = enabled;
                 self.state.write().unwrap().collect_path_check = enabled;

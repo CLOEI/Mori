@@ -62,11 +62,18 @@ impl LuaUserData for BotProxy {
             p.request(Req::SetAutoBan { enabled: v });
             Ok(())
         });
-        fields.add_field_method_get("object_collect_delay", |_, p| {
-            match p.request(Req::GetObjectCollectDelay) { Rep::U32(v) => Ok(v), _ => Ok(500) }
+        fields.add_field_method_get("collect_interval", |_, p| {
+            match p.request(Req::GetCollectInterval) { Rep::U32(v) => Ok(v), _ => Ok(500) }
         });
-        fields.add_field_method_set("object_collect_delay", |_, p, v: u64| {
-            p.request(Req::SetObjectCollectDelay { ms: v });
+        fields.add_field_method_set("collect_interval", |_, p, v: u64| {
+            p.request(Req::SetCollectInterval { ms: v });
+            Ok(())
+        });
+        fields.add_field_method_get("collect_range", |_, p| {
+            match p.request(Req::GetCollectRange) { Rep::U32(v) => Ok(v), _ => Ok(3) }
+        });
+        fields.add_field_method_set("collect_range", |_, p, v: u8| {
+            p.request(Req::SetCollectRange { tiles: v });
             Ok(())
         });
         fields.add_field_method_get("collect_path_check", |_, p| {
