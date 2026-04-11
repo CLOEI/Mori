@@ -14,7 +14,7 @@ use crate::player::{LocalPlayer, Player, parse_pipe_map};
 use crate::server_data::{LoginInfo, get_server_data_proxied};
 use crate::socks5::Socks5UdpSocket;
 use crate::protocol::variant::VariantList;
-use crate::world::{NpcAction, TileType, World, WorldNpc, WorldObject};
+use crate::world::{NpcAction, NpcType, TileType, World, WorldNpc, WorldObject};
 use rusty_enet as enet;
 use std::collections::HashSet;
 use std::net::{SocketAddr, UdpSocket};
@@ -2818,11 +2818,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             for i in 0..count {
                 let off = 1 + i * entry_size;
                 if off + entry_size > data.len() { break; }
-                let npc_type = data[off];
                 let id       = data[off + 1];
                 let read_f32 = |o: usize| f32::from_le_bytes(data[o..o+4].try_into().unwrap_or([0;4]));
                 world.set_npc(WorldNpc {
-                    npc_type,
+                    npc_type: NpcType::from_u8(data[off]),
                     id,
                     x:      read_f32(off + 2),
                     y:      read_f32(off + 6),
@@ -2842,7 +2841,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         match NpcAction::from_u8(pkt.animation_type) {
             Some(NpcAction::Add | NpcAction::MoveTo) => {
                 world.set_npc(WorldNpc {
-                    npc_type: pkt.object_type,
+                    npc_type: NpcType::from_u8(pkt.object_type),
                     id,
                     x:        pkt.vector_x,
                     y:        pkt.vector_y,

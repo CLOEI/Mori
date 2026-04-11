@@ -626,7 +626,7 @@ impl LuaUserData for LuaNetObject {
 
 impl LuaUserData for LuaNpc {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("type",  |_, n| Ok(n.0.npc_type));
+        fields.add_field_method_get("type",  |_, n| Ok(n.0.npc_type as u8));
         fields.add_field_method_get("id",    |_, n| Ok(n.0.id));
         fields.add_field_method_get("x",     |_, n| Ok(n.0.x));
         fields.add_field_method_get("y",     |_, n| Ok(n.0.y));

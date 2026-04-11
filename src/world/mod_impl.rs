@@ -1330,9 +1330,65 @@ impl NpcAction {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum NpcType {
+    None                                    = 0,
+    Ghost                                   = 1,
+    GhostJar                                = 2,
+    BeeSwarm                                = 3,
+    HarvestGhost                            = 4,
+    GrowGa                                  = 5,
+    GhostShark                              = 6,
+    XmasGhost                               = 7,
+    Blast                                   = 8,
+    Pinata                                  = 9,
+    GhostCaptureMachine                     = 10,
+    BossGhost                               = 11,
+    MindControlGhost                        = 12,
+    GhostBeGone                             = 13,
+    HuntedTurkey                            = 14,
+    Trickster                               = 15,
+    ThanksgivingTurkeyBoss                  = 16,
+    ThanksgivingTurkeyBossFeatherProjectile = 17,
+    AttackerMinionTurkey                    = 18,
+    BeachEnemy                              = 19,
+    XmlConfigured                           = 20,
+    XmlRendered                             = 21,
+}
+
+impl NpcType {
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            1  => Self::Ghost,
+            2  => Self::GhostJar,
+            3  => Self::BeeSwarm,
+            4  => Self::HarvestGhost,
+            5  => Self::GrowGa,
+            6  => Self::GhostShark,
+            7  => Self::XmasGhost,
+            8  => Self::Blast,
+            9  => Self::Pinata,
+            10 => Self::GhostCaptureMachine,
+            11 => Self::BossGhost,
+            12 => Self::MindControlGhost,
+            13 => Self::GhostBeGone,
+            14 => Self::HuntedTurkey,
+            15 => Self::Trickster,
+            16 => Self::ThanksgivingTurkeyBoss,
+            17 => Self::ThanksgivingTurkeyBossFeatherProjectile,
+            18 => Self::AttackerMinionTurkey,
+            19 => Self::BeachEnemy,
+            20 => Self::XmlConfigured,
+            21 => Self::XmlRendered,
+            _  => Self::None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct WorldNpc {
-    pub npc_type: u8,
+    pub npc_type: NpcType,
     pub id:       u8,
     pub x:        f32,
     pub y:        f32,
