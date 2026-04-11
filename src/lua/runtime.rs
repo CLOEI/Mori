@@ -12,7 +12,7 @@ use crate::world::{TileFlags, TileType};
 use super::http::register_http_client;
 use super::webhook::register_webhook;
 use super::types::{
-    BotProxy, LuaConsole, LuaGameUpdatePacket, LuaInventory, LuaInventoryItem, LuaItemInfo,
+    BotProxy, LuaGameUpdatePacket, LuaInventory, LuaInventoryItem, LuaItemInfo,
     LuaLogin, LuaNetObject, LuaNpc, LuaPlayer, LuaTile, LuaVariant, LuaVariantList, LuaWorld,
 };
 
@@ -127,10 +127,6 @@ impl LuaUserData for BotProxy {
                 Rep::Inventory(inv) => Ok(LuaInventory(inv)),
                 _                   => Ok(LuaInventory(crate::inventory::Inventory::default())),
             }
-        });
-
-        methods.add_method("getConsole", |_, p, ()| {
-            Ok(LuaConsole(p.state.clone()))
         });
 
         methods.add_method("getLogin", |_, p, ()| {
@@ -389,10 +385,6 @@ impl LuaUserData for LuaWorld {
         fields.add_field_method_get("y",          |_, w| Ok(w.world.tile_map.height));
         fields.add_field_method_get("tile_count", |_, w| Ok(w.world.tile_map.tiles.len()));
         fields.add_field_method_get("version",    |_, w| Ok(w.world.version));
-        fields.add_field_method_get("public",     |_, w| {
-            // bit 1 of flags indicates public world
-            Ok(w.world.flags & 1 != 0)
-        });
         // Convenience table properties
         fields.add_field_method_get("tiles", |lua, w| {
             let t = lua.create_table()?;
@@ -430,14 +422,6 @@ impl LuaUserData for LuaWorld {
         });
 
         methods.add_method("getTiles", |lua, w, ()| {
-            let t = lua.create_table()?;
-            for (i, tile) in w.world.tile_map.tiles.iter().enumerate() {
-                t.set(i + 1, LuaTile(tile.clone()))?;
-            }
-            Ok(t)
-        });
-
-        methods.add_method("getTilesSafe", |lua, w, ()| {
             let t = lua.create_table()?;
             for (i, tile) in w.world.tile_map.tiles.iter().enumerate() {
                 t.set(i + 1, LuaTile(tile.clone()))?;
@@ -523,8 +507,6 @@ impl LuaUserData for LuaWorld {
             }
             Ok(t)
         });
-
-        methods.add_method("hasAccess", |_, _w, ()| Ok(false));
     }
 }
 
@@ -729,14 +711,14 @@ impl LuaUserData for LuaItemInfo {
         fields.add_field_method_get("drop_chance",        |_, i| Ok(i.0.drop_chance));
         fields.add_field_method_get("texture",            |_, i| Ok(i.0.texture_file_name.clone()));
         fields.add_field_method_get("texture_hash",       |_, i| Ok(i.0.texture_hash));
-        fields.add_field_method_get("texture_x",         |_, i| Ok(i.0.texture_x));
-        fields.add_field_method_get("texture_y",         |_, i| Ok(i.0.texture_y));
+        fields.add_field_method_get("texture_x",          |_, i| Ok(i.0.texture_x));
+        fields.add_field_method_get("texture_y",          |_, i| Ok(i.0.texture_y));
         fields.add_field_method_get("seed_color",         |_, i| Ok(i.0.base_color));
         fields.add_field_method_get("seed_overlay_color", |_, i| Ok(i.0.overlay_color));
         fields.add_field_method_get("null_Item",          |_, i| {
             Ok(i.0.name.to_lowercase().contains("null"))
         });
-        fields.add_field_method_get("strength",           |_, i| Ok(i.0.block_health));
+        fields.add_field_method_get("strength",           |_, i| Ok(i.0.block_health / 6));
     }
 }
 
@@ -861,32 +843,6 @@ impl LuaUserData for LuaVariantList {
 impl LuaUserData for LuaLogin {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
         fields.add_field_method_get("mac", |_, l| Ok(l.mac.clone()));
-    }
-}
-
-// ── LuaConsole ────────────────────────────────────────────────────────────────
-
-impl LuaUserData for LuaConsole {
-    fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
-        fields.add_field_method_get("contents", |lua, c| {
-            let state = c.0.read().unwrap();
-            let t = lua.create_table()?;
-            for (i, line) in state.console.iter().enumerate() {
-                t.set(i + 1, line.clone())?;
-            }
-            Ok(t)
-        });
-    }
-
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("append", |_, c, text: String| {
-            let mut state = c.0.write().unwrap();
-            state.console.push(text);
-            if state.console.len() > 100 {
-                state.console.remove(0);
-            }
-            Ok(())
-        });
     }
 }
 
@@ -1144,11 +1100,6 @@ end
 function getTiles()
     local w = getBot():getWorld()
     if w then return w:getTiles() end
-    return {}
-end
-function getTilesSafe()
-    local w = getBot():getWorld()
-    if w then return w:getTilesSafe() end
     return {}
 end
 function getObject(oid)

@@ -45,4 +45,3 @@ pub(super) struct LuaLogin {
     pub mac: String,
 }
 pub(super) struct LuaNpc(pub WorldNpc);
-pub(super) struct LuaConsole(pub Arc<RwLock<BotState>>);
