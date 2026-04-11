@@ -147,6 +147,8 @@ pub struct BotState {
     pub auto_leave_on_mod: bool,
     /// Send `/ban <name>` when any non-local player spawns.
     pub auto_ban: bool,
+    /// Skip objects with no reachable A* path during auto-collect.
+    pub collect_path_check: bool,
     /// Whether the bot should automatically reconnect after a disconnect.
     pub auto_reconnect: bool,
 }
@@ -179,6 +181,7 @@ impl Default for BotState {
             ignore_essences: false,
             auto_leave_on_mod: false,
             auto_ban: false,
+            collect_path_check: true,
             auto_reconnect: true,
         }
     }

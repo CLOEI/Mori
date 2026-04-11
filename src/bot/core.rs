@@ -159,12 +159,18 @@ pub struct Bot {
     pub auto_ban: bool,
     /// Whether the bot should automatically reconnect after a disconnect.
     pub auto_reconnect: bool,
+    /// Delay in ms before reconnecting after a disconnect (default 0).
+    pub reconnect_interval: u64,
     /// Auto-collect range in tiles (1–5); pixel radius is `tiles × 32`.
     collect_radius_tiles: u8,
     /// Item IDs excluded from auto-collect.
     collect_blacklist: HashSet<u16>,
     /// Tracks when collect() was last run.
     collect_timer: std::time::Instant,
+    /// Interval in ms between auto-collect ticks (default 500).
+    object_collect_delay: u64,
+    /// Skip objects with no reachable A* path during auto-collect.
+    pub collect_path_check: bool,
     /// A* pathfinder, re-used across find_path calls.
     astar: AStar,
     /// While `Some`, we are routing to this tile; `OnSetPos` triggers replanning from server position.
@@ -290,9 +296,12 @@ impl Bot {
             auto_leave_on_mod: false,
             auto_ban: false,
             auto_reconnect: true,
+            reconnect_interval: 0,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
+            object_collect_delay: 500,
+            collect_path_check: true,
             astar: AStar::new(),
             pathfind_target: None,
             pathfind_recalc: false,
@@ -450,9 +459,12 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             auto_leave_on_mod: false,
             auto_ban: false,
             auto_reconnect: true,
+            reconnect_interval: 0,
             collect_radius_tiles: 3,
             collect_blacklist: HashSet::new(),
             collect_timer: std::time::Instant::now(),
+            object_collect_delay: 500,
+            collect_path_check: true,
             astar: AStar::new(),
             pathfind_target: None,
             pathfind_recalc: false,
@@ -706,7 +718,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             self.service_once();
             self.drain_script_requests();
             if self.auto_collect
-                && self.collect_timer.elapsed() >= std::time::Duration::from_millis(500)
+                && self.collect_timer.elapsed() >= std::time::Duration::from_millis(self.object_collect_delay)
             {
                 self.collect_timer = std::time::Instant::now();
                 self.collect();
@@ -763,11 +775,22 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     } else if self.reconnect_after.is_some() {
                         // Delayed reconnect already scheduled (e.g. 2FA cooldown) — do nothing here.
                     } else if self.auto_reconnect {
-                        self.log_console(
-                            "[Bot] Server disconnected — re-fetching token and server data"
-                                .to_string(),
-                        );
-                        self.reconnect_main();
+                        if self.reconnect_interval > 0 {
+                            self.log_console(format!(
+                                "[Bot] Server disconnected — reconnecting in {}ms",
+                                self.reconnect_interval
+                            ));
+                            self.reconnect_after = Some(
+                                std::time::Instant::now()
+                                    + std::time::Duration::from_millis(self.reconnect_interval),
+                            );
+                        } else {
+                            self.log_console(
+                                "[Bot] Server disconnected — re-fetching token and server data"
+                                    .to_string(),
+                            );
+                            self.reconnect_main();
+                        }
                     } else {
                         self.log_console(
                             "[Bot] Server disconnected — auto-reconnect is disabled".to_string(),
@@ -2187,7 +2210,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             let tile_x = (*x / 32.0) as u32;
             let tile_y = (*y / 32.0) as u32;
             // Skip if there's no reachable path to the object's tile
-            if self.astar.find_path(from_x, from_y, tile_x, tile_y, has_access).is_none() {
+            if self.collect_path_check
+                && self.astar.find_path(from_x, from_y, tile_x, tile_y, has_access).is_none()
+            {
                 continue;
             }
 
@@ -2532,6 +2557,22 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Ack
             }
             Req::GetAutoBan => Rep::Bool(self.auto_ban),
+            Req::SetObjectCollectDelay { ms } => {
+                self.object_collect_delay = ms;
+                Rep::Ack
+            }
+            Req::GetObjectCollectDelay => Rep::U32(self.object_collect_delay as u32),
+            Req::SetCollectPathCheck { enabled } => {
+                self.collect_path_check = enabled;
+                self.state.write().unwrap().collect_path_check = enabled;
+                Rep::Ack
+            }
+            Req::GetCollectPathCheck => Rep::Bool(self.collect_path_check),
+            Req::SetReconnectInterval { ms } => {
+                self.reconnect_interval = ms;
+                Rep::Ack
+            }
+            Req::GetReconnectInterval => Rep::U32(self.reconnect_interval as u32),
             Req::GetPing => Rep::U32(self.state.read().unwrap().ping_ms),
             Req::GetGems => Rep::I32(self.inventory.gems),
             Req::SetPlaceDelay { ms } => {

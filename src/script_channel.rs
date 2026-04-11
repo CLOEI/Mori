@@ -73,6 +73,12 @@ pub enum ScriptRequest {
     GetAutoLeaveOnMod,
     SetAutoBan { enabled: bool },
     GetAutoBan,
+    SetObjectCollectDelay { ms: u64 },
+    GetObjectCollectDelay,
+    SetCollectPathCheck { enabled: bool },
+    GetCollectPathCheck,
+    SetReconnectInterval { ms: u64 },
+    GetReconnectInterval,
     SetPlaceDelay { ms: u64 },
     SetWalkDelay { ms: u64 },
 
