@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Application, Graphics, Container, Sprite, Texture } from 'pixi.js'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { itemNamesAtom, itemColorsAtom, itemsMapAtom, type LiveBot } from '@/lib/store'
@@ -159,6 +159,15 @@ interface TooltipState {
   tile: TileData
 }
 
+interface ColorTileLayer {
+  canvas: HTMLCanvasElement
+  ctx: CanvasRenderingContext2D
+  texture: Texture
+  sprite: Sprite
+  width: number
+  height: number
+}
+
 const TILE_PX = 4
 const CHAR_PX = 2
 const MIN_ZOOM = 0.5
@@ -183,7 +192,41 @@ function clampOffset(
   return { x, y }
 }
 
-export function Minimap({ bot }: { bot: LiveBot }) {
+function colorForTile(tile: TileData, colors: Record<number, number>) {
+  if (tile.fg === 0) return null
+  return colors[tile.fg] ?? 0x4a4a5a
+}
+
+function colorToCss(color: number) {
+  return `#${color.toString(16).padStart(6, '0')}`
+}
+
+function createColorTileLayer(
+  container: Container,
+  b: LiveBot,
+): ColorTileLayer | null {
+  const canvas = document.createElement('canvas')
+  canvas.width = b.world_width * TILE_PX
+  canvas.height = b.world_height * TILE_PX
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+
+  const texture = Texture.from(canvas)
+  const sprite = new Sprite(texture)
+  container.addChild(sprite)
+
+  return {
+    canvas,
+    ctx,
+    texture,
+    sprite,
+    width: b.world_width,
+    height: b.world_height,
+  }
+}
+
+function MinimapInner({ bot }: { bot: LiveBot }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const itemNames = useAtomValue(itemNamesAtom)
   const itemColors = useAtomValue(itemColorsAtom)
@@ -202,6 +245,8 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     bot: Graphics
   } | null>(null)
   const tileManagerRef = useRef<TileManager | null>(null)
+  const colorTileLayerRef = useRef<ColorTileLayer | null>(null)
+  const previousTilesRef = useRef<TileData[] | null>(null)
 
   const botRef = useRef(bot)
   const itemColorsRef = useRef(itemColors)
@@ -276,7 +321,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     }
     
     loadWorldItems()
-  }, [bot, itemsMap, setItemsMap])
+  }, [bot.tiles, bot.world_width, bot.world_height, itemsMap, setItemsMap])
 
   const zoom = useRef(3)
   const offset = useRef({ x: 0, y: 0 })
@@ -284,16 +329,86 @@ export function Minimap({ bot }: { bot: LiveBot }) {
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 })
 
   function renderTilesInitial(container: Container, b: LiveBot, colors: Record<number, number>) {
-    const gfx = new Graphics()
+    const layer = createColorTileLayer(container, b)
+    if (!layer) return
+
+    colorTileLayerRef.current = layer
+
+    const { ctx, texture } = layer
+    ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height)
     for (let i = 0; i < b.tiles.length; i++) {
       const tile = b.tiles[i]
-      if (tile.fg === 0) continue
-      const color = colors[tile.fg] ?? 0x4a4a5a
+      const color = colorForTile(tile, colors)
+      if (color === null) continue
       const tx = (i % b.world_width) * TILE_PX
       const ty = Math.floor(i / b.world_width) * TILE_PX
-      gfx.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
+      ctx.fillStyle = colorToCss(color)
+      ctx.fillRect(tx, ty, TILE_PX, TILE_PX)
     }
-    container.addChild(gfx)
+    texture.source.update()
+  }
+
+  function renderTilesColor(container: Container, b: LiveBot, colors: Record<number, number>, previousTiles: TileData[] | null) {
+    let layer = colorTileLayerRef.current
+    const needsNewLayer = !layer || layer.width !== b.world_width || layer.height !== b.world_height
+
+    if (needsNewLayer) {
+      container.removeChildren()
+      layer = createColorTileLayer(container, b)
+      colorTileLayerRef.current = layer
+      previousTiles = null
+    }
+
+    if (!layer) return
+
+    const { ctx, texture, canvas } = layer
+
+    if (!previousTiles || previousTiles.length !== b.tiles.length) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      for (let i = 0; i < b.tiles.length; i++) {
+        const tile = b.tiles[i]
+        const color = colorForTile(tile, colors)
+        if (color === null) continue
+        const tx = (i % b.world_width) * TILE_PX
+        const ty = Math.floor(i / b.world_width) * TILE_PX
+        ctx.fillStyle = colorToCss(color)
+        ctx.fillRect(tx, ty, TILE_PX, TILE_PX)
+      }
+      texture.source.update()
+      return
+    }
+
+    let hasChanges = false
+    for (let i = 0; i < b.tiles.length; i++) {
+      const nextTile = b.tiles[i]
+      const prevTile = previousTiles[i]
+      if (
+        nextTile === prevTile ||
+        (
+          nextTile.fg === prevTile.fg &&
+          nextTile.bg === prevTile.bg &&
+          nextTile.flags === prevTile.flags &&
+          nextTile.tile_type === prevTile.tile_type
+        )
+      ) {
+        continue
+      }
+
+      const tx = (i % b.world_width) * TILE_PX
+      const ty = Math.floor(i / b.world_width) * TILE_PX
+      ctx.clearRect(tx, ty, TILE_PX, TILE_PX)
+
+      const color = colorForTile(nextTile, colors)
+      if (color !== null) {
+        ctx.fillStyle = colorToCss(color)
+        ctx.fillRect(tx, ty, TILE_PX, TILE_PX)
+      }
+      hasChanges = true
+    }
+
+    if (hasChanges) {
+      texture.source.update()
+    }
   }
 
   async function renderTilesWithTileManager(container: Container, b: LiveBot, items: ItemRecord[]) {
@@ -602,6 +717,7 @@ export function Minimap({ bot }: { bot: LiveBot }) {
 
       if (b.tiles.length > 0) {
         renderTilesInitial(tileContainer, b, itemColorsRef.current)
+        previousTilesRef.current = b.tiles
       }
 
       for (const obj of b.objects) {
@@ -624,6 +740,8 @@ export function Minimap({ bot }: { bot: LiveBot }) {
         appRef.current = null
       }
       layersRef.current = null
+      colorTileLayerRef.current = null
+      previousTilesRef.current = null
     }
   }, [centerOnBot])
 
@@ -632,12 +750,15 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     if (!layers || bot.tiles.length === 0) return
     
     if (useTileManager && items.length > 0) {
+      colorTileLayerRef.current = null
       renderTilesWithTileManager(layers.tiles, bot, items)
         .then(() => {
+          previousTilesRef.current = bot.tiles
           centerOnBot()
         })
         .catch(() => {
           layers.tiles.removeChildren()
+          colorTileLayerRef.current = null
           const g = new Graphics()
           for (let i = 0; i < bot.tiles.length; i++) {
             const tile = bot.tiles[i]
@@ -648,22 +769,14 @@ export function Minimap({ bot }: { bot: LiveBot }) {
             g.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
           }
           layers.tiles.addChild(g)
+          previousTilesRef.current = bot.tiles
         })
     } else {
-      layers.tiles.removeChildren()
-      const g = new Graphics()
-      for (let i = 0; i < bot.tiles.length; i++) {
-        const tile = bot.tiles[i]
-        if (tile.fg === 0) continue
-        const color = itemColors[tile.fg] ?? 0x4a4a5a
-        const tx = (i % bot.world_width) * TILE_PX
-        const ty = Math.floor(i / bot.world_width) * TILE_PX
-        g.rect(tx, ty, TILE_PX, TILE_PX).fill(color)
-      }
-      layers.tiles.addChild(g)
+      renderTilesColor(layers.tiles, bot, itemColors, previousTilesRef.current)
+      previousTilesRef.current = bot.tiles
       centerOnBot()
     }
-  }, [bot.tiles, bot.world_width, itemColors, useTileManager, items, centerOnBot])
+  }, [bot.tiles, bot.world_width, bot.world_height, itemColors, useTileManager, items, centerOnBot])
 
   useEffect(() => {
     const layers = layersRef.current
@@ -899,3 +1012,14 @@ export function Minimap({ bot }: { bot: LiveBot }) {
     </div>
   )
 }
+
+export const Minimap = memo(MinimapInner, (prev, next) => (
+  prev.bot.id === next.bot.id &&
+  prev.bot.world_width === next.bot.world_width &&
+  prev.bot.world_height === next.bot.world_height &&
+  prev.bot.tiles === next.bot.tiles &&
+  prev.bot.players === next.bot.players &&
+  prev.bot.objects === next.bot.objects &&
+  prev.bot.pos_x === next.bot.pos_x &&
+  prev.bot.pos_y === next.bot.pos_y
+))
