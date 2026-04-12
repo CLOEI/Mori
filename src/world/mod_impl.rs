@@ -43,34 +43,18 @@ impl World {
     /// Update a tile from a raw SendTileUpdateData blob.
     /// Layout: fg(u16) bg(u16) parent(u16) flags(u16) [kind(u8) extra...]
     /// Returns the new (fg, bg) on success.
-    pub fn update_tile_from_bytes(&mut self, x: u32, y: u32, data: &[u8]) -> Option<(u16, u16)> {
-        if data.len() < 4 { return None; }
-        let fg    = u16::from_le_bytes([data[0], data[1]]);
-        let bg    = u16::from_le_bytes([data[2], data[3]]);
-        let tile  = self.get_tile_mut(x, y)?;
-        tile.fg_item_id = fg;
-        tile.bg_item_id = bg;
-        if data.len() >= 8 {
-            let flags_raw = u16::from_le_bytes([data[6], data[7]]);
-            tile.flags_raw = flags_raw;
-            tile.flags     = TileFlags::from_bits_retain(flags_raw);
-            if tile.flags.contains(TileFlags::HAS_EXTRA_DATA) && data.len() >= 9 {
-                let kind = data[8];
-                tile.tile_type = match kind {
-                    4 if data.len() >= 14 => {
-                        let age          = u32::from_le_bytes([data[9], data[10], data[11], data[12]]);
-                        let item_on_tree = data[13];
-                        TileType::Seed { age, item_on_tree }
-                    }
-                    _ => TileType::Basic,
-                };
-            } else if fg == 0 {
-                tile.tile_type = TileType::Basic;
-            }
-        } else if fg == 0 {
-            tile.tile_type = TileType::Basic;
-        }
-        Some((fg, bg))
+    pub fn update_tile(&mut self, x: u32, y: u32, cur: &mut Cursor, map_version: u16) -> Result<(u16, u16)> {
+        let width = self.tile_map.width;
+        let height = self.tile_map.height;
+        let target_tile = self.get_tile_mut(x, y)
+            .ok_or_else(|| anyhow::anyhow!("target_tile.is_none! coord: {x},{y}, world size: {width},{height}"))?;
+
+        let result = Tile::parse(cur, map_version, x, y)?;
+        let fg = result.fg_item_id;
+        let bg = result.bg_item_id;
+        *target_tile = result;
+
+        Ok((fg, bg))
     }
 
     pub fn parse(data: &[u8]) -> Result<Self> {
@@ -196,7 +180,7 @@ pub struct Tile {
 }
 
 impl Tile {
-    fn parse(cur: &mut Cursor, _map_version: u16, x: u32, y: u32) -> Result<Self> {
+    pub fn parse(cur: &mut Cursor, _map_version: u16, x: u32, y: u32) -> Result<Self> {
         let fg_item_id = cur.u16()?;
         let bg_item_id = cur.u16()?;
         let parent_block = cur.u16()?;
@@ -250,8 +234,10 @@ pub enum TileType {
         settings: u8,
         owner_uid: u32,
         access_count: u32,
-        access_uids: Vec<u32>,
-        minimum_level: u8,
+        access_uids: Vec<i32>,
+        bpm: i32,
+        minimum_level: u32,
+        world_timer: u32,
     },
     Seed {
         age: u32,
@@ -279,7 +265,7 @@ pub enum TileType {
         data: u32,
         tile_type: u8,
     },
-    HearthMonitor {
+    HeartMonitor {
         player_id: u32,
         player_name: String,
     },
@@ -587,12 +573,15 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             let settings = cur.u8()?;
             let owner_uid = cur.u32()?;
             let access_count = cur.u32()?;
+            let mut bpm: i32 = 100;
             let mut access_uids = Vec::with_capacity(access_count as usize);
             for _ in 0..access_count {
-                access_uids.push(cur.u32()?);
+                let id = cur.i32()?;
+                if id < 0 { bpm = id; }
+                else { access_uids.push(id); }
             }
-            let minimum_level = cur.u8()?;
-            cur.skip(7)?;
+            let minimum_level = cur.u32()?;
+            let world_timer = cur.u32()?;
 
             // Guild Lock
             if fg_item_id == 5814 {
@@ -603,7 +592,9 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
                 owner_uid,
                 access_count,
                 access_uids,
+                bpm,
                 minimum_level,
+                world_timer
             })
         }
         4 => {
@@ -651,7 +642,7 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             // HearthMonitor
             let player_id = cur.u32()?;
             let player_name = cur.plain_string()?;
-            Ok(TileType::HearthMonitor {
+            Ok(TileType::HeartMonitor {
                 player_id,
                 player_name,
             })
