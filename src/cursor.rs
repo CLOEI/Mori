@@ -11,6 +11,8 @@ impl<'a> Cursor<'a> {
         Self { data, pos: 0, label }
     }
 
+    pub fn set_pos(&mut self, pos: usize) { self.pos = pos; }
+
     pub fn pos(&self) -> usize { self.pos }
 
     pub fn remaining(&self) -> usize {

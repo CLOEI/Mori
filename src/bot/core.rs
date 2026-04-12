@@ -4,6 +4,7 @@ use crate::bot_state::{
     WorldObjectInfo,
 };
 use crate::constants::{FHASH, GAME_VER, PROTOCOL};
+use crate::cursor::Cursor;
 use crate::protocol::crypto::{compute_klv, generate_rid, hash_string, random_hex, random_mac};
 use crate::events::{WsEvent, WsInvItem, WsObject, WsTile, WsTx};
 use crate::inventory::Inventory;
@@ -23,6 +24,7 @@ use std::sync::{Arc, RwLock};
 
 use super::auth::fetch_credentials;
 use super::shared::{BotEventRaw, Socks5Config, TemporaryData};
+use crate::world::Tile;
 
 enum BotHost {
     Direct(enet::Host<UdpSocket>),
@@ -1652,74 +1654,12 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         };
         let idx = (y * width + x) as usize;
 
-        let result = self
-            .world
-            .as_mut()
-            .unwrap()
-            .update_tile_from_bytes(x, y, &pkt.extra_data);
+        let mut cur = Cursor::new(&pkt.extra_data, "tile_update_data");
+        let world = self.world.as_mut().unwrap();
+        let result = world.update_tile(x, y, &mut cur, world.version);
 
-        if let Some((fg, bg)) = result {
-            {
-                let mut s = self.state.write().unwrap();
-                if let Some(ti) = s.tiles.get_mut(idx) {
-                    ti.fg_item_id = fg;
-                    ti.bg_item_id = bg;
-                }
-            }
-            self.emit(WsEvent::TileUpdate {
-                bot_id: self.bot_id,
-                x,
-                y,
-                fg,
-                bg,
-            });
-        }
-        self.log_console(format!("[Bot] TileUpdateData ({x},{y})"));
-    }
-
-    fn on_send_tile_update_data_multiple(&mut self, pkt: &GameUpdatePacket) {
-        // extra_data: u32 count, then for each: i32 x, i32 y, u16 fg, u16 bg, ...
-        let data = &pkt.extra_data;
-        if data.len() < 4 {
-            return;
-        }
-
-        let count = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
-        let mut offset = 4;
-
-        let width = match self.world.as_ref() {
-            Some(w) => w.tile_map.width,
-            None => return,
-        };
-
-        for _ in 0..count {
-            // Each entry: i32 x (4), i32 y (4), u16 fg (2), u16 bg (2) = 12 bytes minimum
-            if offset + 12 > data.len() {
-                break;
-            }
-
-            let x = u32::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-            ]);
-            let y = u32::from_le_bytes([
-                data[offset + 4],
-                data[offset + 5],
-                data[offset + 6],
-                data[offset + 7],
-            ]);
-            let tile_data = &data[offset + 8..];
-            let idx = (y as u64 * width as u64 + x as u64) as usize;
-
-            let result = self
-                .world
-                .as_mut()
-                .unwrap()
-                .update_tile_from_bytes(x, y, tile_data);
-
-            if let Some((fg, bg)) = result {
+        match result {
+            Ok((fg,bg)) => {
                 {
                     let mut s = self.state.write().unwrap();
                     if let Some(ti) = s.tiles.get_mut(idx) {
@@ -1734,11 +1674,58 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     fg,
                     bg,
                 });
+                self.log_console(format!("[Bot] TileUpdateData ({x},{y})"));
             }
-
-            offset += 12; // advance past the known fields; extra tile data is not parsed
+            Err(e) => {
+                self.log_console(format!("[Bot] TileUpdateData failed ({x},{y}) (Error: {e})"));
+            }
         }
-        self.log_console(format!("[Bot] TileUpdateDataMultiple count={count}"));
+    }
+
+    fn on_send_tile_update_data_multiple(&mut self, pkt: &GameUpdatePacket) {
+        // extra_data: u32 count, then for each: i32 x, i32 y, u16 fg, u16 bg, ...
+        let data = &pkt.extra_data;
+        if data.len() < 4 {
+            return;
+        }
+
+        let mut cur = Cursor::new(&pkt.extra_data, "tile_update_data_multiple");
+
+        // x u32, y u32, fg u16, bg u16, parent u16, flags u16 16 bytes
+        while cur.remaining() >= 16 {
+            // should be safe to assume all is unwrap-able.
+            let x = cur.u32().unwrap();
+            if x == 0xFFFFFFFF { break; } // end marker
+            let y = cur.u32().unwrap();
+
+            let world = self.world.as_mut().unwrap();
+            let result = world.update_tile(x, y, &mut cur, world.version);
+            let idx = (y * world.tile_map.width + x) as usize;
+
+            match result {
+                Ok((fg,bg)) => {
+                    {
+                        let mut s = self.state.write().unwrap();
+                        if let Some(ti) = s.tiles.get_mut(idx) {
+                            ti.fg_item_id = fg;
+                            ti.bg_item_id = bg;
+                        }
+                    }
+                    self.emit(WsEvent::TileUpdate {
+                        bot_id: self.bot_id,
+                        x,
+                        y,
+                        fg,
+                        bg,
+                    });
+                    self.log_console(format!("[Bot] TileUpdateDataMultiple ({x},{y})"));
+                }
+                Err(e) => {
+                    self.log_console(format!("[Bot] TileUpdateDataMultiple failed ({x},{y}) (Error: {e})"));
+                    return;
+                }
+            }
+        }
     }
 
     fn on_send_tile_tree_state(&mut self, pkt: &GameUpdatePacket) {
