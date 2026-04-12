@@ -250,8 +250,10 @@ pub enum TileType {
         settings: u8,
         owner_uid: u32,
         access_count: u32,
-        access_uids: Vec<u32>,
-        minimum_level: u8,
+        access_uids: Vec<i32>,
+        bpm: i32,
+        minimum_level: u32,
+        world_timer: u32,
     },
     Seed {
         age: u32,
@@ -279,7 +281,7 @@ pub enum TileType {
         data: u32,
         tile_type: u8,
     },
-    HearthMonitor {
+    HeartMonitor {
         player_id: u32,
         player_name: String,
     },
@@ -587,12 +589,15 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             let settings = cur.u8()?;
             let owner_uid = cur.u32()?;
             let access_count = cur.u32()?;
+            let mut bpm: i32 = 100;
             let mut access_uids = Vec::with_capacity(access_count as usize);
             for _ in 0..access_count {
-                access_uids.push(cur.u32()?);
+                let id = cur.i32()?;
+                if id < 0 { bpm = id; }
+                else { access_uids.push(id); }
             }
-            let minimum_level = cur.u8()?;
-            cur.skip(7)?;
+            let minimum_level = cur.u32()?;
+            let world_timer = cur.u32()?;
 
             // Guild Lock
             if fg_item_id == 5814 {
@@ -603,7 +608,9 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
                 owner_uid,
                 access_count,
                 access_uids,
+                bpm,
                 minimum_level,
+                world_timer
             })
         }
         4 => {
@@ -651,7 +658,7 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             // HearthMonitor
             let player_id = cur.u32()?;
             let player_name = cur.plain_string()?;
-            Ok(TileType::HearthMonitor {
+            Ok(TileType::HeartMonitor {
                 player_id,
                 player_name,
             })
