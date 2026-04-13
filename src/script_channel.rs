@@ -2,11 +2,12 @@ use crate::inventory::Inventory;
 use crate::protocol::packet::GameUpdatePacket;
 use crate::player::Player;
 use crate::world::World;
+use std::sync::Arc;
 
 /// A snapshot of the bot's world state, cloned and sent to the script thread.
 pub struct WorldSnapshot {
-    pub world:         World,
-    pub players:       Vec<Player>,
+    pub world:         Arc<World>,
+    pub players:       Arc<Vec<Player>>,
     pub local_net_id:  u32,
     pub local_user_id: u32,
     pub local_name:    String,

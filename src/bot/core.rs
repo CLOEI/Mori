@@ -24,7 +24,6 @@ use std::sync::{Arc, RwLock};
 
 use super::auth::fetch_credentials;
 use super::shared::{BotEventRaw, Socks5Config, TemporaryData};
-use crate::world::Tile;
 
 enum BotHost {
     Direct(enet::Host<UdpSocket>),
@@ -143,7 +142,7 @@ pub struct Bot {
     /// The bot's inventory, updated on SendInventoryState.
     pub inventory: Inventory,
     /// The current world, updated on SendMapData.
-    pub world: Option<World>,
+    pub world: Option<Arc<World>>,
     /// Active peer, set on Connect and cleared on Disconnect.
     peer_id: Option<enet::PeerID>,
     /// Shared state written by the bot and read by the web layer.
@@ -1011,7 +1010,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                                 world.tile_map.height,
                                                 world.objects.len(),
                                             ));
-                                            self.world = Some(world.clone());
+                                            let world = Arc::new(world);
+                                            self.world = Some(Arc::clone(&world));
                                             let tiles: Vec<TileInfo> = world
                                                 .tile_map
                                                 .tiles
@@ -1607,7 +1607,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         let idx = (y * width + x) as usize;
 
         let result = {
-            let world = self.world.as_mut().unwrap();
+            let world = Arc::make_mut(self.world.as_mut().unwrap());
             if let Some(tile) = world.get_tile_mut(x, y) {
                 if item_id == 18 {
                     if tile.fg_item_id != 0 {
@@ -1655,7 +1655,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         let idx = (y * width + x) as usize;
 
         let mut cur = Cursor::new(&pkt.extra_data, "tile_update_data");
-        let world = self.world.as_mut().unwrap();
+        let world = Arc::make_mut(self.world.as_mut().unwrap());
         let result = world.update_tile(x, y, &mut cur, world.version);
 
         match result {
@@ -1698,7 +1698,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             if x == 0xFFFFFFFF { break; } // end marker
             let y = cur.u32().unwrap();
 
-            let world = self.world.as_mut().unwrap();
+            let world = Arc::make_mut(self.world.as_mut().unwrap());
             let result = world.update_tile(x, y, &mut cur, world.version);
             let idx = (y * world.tile_map.width + x) as usize;
 
@@ -1738,7 +1738,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         };
         let idx = (y * width + x) as usize;
 
-        let world = self.world.as_mut().unwrap();
+        let world = Arc::make_mut(self.world.as_mut().unwrap());
         if let Some(tile) = world.get_tile_mut(x, y) {
             tile.fg_item_id = 0;
             tile.tile_type = TileType::Basic;
@@ -1831,7 +1831,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         match pkt.net_id {
             u32::MAX => {
                 // New item dropped into the world
-                let world = self.world.as_mut().unwrap();
+                let world = Arc::make_mut(self.world.as_mut().unwrap());
                 let next_uid = world.next_object_uid;
                 world.next_object_uid += 1;
                 let obj = WorldObject {
@@ -1878,7 +1878,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             }
             net_id if net_id == u32::MAX - 2 => {
                 // Update count for an existing dropped item
-                let world = self.world.as_mut().unwrap();
+                let world = Arc::make_mut(self.world.as_mut().unwrap());
                 if let Some(obj) = world.objects.iter_mut().find(|o| {
                     o.item_id == pkt.value as u16
                         && o.x == pkt.vector_x.ceil()
@@ -1917,7 +1917,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             net_id if net_id > 0 => {
                 // Item collected — remove from world by uid; release borrow before updating inventory
                 let collected = {
-                    let world = self.world.as_mut().unwrap();
+                    let world = Arc::make_mut(self.world.as_mut().unwrap());
                     world
                         .objects
                         .iter()
@@ -1982,7 +1982,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         let fg = pkt.value as u16;
 
         let world = match self.world.as_mut() {
-            Some(w) => w,
+            Some(w) => Arc::make_mut(w),
             None => return,
         };
         let width = world.tile_map.width;
@@ -2533,10 +2533,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Ack
             }
             Req::GetWorld => {
-                let snap = self.world.clone().map(|world| {
-                    let players = self.players.values().cloned().collect();
+                let snap = self.world.as_ref().map(|world| {
+                    let players = Arc::new(self.players.values().cloned().collect());
                     WorldSnapshot {
-                        world,
+                        world: Arc::clone(world),
                         players,
                         local_net_id: self.local.net_id,
                         local_user_id: self.local.user_id,
@@ -2951,7 +2951,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
 
     fn on_npc_packet(&mut self, pkt: &GameUpdatePacket) {
         let world = match self.world.as_mut() {
-            Some(w) => w,
+            Some(w) => Arc::make_mut(w),
             None    => return,
         };
 

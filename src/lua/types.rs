@@ -1,9 +1,9 @@
 use crate::bot_state::BotState;
 use crate::inventory::{Inventory, InventoryItem};
 use crate::items::ItemInfo;
+use crate::protocol::variant::{Variant, VariantList};
 use crate::protocol::packet::GameUpdatePacket;
 use crate::player::Player;
-use crate::protocol::variant::{Variant, VariantList};
 use crate::world::{Tile, World, WorldNpc, WorldObject};
 use std::sync::{Arc, RwLock};
 
@@ -24,8 +24,8 @@ impl BotProxy {
 }
 
 pub(super) struct LuaWorld {
-    pub world: World,
-    pub players: Vec<Player>,
+    pub world: Arc<World>,
+    pub players: Arc<Vec<Player>>,
     pub local_net_id: u32,
     pub local_user_id: u32,
     pub local_name: String,

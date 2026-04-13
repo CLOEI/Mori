@@ -1,4 +1,6 @@
 use mlua::prelude::*;
+use mlua::MetaMethod;
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
@@ -7,7 +9,7 @@ use crate::protocol::packet::{GamePacketType, GameUpdatePacket, PacketFlags};
 use crate::player::Player;
 use crate::script_channel::{ScriptRequest as Req, ScriptReply as Rep};
 use crate::protocol::variant::Variant;
-use crate::world::{TileFlags, TileType};
+use crate::world::{TileFlags, TileType, World};
 
 use super::http::register_http_client;
 use super::webhook::register_webhook;
@@ -15,6 +17,121 @@ use super::types::{
     BotProxy, LuaGameUpdatePacket, LuaInventory, LuaInventoryItem, LuaItemInfo,
     LuaLogin, LuaNetObject, LuaNpc, LuaPlayer, LuaTile, LuaVariant, LuaVariantList, LuaWorld,
 };
+
+fn sequence_index_value<F>(
+    lua: &Lua,
+    key: LuaValue,
+    len: usize,
+    get_value: &F,
+) -> LuaResult<LuaValue>
+where
+    F: Fn(&Lua, usize) -> LuaResult<LuaValue>,
+{
+    let index = match key {
+        LuaValue::Integer(i) if i >= 1 => (i - 1) as usize,
+        LuaValue::Number(n) if n.fract() == 0.0 && n >= 1.0 => (n as usize).saturating_sub(1),
+        _ => return Ok(LuaValue::Nil),
+    };
+    if index >= len {
+        return Ok(LuaValue::Nil);
+    }
+    get_value(lua, index)
+}
+
+fn create_lazy_sequence<F>(lua: &Lua, len: usize, get_value: F) -> LuaResult<LuaTable>
+where
+    F: Fn(&Lua, usize) -> LuaResult<LuaValue> + Clone + 'static,
+{
+    let table = lua.create_table()?;
+    table.raw_set("__mori_sequence", true)?;
+
+    let metatable = lua.create_table()?;
+
+    metatable.set(
+        MetaMethod::Len.name(),
+        lua.create_function(move |_, _: LuaTable| Ok(len))?,
+    )?;
+
+    let get_value_index = get_value.clone();
+    metatable.set(
+        MetaMethod::Index.name(),
+        lua.create_function(move |lua, (_table, key): (LuaTable, LuaValue)| {
+            sequence_index_value(lua, key, len, &get_value_index)
+        })?,
+    )?;
+
+    let get_value_pairs = get_value;
+    metatable.set(
+        MetaMethod::Pairs.name(),
+        lua.create_function(move |lua, table: LuaTable| {
+            let get_value = get_value_pairs.clone();
+            let iter = lua.create_function(move |lua, (_seq, last): (LuaTable, LuaValue)| {
+                let next_index = match last {
+                    LuaValue::Integer(i) if i >= 0 => i + 1,
+                    LuaValue::Nil => 1,
+                    _ => 1,
+                };
+                if next_index as usize > len {
+                    return Ok((LuaValue::Nil, LuaValue::Nil));
+                }
+                let item = sequence_index_value(lua, LuaValue::Integer(next_index), len, &get_value)?;
+                if matches!(item, LuaValue::Nil) {
+                    Ok((LuaValue::Nil, LuaValue::Nil))
+                } else {
+                    Ok((LuaValue::Integer(next_index), item))
+                }
+            })?;
+            Ok((iter, table, LuaValue::Nil))
+        })?,
+    )?;
+
+    let _ = table.set_metatable(Some(metatable));
+    Ok(table)
+}
+
+fn tile_value(lua: &Lua, tile: TileTypeSource) -> LuaResult<LuaValue> {
+    Ok(LuaValue::UserData(lua.create_userdata(LuaTile(tile.into_tile()))?))
+}
+
+enum TileTypeSource {
+    Tile(crate::world::Tile),
+}
+
+impl TileTypeSource {
+    fn into_tile(self) -> crate::world::Tile {
+        match self {
+            TileTypeSource::Tile(tile) => tile,
+        }
+    }
+}
+
+fn create_lazy_tile_sequence(lua: &Lua, world: Arc<World>) -> LuaResult<LuaTable> {
+    let len = world.tile_map.tiles.len();
+    create_lazy_sequence(lua, len, move |lua, index| {
+        tile_value(lua, TileTypeSource::Tile(world.tile_map.tiles[index].clone()))
+    })
+}
+
+fn create_lazy_object_sequence(lua: &Lua, world: Arc<World>) -> LuaResult<LuaTable> {
+    let len = world.objects.len();
+    create_lazy_sequence(lua, len, move |lua, index| {
+        Ok(LuaValue::UserData(lua.create_userdata(LuaNetObject(world.objects[index].clone()))?))
+    })
+}
+
+fn create_lazy_player_sequence(lua: &Lua, players: Arc<Vec<Player>>) -> LuaResult<LuaTable> {
+    let len = players.len();
+    create_lazy_sequence(lua, len, move |lua, index| {
+        Ok(LuaValue::UserData(lua.create_userdata(LuaPlayer(players[index].clone()))?))
+    })
+}
+
+fn create_lazy_npc_sequence(lua: &Lua, world: Arc<World>) -> LuaResult<LuaTable> {
+    let len = world.npcs.len();
+    create_lazy_sequence(lua, len, move |lua, index| {
+        Ok(LuaValue::UserData(lua.create_userdata(LuaNpc(world.npcs[index].clone()))?))
+    })
+}
 
 impl LuaUserData for BotProxy {
     fn add_fields<F: LuaUserDataFields<Self>>(fields: &mut F) {
@@ -387,32 +504,16 @@ impl LuaUserData for LuaWorld {
         fields.add_field_method_get("version",    |_, w| Ok(w.world.version));
         // Convenience table properties
         fields.add_field_method_get("tiles", |lua, w| {
-            let t = lua.create_table()?;
-            for (i, tile) in w.world.tile_map.tiles.iter().enumerate() {
-                t.set(i + 1, LuaTile(tile.clone()))?;
-            }
-            Ok(t)
+            create_lazy_tile_sequence(lua, Arc::clone(&w.world))
         });
         fields.add_field_method_get("objects", |lua, w| {
-            let t = lua.create_table()?;
-            for (i, obj) in w.world.objects.iter().enumerate() {
-                t.set(i + 1, LuaNetObject(obj.clone()))?;
-            }
-            Ok(t)
+            create_lazy_object_sequence(lua, Arc::clone(&w.world))
         });
         fields.add_field_method_get("players", |lua, w| {
-            let t = lua.create_table()?;
-            for (i, p) in w.players.iter().enumerate() {
-                t.set(i + 1, LuaPlayer(p.clone()))?;
-            }
-            Ok(t)
+            create_lazy_player_sequence(lua, Arc::clone(&w.players))
         });
         fields.add_field_method_get("npcs", |lua, w| {
-            let t = lua.create_table()?;
-            for (i, n) in w.world.npcs.iter().enumerate() {
-                t.set(i + 1, LuaNpc(n.clone()))?;
-            }
-            Ok(t)
+            create_lazy_npc_sequence(lua, Arc::clone(&w.world))
         });
     }
 
@@ -422,11 +523,7 @@ impl LuaUserData for LuaWorld {
         });
 
         methods.add_method("getTiles", |lua, w, ()| {
-            let t = lua.create_table()?;
-            for (i, tile) in w.world.tile_map.tiles.iter().enumerate() {
-                t.set(i + 1, LuaTile(tile.clone()))?;
-            }
-            Ok(t)
+            create_lazy_tile_sequence(lua, Arc::clone(&w.world))
         });
 
         methods.add_method("getObject", |_, w, oid: u32| {
@@ -434,11 +531,7 @@ impl LuaUserData for LuaWorld {
         });
 
         methods.add_method("getObjects", |lua, w, ()| {
-            let t = lua.create_table()?;
-            for (i, obj) in w.world.objects.iter().enumerate() {
-                t.set(i + 1, LuaNetObject(obj.clone()))?;
-            }
-            Ok(t)
+            create_lazy_object_sequence(lua, Arc::clone(&w.world))
         });
 
         methods.add_method("getPlayer", |_, w, key: LuaValue| {
@@ -455,11 +548,7 @@ impl LuaUserData for LuaWorld {
         });
 
         methods.add_method("getPlayers", |lua, w, ()| {
-            let t = lua.create_table()?;
-            for (i, p) in w.players.iter().enumerate() {
-                t.set(i + 1, LuaPlayer(p.clone()))?;
-            }
-            Ok(t)
+            create_lazy_player_sequence(lua, Arc::clone(&w.players))
         });
 
         methods.add_method("getLocal", |_, w, ()| {
@@ -501,11 +590,7 @@ impl LuaUserData for LuaWorld {
         });
 
         methods.add_method("getNPCs", |lua, w, ()| {
-            let t = lua.create_table()?;
-            for (i, n) in w.world.npcs.iter().enumerate() {
-                t.set(i + 1, LuaNpc(n.clone()))?;
-            }
-            Ok(t)
+            create_lazy_npc_sequence(lua, Arc::clone(&w.world))
         });
     }
 }
@@ -1076,6 +1161,37 @@ end
 
         // ── Shortcut globals ───────────────────────────────────────────────────
         lua.load(r#"
+local __builtin_ipairs = ipairs
+local __builtin_pairs = pairs
+
+function ipairs(t)
+    if type(t) == "table" and rawget(t, "__mori_sequence") then
+        local function iter(seq, i)
+            i = i + 1
+            local item = seq[i]
+            if item ~= nil then
+                return i, item
+            end
+        end
+        return iter, t, 0
+    end
+    return __builtin_ipairs(t)
+end
+
+function pairs(t)
+    if type(t) == "table" and rawget(t, "__mori_sequence") then
+        local function iter(seq, i)
+            i = i + 1
+            local item = seq[i]
+            if item ~= nil then
+                return i, item
+            end
+        end
+        return iter, t, 0
+    end
+    return __builtin_pairs(t)
+end
+
 function getLocal()
     return getBot():getLocal()
 end
