@@ -1,300 +1,312 @@
-import { useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { useDeferredValue, useMemo, useState } from 'react'
+import { BookOpen, Code2, Search, Sparkles } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { LUA_DOC_SECTIONS, LUA_DOC_VERSION, type DocSection } from '@/lib/lua-docs'
+import { cn } from '@/lib/utils'
 
-type Entry = { sig: string; desc: string }
-type Section = { title: string; entries: Entry[] }
+type FilteredSection = DocSection & {
+  matchedEntries: NonNullable<DocSection['entries']>
+  matchedTables: NonNullable<DocSection['tables']>
+}
 
-const SECTIONS: Section[] = [
-  {
-    title: 'Globals',
-    entries: [
-      { sig: 'bot', desc: 'The current bot (BotProxy). Scripts may only control their own bot.' },
-      { sig: 'sleep(ms)', desc: 'Pause script execution for the given number of milliseconds.' },
-      { sig: 'getInfo(id|name)', desc: 'Get ItemInfo by numeric ID or name string. → ItemInfo?' },
-      { sig: 'getInfos()', desc: 'Get all items from items.dat. → ItemInfo[]' },
-      { sig: 'getUsername()', desc: "Return the current bot's username. → string" },
-      { sig: 'read(path)', desc: 'Read a file from disk and return its contents as a string.' },
-      { sig: 'write(path, content)', desc: 'Write a string to a file (overwrite).' },
-      { sig: 'append(path, content)', desc: 'Append a string to a file (creates if missing).' },
-      { sig: 'removeColor(text)', desc: 'Strip Growtopia backtick-prefixed color codes from a string.' },
-      { sig: 'clearConsole()', desc: "Clear the current bot's console output." },
-      { sig: 'runThread(fn, ...)', desc: 'Call a function immediately with the given args (synchronous).' },
-    ],
-  },
-  {
-    title: 'Shortcut Globals',
-    entries: [
-      { sig: 'getWorld()', desc: 'Shortcut for bot:getWorld(). → World?' },
-      { sig: 'getInventory()', desc: 'Shortcut for bot:getInventory(). → Inventory' },
-      { sig: 'getLocal()', desc: 'Shortcut for bot:getLocal(). → Player' },
-      { sig: 'getPlayer(key)', desc: 'Get a player by net_id or name from the current world. → Player?' },
-      { sig: 'getPlayers()', desc: 'Get all players in the current world. → Player[]' },
-      { sig: 'getTile(x, y)', desc: 'Get a tile at position. → Tile?' },
-      { sig: 'getTiles()', desc: 'Get all tiles in the current world. → Tile[]' },
-      { sig: 'getObject(oid)', desc: 'Get a dropped world object by UID. → NetObject?' },
-      { sig: 'getObjects()', desc: 'Get all dropped objects in the current world. → NetObject[]' },
-      { sig: 'hasAccess(x, y)', desc: 'Returns false (stub).' },
-    ],
-  },
-  {
-    title: 'Events',
-    entries: [
-      { sig: 'Event.variantlist', desc: '= 1. Handler receives (VariantList, net_id).' },
-      { sig: 'Event.gameupdate', desc: '= 2. Handler receives (GameUpdatePacket).' },
-      { sig: 'Event.gamemessage', desc: '= 3. Handler receives (text: string).' },
-      { sig: 'addEvent(etype, fn)', desc: 'Register a callback for an event type.' },
-      { sig: 'removeEvent(etype)', desc: 'Remove the callback for an event type.' },
-      { sig: 'removeEvents()', desc: 'Clear all event callbacks.' },
-      { sig: 'listenEvents([secs])', desc: 'Pump ENet and fire registered callbacks. Loops until unlistenEvents() if no duration given.' },
-      { sig: 'unlistenEvents()', desc: 'Request the current listenEvents loop to exit early.' },
-    ],
-  },
-  {
-    title: 'Bot — Fields',
-    entries: [
-      { sig: 'bot.name', desc: 'Username string.' },
-      { sig: 'bot.status', desc: 'Current status string.' },
-      { sig: 'bot.gem_count', desc: 'Gem count from inventory.' },
-      { sig: 'bot.auto_collect', desc: 'Auto-collect toggle (read/write).' },
-    ],
-  },
-  {
-    title: 'Bot — Info / State',
-    entries: [
-      { sig: 'bot:getWorld()', desc: 'Get the current world snapshot. → World?' },
-      { sig: 'bot:getInventory()', desc: 'Get the current inventory snapshot. → Inventory' },
-      { sig: 'bot:getLocal()', desc: 'Get a Player object representing this bot. → Player' },
-      { sig: 'bot:getConsole()', desc: 'Get the console object. → Console' },
-      { sig: 'bot:getLogin()', desc: 'Get login data (MAC address). → Login' },
-      { sig: 'bot:getPing()', desc: 'Current round-trip ping in ms. → uint' },
-      { sig: 'bot:isInWorld([name])', desc: 'True if in any world, or a specific world if name given. → bool' },
-      { sig: 'bot:isInTile(x, y)', desc: 'True if the bot is currently standing on tile (x, y). → bool' },
-    ],
-  },
-  {
-    title: 'Bot — Movement',
-    entries: [
-      { sig: 'bot:moveTo(dx, dy)', desc: 'Move relative to current tile position by (dx, dy) tiles.' },
-      { sig: 'bot:moveTile(x, y)', desc: 'Walk to absolute tile (x, y).' },
-      { sig: 'bot:moveLeft([n])', desc: 'Move left n tiles (default 1).' },
-      { sig: 'bot:moveRight([n])', desc: 'Move right n tiles (default 1).' },
-      { sig: 'bot:moveUp([n])', desc: 'Move up n tiles (default 1).' },
-      { sig: 'bot:moveDown([n])', desc: 'Move down n tiles (default 1).' },
-      { sig: 'bot:setDirection(facing_left)', desc: 'Set bot facing direction.' },
-      { sig: 'bot:findPath(x, y)', desc: 'Pathfind to tile (x, y) using A*.' },
-      { sig: 'bot:getPath(x, y)', desc: 'Compute and return A* path without walking. → table[]' },
-    ],
-  },
-  {
-    title: 'Bot — World Actions',
-    entries: [
-      { sig: 'bot:warp(name, [id])', desc: 'Warp to a world by name, with optional door ID.' },
-      { sig: 'bot:say(text)', desc: 'Send a chat message.' },
-      { sig: 'bot:leaveWorld()', desc: 'Leave the current world.' },
-      { sig: 'bot:respawn()', desc: 'Respawn the bot.' },
-      { sig: 'bot:place(x, y, item)', desc: 'Place item ID at tile (x, y).' },
-      { sig: 'bot:hit(x, y)', desc: 'Punch tile at (x, y).' },
-      { sig: 'bot:wrench(x, y)', desc: 'Wrench tile at (x, y).' },
-      { sig: 'bot:wrenchPlayer(net_id)', desc: 'Wrench a player by net ID.' },
-      { sig: 'bot:active(x, y)', desc: 'Activate/enter tile at (x, y).' },
-      { sig: 'bot:enter([pass])', desc: 'Activate the tile under the bot, optionally with a password.' },
-      { sig: 'bot:collectObject(oid, range)', desc: 'Collect a specific dropped object by UID within range tiles.' },
-      { sig: 'bot:collect(range, interval)', desc: 'Collect all nearby objects within range tiles. → int count' },
-    ],
-  },
-  {
-    title: 'Bot — Inventory Actions',
-    entries: [
-      { sig: 'bot:wear(item_id)', desc: 'Wear / equip an item.' },
-      { sig: 'bot:unwear(item_id)', desc: 'Unequip an item.' },
-      { sig: 'bot:use(item_id)', desc: 'Alias for wear.' },
-      { sig: 'bot:consume(item_id)', desc: 'Use / drink an item.' },
-      { sig: 'bot:drop(item_id, [count])', desc: 'Drop item by ID (default 1).' },
-      { sig: 'bot:trash(item_id)', desc: 'Delete item from inventory.' },
-      { sig: 'bot:send(item_id, [count], username)', desc: 'Send item to another player (default count 1).' },
-      { sig: 'bot:store(item_id, [count])', desc: "Store item in the current world's storage (not portable)." },
-    ],
-  },
-  {
-    title: 'Remote Bot (RBProxy)',
-    entries: [
-      { sig: 'getRBot(name)', desc: 'Get another bot handle from the controller. → RBProxy?' },
-      { sig: 'rb.name / .status / .gem_count', desc: "Read-only fields mirroring the remote bot's state." },
-      { sig: 'rb:getWorld()', desc: "Snapshot of remote bot's world (via shared Arc). → World?" },
-      { sig: 'rb:getInventory()', desc: "Snapshot of remote bot's inventory. → Inventory" },
-      { sig: 'rb:say / warp / moveTo / findPath / place / hit / ...', desc: "Commands queued and executed on the remote bot's thread." },
-    ],
-  },
-  {
-    title: 'World',
-    entries: [
-      { sig: '.name', desc: 'World name string.' },
-      { sig: '.x / .y', desc: 'Width / height in tiles.' },
-      { sig: '.tile_count / .version / .public', desc: 'Tile count, version number, public flag.' },
-      { sig: '.tiles / .objects / .players', desc: 'Arrays of Tile, NetObject, Player.' },
-      { sig: ':getTile(x, y)', desc: 'Get Tile at position. → Tile?' },
-      { sig: ':getTiles() / :getTilesSafe()', desc: 'Get all tiles as array. → Tile[]' },
-      { sig: ':getObject(oid)', desc: 'Get dropped object by UID. → NetObject?' },
-      { sig: ':getObjects()', desc: 'All dropped objects. → NetObject[]' },
-      { sig: ':getPlayer(net_id|name)', desc: 'Find player by net ID or name. → Player?' },
-      { sig: ':getPlayers()', desc: 'All players in world. → Player[]' },
-      { sig: ':getLocal()', desc: "Bot's own Player representation. → Player" },
-      { sig: ':isValidPosition(x, y)', desc: 'True if tile coords are in bounds. → bool' },
-    ],
-  },
-  {
-    title: 'Inventory',
-    entries: [
-      { sig: '.itemcount / .slotcount', desc: 'Item count and max slot count.' },
-      { sig: '.items', desc: 'Array of InventoryItem.' },
-      { sig: ':getItem(id)', desc: 'Get item by ID. → InventoryItem?' },
-      { sig: ':getItems()', desc: 'All items in inventory. → InventoryItem[]' },
-      { sig: ':findItem(id) / :getItemCount(id)', desc: 'Return count of item ID (0 if not present). → uint' },
-    ],
-  },
-  {
-    title: 'Player',
-    entries: [
-      { sig: '.name / .country', desc: 'Display name and country code.' },
-      { sig: '.netid / .userid', desc: 'Network ID and user ID.' },
-      { sig: '.posx / .posy', desc: 'Pixel-space position (divide by 32 for tile).' },
-      { sig: '.avatarFlags', desc: 'Raw avatar state flags.' },
-      { sig: '.roleicon', desc: 'Role icon string.' },
-    ],
-  },
-  {
-    title: 'Tile',
-    entries: [
-      { sig: '.fg / .foreground', desc: 'Foreground item ID.' },
-      { sig: '.bg / .background', desc: 'Background item ID.' },
-      { sig: '.x / .y', desc: 'Tile coordinates.' },
-      { sig: '.flags', desc: 'Raw tile flags bitmask.' },
-      { sig: ':hasExtra()', desc: 'True if tile has extra data. → bool' },
-      { sig: ':getExtra()', desc: 'Returns extra data table. → table?' },
-      { sig: ':canHarvest()', desc: 'True if tile is a ready-to-harvest seed. → bool' },
-      { sig: ':hasFlag(flag)', desc: 'Test a specific flag bit. → bool' },
-    ],
-  },
-  {
-    title: 'NetObject (dropped item)',
-    entries: [
-      { sig: '.id', desc: 'Item ID.' },
-      { sig: '.x / .y', desc: 'Pixel-space position.' },
-      { sig: '.count', desc: 'Stack count.' },
-      { sig: '.flags', desc: 'Object flags.' },
-      { sig: '.oid', desc: 'Unique object UID used with collectObject.' },
-    ],
-  },
-  {
-    title: 'ItemInfo',
-    entries: [
-      { sig: '.id / .name', desc: 'Item ID and display name.' },
-      { sig: '.action_type / .collision_type / .clothing_type', desc: 'Type enumerations.' },
-      { sig: '.rarity / .grow_time / .drop_chance', desc: 'Economy stats.' },
-      { sig: '.texture / .texture_hash / .texture_x / .texture_y', desc: 'Sprite sheet info.' },
-      { sig: '.strength', desc: 'Block health / punch count.' },
-    ],
-  },
-  {
-    title: 'Console',
-    entries: [
-      { sig: '.contents', desc: 'Table of log lines (max 100). string[]' },
-      { sig: ':append(text)', desc: 'Push a line to the console (visible in the dashboard).' },
-    ],
-  },
-  {
-    title: 'GameUpdatePacket',
-    entries: [
-      { sig: 'GameUpdatePacket.new()', desc: 'Create a new blank packet. → GameUpdatePacket' },
-      { sig: '.type / .object_type / .count1 / .count2', desc: 'Packet type and counters (read/write).' },
-      { sig: '.netid / .item / .flags', desc: 'Net ID, item target, flags bitmask (read/write).' },
-      { sig: '.vec_x/.pos_x / .vec_y/.pos_y', desc: 'Primary position vector (read/write, aliased).' },
-      { sig: '.vec2_x/.pos2_x / .vec2_y/.pos2_y', desc: 'Secondary position vector (read/write, aliased).' },
-    ],
-  },
-  {
-    title: 'Variant / VariantList',
-    entries: [
-      { sig: 'variant:getType()', desc: '1=float, 2=string, 3=vec2, 4=vec3, 5=uint, 9=int, 0=unknown. → uint' },
-      { sig: 'variant:getString() / :getInt() / :getFloat()', desc: 'Extract typed value.' },
-      { sig: 'variant:getVector2()', desc: 'Returns {x, y}.' },
-      { sig: 'variantlist:get(idx)', desc: 'Get variant at 0-based index. → Variant?' },
-      { sig: 'variantlist:print()', desc: 'Comma-separated string of all variants.' },
-    ],
-  },
-  {
-    title: 'Login',
-    entries: [
-      { sig: '.mac', desc: "The bot's MAC address string." },
-    ],
-  },
-]
+function matchesText(haystack: string, term: string) {
+  return haystack.toLowerCase().includes(term)
+}
 
 export function DocsPage() {
   const [q, setQ] = useState('')
+  const deferredQuery = useDeferredValue(q)
 
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase()
-    if (!term) return SECTIONS
-    return SECTIONS
-      .map((s) => ({
-        ...s,
-        entries: s.entries.filter(
-          (e) =>
-            e.sig.toLowerCase().includes(term) ||
-            e.desc.toLowerCase().includes(term),
-        ),
-      }))
-      .filter((s) => s.entries.length > 0 || s.title.toLowerCase().includes(term))
-  }, [q])
+  const filtered = useMemo<FilteredSection[]>(() => {
+    const term = deferredQuery.trim().toLowerCase()
+
+    return LUA_DOC_SECTIONS
+      .map((section) => {
+        const entries = section.entries ?? []
+        const tables = section.tables ?? []
+
+        if (!term) {
+          return {
+            ...section,
+            matchedEntries: entries,
+            matchedTables: tables,
+          }
+        }
+
+        const matchedEntries = entries.filter((entry) =>
+          matchesText(
+            [
+              entry.name,
+              entry.signature,
+              entry.description,
+              ...(entry.details ?? []),
+            ]
+              .filter(Boolean)
+              .join(' '),
+            term,
+          ),
+        )
+
+        const matchedTables = tables.filter((table) =>
+          matchesText(
+            [table.title, ...table.columns, ...table.rows.flat()].join(' '),
+            term,
+          ),
+        )
+
+        const sectionMatch = matchesText(
+          [section.title, section.summary, section.example].filter(Boolean).join(' '),
+          term,
+        )
+
+        return {
+          ...section,
+          matchedEntries: sectionMatch ? entries : matchedEntries,
+          matchedTables: sectionMatch ? tables : matchedTables,
+        }
+      })
+      .filter((section) => section.matchedEntries.length > 0 || section.matchedTables.length > 0)
+  }, [deferredQuery])
+
+  const totalEntries = useMemo(
+    () => LUA_DOC_SECTIONS.reduce((sum, section) => sum + (section.entries?.length ?? 0), 0),
+    [],
+  )
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-border bg-card">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search API…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="pl-8 h-8 text-xs"
-          />
+    <div className="h-full overflow-hidden bg-background">
+      <div className="border-b border-border bg-card/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="gap-1.5">
+                  <BookOpen className="size-3" />
+                  Lua API
+                </Badge>
+                <Badge variant="secondary">v{LUA_DOC_VERSION}</Badge>
+                <Badge variant="outline">Synced to LUA.md</Badge>
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                  Mori scripting reference
+                </h1>
+                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                  Search the current Lua contract, browse object models, and inspect examples
+                  without leaving the dashboard.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 lg:min-w-[22rem]">
+              <StatCard label="Sections" value={String(LUA_DOC_SECTIONS.length)} icon={BookOpen} />
+              <StatCard label="Functions" value={String(totalEntries)} icon={Code2} />
+              <StatCard label="Search hits" value={String(filtered.length)} icon={Sparkles} />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full max-w-xl">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search functions, fields, tables, or examples..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="h-10 rounded-xl border-border/70 bg-background pl-10 text-sm"
+              />
+            </div>
+            {q.trim() ? (
+              <Button size="sm" variant="ghost" onClick={() => setQ('')}>
+                Clear search
+              </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Covers globals, events, bot actions, HTTP, webhooks, and reference tables.
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="max-w-3xl mx-auto px-6 py-6 space-y-7">
-          {filtered.map((section) => (
-            <div key={section.title}>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 pb-2 border-b border-border">
-                {section.title}
+      <div className="mx-auto grid h-[calc(100%-14.5rem)] max-w-7xl xl:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="hidden border-r border-border/70 bg-card/40 xl:block">
+          <ScrollArea className="h-full">
+            <div className="space-y-2 p-4">
+              <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+                Jump to section
               </p>
-              <Table className="text-xs">
-                <TableHeader>
-                  <TableRow className="border-b border-border">
-                    <TableHead className="w-64">Signature</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {section.entries.map((entry, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-mono text-primary whitespace-nowrap align-top">{entry.sig}</TableCell>
-                      <TableCell className="text-muted-foreground align-top">{entry.desc}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {filtered.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() =>
+                    document.getElementById(section.id)?.scrollIntoView({
+                      behavior: 'smooth',
+                      block: 'start',
+                    })
+                  }
+                  className="w-full rounded-xl border border-transparent px-3 py-2 text-left transition-colors hover:border-border hover:bg-background"
+                >
+                  <p className="text-sm font-medium text-foreground">{section.title}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    {section.summary}
+                  </p>
+                </button>
+              ))}
             </div>
-          ))}
-          {filtered.length === 0 && (
-            <p className="text-center text-muted-foreground text-xs py-12">No results.</p>
-          )}
+          </ScrollArea>
+        </aside>
+
+        <ScrollArea className="h-full">
+          <div className="mx-auto flex max-w-5xl flex-col gap-5 px-6 py-6">
+            {filtered.map((section) => (
+              <section
+                key={section.id}
+                id={section.id}
+                className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm"
+              >
+                <div className="border-b border-border/70 bg-gradient-to-r from-muted/70 via-card to-card px-6 py-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+                        {section.title}
+                      </p>
+                      <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                        {section.summary}
+                      </h2>
+                    </div>
+                    <Badge variant="outline">
+                      {section.matchedEntries.length + section.matchedTables.length} blocks
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-5 p-6">
+                  {section.matchedEntries.length > 0 && (
+                    <div className="grid gap-3">
+                      {section.matchedEntries.map((entry) => (
+                        <article
+                          key={`${section.id}-${entry.name}-${entry.signature ?? 'entry'}`}
+                          className="rounded-2xl border border-border/70 bg-background/70 p-4"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary">{entry.name}</Badge>
+                              {entry.signature && (
+                                <code className="rounded-lg bg-muted px-2.5 py-1 font-mono text-xs text-foreground">
+                                  {entry.signature}
+                                </code>
+                              )}
+                            </div>
+                            <p className="text-sm leading-6 text-foreground">{entry.description}</p>
+                            {entry.details && entry.details.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {entry.details.map((detail) => (
+                                  <span
+                                    key={detail}
+                                    className="rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground"
+                                  >
+                                    {detail}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+
+                  {section.matchedTables.map((table) => (
+                    <div key={`${section.id}-${table.title}`} className="overflow-hidden rounded-2xl border border-border/70">
+                      <div className="border-b border-border/70 bg-muted/40 px-4 py-3">
+                        <h3 className="text-sm font-semibold text-foreground">{table.title}</h3>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {table.columns.map((column) => (
+                              <TableHead key={column} className="text-xs font-semibold">
+                                {column}
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {table.rows.map((row, rowIndex) => (
+                            <TableRow key={`${table.title}-${rowIndex}`}>
+                              {row.map((cell, cellIndex) => (
+                                <TableCell
+                                  key={`${table.title}-${rowIndex}-${cellIndex}`}
+                                  className={cn(
+                                    'align-top text-xs leading-6',
+                                    cellIndex === 0 ? 'font-mono text-foreground' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  {cell}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ))}
+
+                  {section.example && (
+                    <div className="overflow-hidden rounded-2xl border border-border/70 bg-zinc-950 text-zinc-50">
+                      <div className="border-b border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-400">
+                        Example
+                      </div>
+                      <pre className="overflow-x-auto p-4 text-xs leading-6">
+                        <code>{section.example}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </section>
+            ))}
+
+            {filtered.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-border bg-card/60 px-6 py-16 text-center">
+                <p className="text-lg font-medium text-foreground">No docs matched your search.</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Try Bot, Tile, HttpClient, Webhook, or a method like collectObject.
+                </p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string
+  value: string
+  icon: typeof BookOpen
+}) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
         </div>
-      </ScrollArea>
+        <div className="rounded-xl border border-border/70 bg-card p-2 text-muted-foreground">
+          <Icon className="size-4" />
+        </div>
+      </div>
     </div>
   )
 }
