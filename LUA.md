@@ -20,6 +20,9 @@ Returns the current world snapshot, or `nil` if not in a world.
 ### `getInventory() -> Inventory`
 Returns the bot's current inventory.
 
+### `buy(pack_id: string)`
+Shortcut for `getBot():buy(pack_id)`.
+
 ### `getPlayer(key: number | string) -> Player | nil`
 Returns a player by net ID or name. Returns `nil` if not found.
 
@@ -70,6 +73,15 @@ Strips Growtopia color codes (`` `X ``) from a string.
 
 ### `clearConsole()`
 Clears the bot's console log.
+
+### `packs: string`
+Raw store-pack constant in `Name:PackID:Gems:Items` format.
+
+### `PackDB: table<string, table>`
+Parsed store-pack lookup keyed by `pack_id`.
+
+### `PackNames: table<string, table>`
+Parsed store-pack lookup keyed by display name.
 
 ---
 
@@ -186,6 +198,7 @@ The main bot object returned by `getBot()`.
 * `trash(item_id: number, count: number)` — Permanently deletes items.
 * `fastDrop(item_id: number, count: number)` — Drops items without the normal delay.
 * `fastTrash(item_id: number, count: number)` — Trashes items without the normal delay.
+* `buy(pack_id: string)` — Buys a store item by its store pack ID, for example `small_lock`.
 
 **Movement**
 

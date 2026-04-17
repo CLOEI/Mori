@@ -251,6 +251,10 @@ impl LuaUserData for BotProxy {
         methods.add_method("trash",     |_, p, (item_id, count): (u32, u32)| { p.request(Req::Trash { item_id, count }); Ok(()) });
         methods.add_method("fastDrop",  |_, p, (item_id, count): (u32, u32)| { p.request(Req::FastDrop  { item_id, count }); Ok(()) });
         methods.add_method("fastTrash", |_, p, (item_id, count): (u32, u32)| { p.request(Req::FastTrash { item_id, count }); Ok(()) });
+        methods.add_method("buy", |_, p, pack_id: String| {
+            p.request(Req::Buy { item: pack_id });
+            Ok(())
+        });
 
         // ── Movement ───────────────────────────────────────────────────────────
         methods.add_method("moveTo", |_, p, (dx, dy): (i32, i32)| {
@@ -1023,6 +1027,162 @@ function unlistenEvents()
 end
         "#).exec()?;
 
+        lua.load(r#"
+packs = [[
+--Name:PackID:Gems:Items
+UpgradeBackpack:upgrade_backpack::
+ClothesPack:clothes_pack:50:234,210,1846,342,11202,214,138,354,2938,144,272,208,90,38,66,238,122,36,34,44,48,76,140,10034,694,142,236,270,130,40,68,42,374,372,3578,370
+RareClothesPack:rare_clothes:500:11204,600,1762,1028,1146,292,1708,5016,576,1736,348,1652,1650,294,3052,1330,890,1124,312,3530,1140,156,2882,258,452,9356,154,1478,1142,1120,150,2934,80,2928,1524,796,1126,152,1954,2576,2958,158,136,496,1848,896,1476,4954,1864,6674,296,290,310,1862,6796,4964,4968,2700,1316,1516,1854,1856,446,3590,1312,1688,1314,3466,594,1858,8884,1502,268,794,1342,488,798,1590,724,352,3048,1026,1860,1032,1838,1718,1850,316,1690,492,894,6788,1116,304,1332,302,86,3164,2578,1022,2960,88,1800,3056,3060,3934,2954,132,852,266,494,1504,74,50,134,98,448,3932,96,148,788,232,288,4966,70,2718,1844,1722,84,212,1122,92,1720,124,46,72,356,146,754,662,94,78,82,1716,250
+InfernalShades:infernal_shades:25000:12474
+TidalShades:tidal_shades:25000:12476
+VerdantShades:verdant_shades:25000:12478
+Transmutabooth:transmutation_device:25000:9170
+ContactLensPack:contact_lenses:15000:6768,6760,6762,6764,6766
+EyeDropPack:eye_drops:30000:5468,5466,5464,5462,5460,5458
+TurtleHat:nyan_hat:25000:574
+TinyHorsie:tiny_horsie:25000:592
+PleiadianStarShip:star_ship:25000:760
+DragonHand:dragon_hand:50000:900
+LittleRedCorvette:corvette:25000:766
+StickHorse:stick_horse:25000:1012
+Ambulance:ambulance:25000:1272
+RidingRaptor:raptor:25000:1320
+Mid-PacificOwl:owl:30000:1540
+UnicornGarland:unicorn:50000:1648
+StarBoard:starboard:30000:1740
+GrowleyMotorcycle:motorcycle:50000:1950
+MonkeyOnYourBack:monkey_on_back:50000:2900
+CarrotSword:carrot_sword:15000:2908
+RedBicycle:red_bicycle:30000:2974
+FireTruck:fire_truck:50000:3068
+PetSlime:pet_slime:100000:3166
+DabstepLowTopSneakers:dabstep_shoes:30000:6790
+WorldLock:world_lock:2000:242
+WorldLockPack:world_lock_10_pack:20000:242
+AdvertisersPack:anzu_pack1:10000:10874,10872,10870,10876
+SmallLock:small_lock:50:202
+BigLock:big_lock:200:204
+HugeLock:huge_lock:500:206
+DoorAndSignHelloPack:door_pack:12:12,20
+DoorMover:door_mover:5000:1404
+VendingMachine:vending_machine:8000:2978
+DigiVendMachine:digi_vend:12000:9268
+VendingHub-CheckoutCounter:checkout_counter:50000:9270
+ChangeofAddress:change_addr:20000:2580
+SignalJammer:signal_jammer:2000:226
+PunchJammer:punch_jammer:15000:1276
+ZombieJammer:zombie_jammer:15000:1278
+ImperialStarshipBlast:starship_blast:10000:6420
+SurgWorldBlast:surg_blast:10000:8556
+BountifulBlast:bountiful_blast:5000:8738
+ThermonuclearBlast:thermo_blast:15000:1402
+AntigravityGenerator:antigravity_generator:450000:4992
+BuildingBlocksMachine:building_blocks_machine:8000:8196
+Builder'sLock:builders_lock:50000:4994
+WeatherMachine-Sunny:weather_sunny:1000:932
+WeatherMachine-Night:weather_night:10000:934
+WeatherMachine-Arid:weather_arid:10000:946
+WeatherMachine-RainyCity:weather_rainy:10000:984
+WeatherMachine-WarpSpeed:weather_warp:10000:1750
+MarsBlast:mars_blast:15000:1136
+UnderseaBlast:undersea_blast:15000:1532
+CaveBlast:cave_blast:30000:3562
+WeatherMachine-Stuff:weather_stuff:50000:3832
+WeatherMachine-Jungle:weather_jungle:20000:4776
+WeatherMachine-Background:weather_backgd:150000:5000
+WeatherMachine-DigitalRain:digital_rain_weather:30000:6854
+TreasureBlast:treasure_blast:10000:7588
+InfinityWeatherMachine:infinity_weather_machine:50000:10058
+SmallSeedPack:5seed:100:5706
+SmallSeedPackCollection:ssp_10_pack:1000:5706
+RareSeedPack:rare_seed:1000:2293,2295,2297,2299,2301,2305,2629,2309,2311,2313,2315,2317,2321,2323,2325,2327,2329,2333,2335,2337,2339,2341,2319,2331,2343,4697,2447,2519,2629,2727,231,487,483,2019,427,1757,2009,281,781,329,459,1041,421,2787,2789,1043,2797,181,613,65,4983,283,553,425,4635,987,627,2017,989,61,4639,973,3523,331,265,859,433,253,339,1105,439,4567,333,677,5673,1427,5603,183,10533,5731,7223,10833,6035,6813,1113,1047,653,2811,4703,1429,847,665,485,1613,833,2025,1775,3931,429,3831,423,437,1773,4767,1299,361,667,2815,3473,301,4637,5683,2709,415,955,461,861,9389,5467,2791,2815,1803,419,2027,685,555,741,10531,5729,7221,10831,6033,6811,621,6401,1107,359,3471,855,309,1685,1449,1309,441,1111,221,1431,3065,9307,1257,1501,1109,4641,3587,1103,417,743,431,3823,2949,1131,3825,727,5379,729,187,787,5459,3423,3261,3521,5461,3721,327,247,63,3479,445,4783,299,863,8935,1451,261,1871,1499,455,9391,683,1159,551,1745,411,3005,557,687,4799,559,4643,3899,1605,9309,567,565,1155,3827,1327,1767,993,1157,563,4721,115,1423,10515,1329,6545,287,669,777,5463,1655,1599,561,4585,3413,4745,1771,2011,1161,1729,3757,3753,321,3265,3263,623,775,6397,129,4667,759,3767,1529,6543,4707,3835,1435,651,8929,569,527,3287,1595,6063,2795,1003,1731,4943,4963,597,4669,1531,1523,625,4297,599,657,571,873,3755,2969,1725,4603,1447,3267,5375,1683
+5-packofGrowSprayFertilizer:grow_spray:200:228
+DeluxeGrowSpray:deluxe_grow_spray:900:1778,5746,5742,5748
+MutantPack:gross_mixers:10000:5746,5742,5748,8392,8394,8396,8398,8390
+BountifulSeedPack:bountiful_seed_pack:1000:8970
+BasicSplicingKit:basic_splice:200:101,21,1139,381,17,57,13,3567,11
+SurgeryStarterPack:surg_starter_pack:5000:1248,1246,1244,1242,8558,1256,1240
+SurgicalKit:surgical_kit:12000:9310,4316,4310,1270,1258,1268,1260,4308,4318,4312,4314,1264,1266,1263,4296
+SurgicalToolsValuePack:surg_value_pack:45000:9310,4316,4310,1270,1258,1268,1260,4308,4318,4312,4314,1264,1266,1262,4296
+GalacticGoodies:star_supplies:15000:6526,6532,6534,6536,6416,6524,6530,6518,6540,6528,6522,6538,6520
+Fishin'Pack:fishin_pack:10000:2912,3044,3004,3002,2914,5524,5522
+FishTrainin'Pack:fish_training_pack:10000:5536,5532,5530
+FishFlakes:fish_flakes:7500:5536
+FishMedicine:fish_medicine:1500:5532
+FishReviver:fish_reviver:5000:5534
+crimewave:crime_wave:5000:2382,2380,2322,2326,2328,2320,2324,2336,2340,2338,2332,2334,2296,2292,2294,2298,2300,2314,2312,2310,2308,2316
+Silkworm:silkworn:7000:3316
+GeigerCounter:geiger:25000:2204
+ZombieDefensePack:zombie_pack:10000:764,768,784,nul,nul,782,786,774,788,790
+B.O.O.TrainingPack:boo_pack:10000:3710,3716,3714,3720
+EctoJuicer:ectojuicer:30000:6096
+GhostHunter'sPack:ghost_hunting:10000:13820
+nian_lunar_chest:nian_lunar_chest:25000:
+ChemsynthPack:chemsynth:10000:4442,4434,4440,4438,4436,4432,4430
+RacingActionPack:race_pack:3500:486,484,482,410,430,428,496,356,488,490,494,492
+Composer'sPack:music_pack:5000:418,416,414,426,424,422,420,412
+EducationPack:school_pack:5000:678,672,670,676,658,654,650,652,674,8872,8870,8876,8874
+DungeonPack:dungeon_pack:10000:692,696,694,690,688,686,684,682,680
+FantasyPack:fantasy_pack:5000:583,596,598,606,608,604,594,600
+VegasPack:vegas_pack:20000:798,796,794,758,756,754,456,752,1582,740,1922,1920,1924,1918,1916,743,747,749,744
+FarmPack:farm_pack:15000:898,896,894,892,13732,890,886,888,884,880,872,866
+MadScienceKit:science_pack:5000:918,920,924,914,916,930,904,12494,770,772,912,928
+CityPack:city_pack:8000:1008,1002,988,1006,1004,998,996,990,992,986,994
+WildWestPack:west_pack:8000:1016,1020,1048,1046,1044,1042,1040,1038,1032,1034,1036,1028,1026,1024,1030,1022
+AstroPack:astro_pack:5000:1152,1154,1130,1128,1160,1162,1164,1146,1144,1142,1140,1148
+PrehistoricPack:prehistoric_pack:5000:1328,1324,1322,1326,1342,1340,1332,1334,1338,1330,1336
+ShopPack:shop_pack:10000:1420,1434,1446,1430,1432,1428,1426,1422,1436
+HomePack:home_pack:50000:1474,1476,1478,1454,1472,1450,1480,1448,1482
+CinemaPack:cinema_pack:6000:1596,1608,1606,1604,1600,1598,1594,1590,1592,1588
+AdventurePack:adventure_pack:20000:4780,1704,1692,1698,1696,1702,1694,4706,4704,1706,1684,1682
+Rockin'Pack:rockin_pack:9999:1726,1730,1728,1724,1720,1722,1732,1718,1714,1712,1710
+GamePack:game_pack:50000:1658,1656,1622,1618,1616,1660
+SuperheroPack:superhero:10000:6684,7148,2196,2200,2202,2198,2194,6694,2162,2164,2160,2158,6696,6686,2126,2128,2124,2122,6692,6682,2102,2104,2100,2098,2114,2116,2112,2110,6690,6680,2174,2176,2172,2170,2078,2080,2076,2074,6688,6678,2138,2140,2136,2134,2186,2188,2184,2182,2150,2152,2148,2146,2208
+FashionPack:fashion_pack:5000:11800,11206,10080,2672,2684,2660,2648,2708,2646
+SportsballPack:sportsball_pack:20000:13600,6676,6670,2906,2888,2884,2880,6672,2882,2878,2890,2886,6668,2894,2892,2898,2896,6674,2904,2902
+FirefighterPack:firefighter:10000:3072,3066,3052,3060,3056,3048
+Steampack:steampack:20000:3292,3280,3284,3282,3270,3260
+Painter'sPack:paintbrush:30000:3494,3492,3480,3484,3486,3488,3482,3478,3490
+Paleontologist'sKit:paleo_kit:20000:3938,4128,3934,3932,4132
+CyBlocksStarterPack:robot_starter_pack:5000:5668,5680,5676,5672,5678,5674
+CyBlocksCommandPack:robot_command_pack:2000:5704,5702,5698,5700,5696,5694,5690,5692,5688,5686,5682,5684,5680,5678,5676,5672,5674
+CyBotPack:robot_pack:15000:5670,5710,5708
+GanglandStyle:gang_pack:5000:478,480,472,470,476,474,468,466,464,462
+Kuwii'sTutelar:kuwiistutelar:250000:15612
+]]
+
+PackDB = {}
+PackNames = {}
+
+do
+    for line in packs:gmatch("[^\r\n]+") do
+        if line ~= "" and line:sub(1, 2) ~= "--" then
+            local name, pack_id, gems, items = line:match("^([^:]+):([^:]+):([^:]*):(.*)$")
+            if name and pack_id then
+                local parsed_items = {}
+                if items and items ~= "" then
+                    for token in items:gmatch("[^,]+") do
+                        token = token:match("^%s*(.-)%s*$")
+                        parsed_items[#parsed_items + 1] = tonumber(token) or token
+                    end
+                end
+
+                local entry = {
+                    name = name,
+                    pack_id = pack_id,
+                    gems = tonumber(gems) or 0,
+                    items = parsed_items,
+                    items_raw = items or "",
+                }
+
+                PackDB[pack_id] = entry
+                PackNames[name] = entry
+            end
+        end
+    end
+end
+        "#).exec()?;
+
         {
             let event_rx2 = event_rx.clone();
             let stop2     = stop_flag.clone();
@@ -1084,6 +1244,9 @@ function getWorld()
 end
 function getInventory()
     return getBot():getInventory()
+end
+function buy(pack_id)
+    return getBot():buy(pack_id)
 end
 function getPlayer(key)
     local w = getBot():getWorld()

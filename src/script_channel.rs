@@ -52,6 +52,7 @@ pub enum ScriptRequest {
     Trash { item_id: u32, count: u32 },
     FastDrop { item_id: u32, count: u32 },
     FastTrash { item_id: u32, count: u32 },
+    Buy { item: String },
 
     // Movement
     Walk { tile_x: i32, tile_y: i32 },

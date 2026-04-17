@@ -29,6 +29,7 @@ const SECTIONS: Section[] = [
     entries: [
       { sig: 'getWorld()', desc: 'Shortcut for bot:getWorld(). → World?' },
       { sig: 'getInventory()', desc: 'Shortcut for bot:getInventory(). → Inventory' },
+      { sig: 'buy(pack_id)', desc: 'Shortcut for bot:buy(pack_id). Sends a store purchase by store pack ID.' },
       { sig: 'getLocal()', desc: 'Shortcut for bot:getLocal(). → Player' },
       { sig: 'getPlayer(key)', desc: 'Get a player by net_id or name from the current world. → Player?' },
       { sig: 'getPlayers()', desc: 'Get all players in the current world. → Player[]' },
@@ -36,6 +37,7 @@ const SECTIONS: Section[] = [
       { sig: 'getTiles()', desc: 'Get all tiles in the current world. → Tile[]' },
       { sig: 'getObject(oid)', desc: 'Get a dropped world object by UID. → NetObject?' },
       { sig: 'getObjects()', desc: 'Get all dropped objects in the current world. → NetObject[]' },
+      { sig: 'packs / PackDB / PackNames', desc: 'Store pack constants. `packs` is raw text, `PackDB` is keyed by pack_id, `PackNames` by display name.' },
       { sig: 'hasAccess(x, y)', desc: 'Returns false (stub).' },
     ],
   },
@@ -111,6 +113,7 @@ const SECTIONS: Section[] = [
       { sig: 'bot:wear(item_id)', desc: 'Wear / equip an item.' },
       { sig: 'bot:unwear(item_id)', desc: 'Unequip an item.' },
       { sig: 'bot:use(item_id)', desc: 'Alias for wear.' },
+      { sig: 'bot:buy(pack_id)', desc: 'Buy a store item using its Growtopia store pack ID, e.g. `small_lock`.' },
       { sig: 'bot:consume(item_id)', desc: 'Use / drink an item.' },
       { sig: 'bot:drop(item_id, [count])', desc: 'Drop item by ID (default 1).' },
       { sig: 'bot:trash(item_id)', desc: 'Delete item from inventory.' },

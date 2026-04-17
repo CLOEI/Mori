@@ -2494,6 +2494,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 self.fast_trash(item_id, count);
                 Rep::Ack
             }
+            Req::Buy { item } => {
+                self.buy(&item);
+                Rep::Ack
+            }
             Req::Walk { tile_x, tile_y } => {
                 self.walk(tile_x, tile_y);
                 Rep::Ack
@@ -2893,6 +2897,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         self.send_text(&format!(
             "action|dialog_return\ndialog_name|trash_item\nitemID|{item_id}|\ncount|{count}\n"
         ));
+    }
+
+    pub fn buy(&mut self, item: &str) {
+        self.send_text(&format!("action|buy\nitem|{item}\n"));
     }
 
     pub fn collect_object_at(&mut self, uid: u32, range_tiles: f32) {
