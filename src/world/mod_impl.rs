@@ -46,13 +46,17 @@ impl World {
     pub fn update_tile(&mut self, x: u32, y: u32, cur: &mut Cursor, map_version: u16) -> Result<(u16, u16)> {
         let width = self.tile_map.width;
         let height = self.tile_map.height;
+        let idx = y * self.tile_map.width + x;
+
+        let tile = Tile::parse(cur, map_version, x, y)?;
+        let fg = tile.fg_item_id;
+        let bg = tile.bg_item_id;
+        if let TileType::Lock{ .. } = tile.tile_type && !NON_WORLDLOCK_TILE_IDS.contains(&tile.fg_item_id) {
+            self.tile_map.world_lock_index = Some(idx as usize);
+        }
         let target_tile = self.get_tile_mut(x, y)
             .ok_or_else(|| anyhow::anyhow!("target_tile.is_none! coord: {x},{y}, world size: {width},{height}"))?;
-
-        let result = Tile::parse(cur, map_version, x, y)?;
-        let fg = result.fg_item_id;
-        let bg = result.bg_item_id;
-        *target_tile = result;
+        *target_tile = tile;
 
         Ok((fg, bg))
     }
@@ -685,7 +689,7 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             // Lock
             let settings = cur.u8()?;
             let owner_uid = cur.u32()?;
-            let access_count = cur.u32()?;
+            let mut access_count = cur.u32()?;
             let mut bpm: i32 = 100;
             let mut access_uids = Vec::with_capacity(access_count as usize);
             for _ in 0..access_count {
@@ -693,6 +697,8 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
                 if id < 0 { bpm = id; }
                 else { access_uids.push(id as u32); }
             }
+            access_count = access_uids.len() as u32;
+
             let minimum_level = cur.u32()?;
             let world_timer = cur.u32()?;
 
