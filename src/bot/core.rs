@@ -2289,7 +2289,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         for tile in &world.tile_map.tiles {
             if LOCK_ITEM_IDS.contains(&tile.fg_item_id) {
                 if let TileType::Lock { access_uids, .. } = &tile.tile_type {
-                    if access_uids.contains(&(bot_uid as i32)) {
+                    if access_uids.contains(&bot_uid) {
                         return true;
                     }
                 }

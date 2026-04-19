@@ -1,4 +1,4 @@
-use crate::cursor::Cursor;
+use crate::{cursor::Cursor, world::constants::{BUILDERS_LOCK_TILE_ID, NON_WORLDLOCK_TILE_IDS}};
 use anyhow::{Result, bail};
 
 use super::constants::{CBOR_TILE_IDS, MAP_VERSION_MIN, MAX_TILE_COUNT, MAX_WORLD_OBJECTS};
@@ -46,13 +46,17 @@ impl World {
     pub fn update_tile(&mut self, x: u32, y: u32, cur: &mut Cursor, map_version: u16) -> Result<(u16, u16)> {
         let width = self.tile_map.width;
         let height = self.tile_map.height;
+        let idx = y * self.tile_map.width + x;
+
+        let tile = Tile::parse(cur, map_version, x, y)?;
+        let fg = tile.fg_item_id;
+        let bg = tile.bg_item_id;
+        if let TileType::Lock{ .. } = tile.tile_type && !NON_WORLDLOCK_TILE_IDS.contains(&tile.fg_item_id) {
+            self.tile_map.world_lock_index = Some(idx as usize);
+        }
         let target_tile = self.get_tile_mut(x, y)
             .ok_or_else(|| anyhow::anyhow!("target_tile.is_none! coord: {x},{y}, world size: {width},{height}"))?;
-
-        let result = Tile::parse(cur, map_version, x, y)?;
-        let fg = result.fg_item_id;
-        let bg = result.bg_item_id;
-        *target_tile = result;
+        *target_tile = tile;
 
         Ok((fg, bg))
     }
@@ -88,6 +92,18 @@ impl World {
     }
 }
 
+// WorldTilePermission
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub struct WorldTilePermission: u8 {
+        const NONE = 0;
+        const BUILD = 1;
+        const BREAK = 2;
+        const FULL_ACCESS = 3;
+    }
+}
+
 // ── WorldTileMap ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -96,6 +112,7 @@ pub struct WorldTileMap {
     pub width: u32,
     pub height: u32,
     pub tiles: Vec<Tile>,
+    pub world_lock_index: Option<usize>,
 }
 
 impl WorldTileMap {
@@ -104,6 +121,7 @@ impl WorldTileMap {
         let name_raw = cur.bytes(name_len)?;
         let world_name = String::from_utf8_lossy(&name_raw).into_owned();
 
+        let mut world_lock_index: Option<usize> = None;
         let width = cur.u32()?;
         let height = cur.u32()?;
         let tile_count = cur.u32()?;
@@ -121,6 +139,9 @@ impl WorldTileMap {
             let pos_before = cur.pos();
             match Tile::parse(cur, map_version, x, y) {
                 Ok(t) => {
+                    if let TileType::Lock{ .. } = t.tile_type && !NON_WORLDLOCK_TILE_IDS.contains(&t.fg_item_id) {
+                        world_lock_index = Some(idx as usize);
+                    }
                     tiles.push(t);
                 }
                 Err(e) => {
@@ -137,7 +158,86 @@ impl WorldTileMap {
             width,
             height,
             tiles,
+            world_lock_index,
         })
+    }
+
+    // Retrieve the lock that owns that tile
+    pub fn get_tile_parent(&self, x: u32, y: u32) -> Option<&Tile> {
+        let idx = (y * self.width + x) as usize;
+        if idx >= self.tiles.len() { return None; }
+
+        let tile = self.tiles.get(idx).unwrap();
+        if !tile.flags.contains(TileFlags::HAS_PARENT) { return None; }
+
+        self.tiles.get(tile.parent_block as usize)
+    }
+
+    // return what action is allowed on that tile
+    pub fn get_tile_permission(&self, x: u32, y: u32, user_id: u32) -> WorldTilePermission {
+        let idx = (y * self.width + x) as usize;
+        let Some(tile) = self.tiles.get(idx) else {
+            return WorldTilePermission::NONE;
+        };
+
+        if let TileType::Lock { owner_uid, .. } = tile.tile_type {
+            return if user_id == owner_uid { WorldTilePermission::FULL_ACCESS }
+            else { WorldTilePermission::NONE };
+        }
+
+        let tile_parent = self.get_tile_parent(tile.x, tile.y);
+
+        if let Some(world_lock_index) = self.world_lock_index {
+            if let Some(world_lock) = self.tiles.get(world_lock_index) {
+                let TileType::Lock { owner_uid, ref access_uids, .. } = world_lock.tile_type else {
+                    eprintln!("[world] world_lock tile type is not TileType::Lock. {:?}", world_lock.tile_type);
+                    return WorldTilePermission::NONE;
+                };
+
+                if user_id == owner_uid {
+                    return WorldTilePermission::FULL_ACCESS;
+                }
+                else if access_uids.contains(&user_id) && tile_parent.is_none() {
+                    return WorldTilePermission::FULL_ACCESS;
+                }
+                else if world_lock.flags.contains(TileFlags::IS_OPEN_TO_PUBLIC) && tile_parent.is_none() {
+                    return WorldTilePermission::FULL_ACCESS;
+                }
+            }
+        }
+
+        // Area lock. This can apply restrriction on certain area, overriding world lock
+        // like Small lock, big lock, etc
+        if let Some(lock) = tile_parent {
+            let TileType::Lock { settings, owner_uid, ref access_uids, .. } = lock.tile_type else {
+                eprintln!("[world] parent_tile type is not TileType::Lock. {:?}", lock.tile_type);
+                return WorldTilePermission::NONE;
+            };
+
+            if user_id == owner_uid {
+                return WorldTilePermission::FULL_ACCESS;
+            }
+
+            let flags = TileLockFlags::from_bits_retain(settings);
+            if lock.fg_item_id == BUILDERS_LOCK_TILE_ID {
+                // if is admin in builders lock
+                if access_uids.contains(&user_id) || lock.flags.contains(TileFlags::IS_OPEN_TO_PUBLIC) {
+                    if !flags.contains(TileLockFlags::ADMIN_LIMITED) {
+                        return WorldTilePermission::FULL_ACCESS;
+                    }
+
+                    if flags.contains(TileLockFlags::BREAK_ONLY) { return WorldTilePermission::BREAK; }
+                    else { return WorldTilePermission::BUILD; }
+                }
+            }
+            else {
+                if access_uids.contains(&user_id) || lock.flags.contains(TileFlags::IS_OPEN_TO_PUBLIC) {
+                    return WorldTilePermission::FULL_ACCESS;
+                }
+            }
+        }
+
+        return WorldTilePermission::NONE;
     }
 }
 
@@ -217,6 +317,23 @@ impl Tile {
     }
 }
 
+
+bitflags::bitflags! {
+    // TileLockFlags
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub struct TileLockFlags: u8 {
+        const IGNORE_EMPTY_AIR     = 0x01;
+        const DISABLE_MUSIC_NOTE   = 0x10;
+        const INVISIBLE_MUSIC_NOTE = 0x20;
+        const BREAK_ONLY           = 0x40;
+        const ADMIN_LIMITED        = 0x80;
+    }
+
+    // put more flags here...
+}
+
+
+
 // ── TileType ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -234,7 +351,7 @@ pub enum TileType {
         settings: u8,
         owner_uid: u32,
         access_count: u32,
-        access_uids: Vec<i32>,
+        access_uids: Vec<u32>,
         bpm: i32,
         minimum_level: u32,
         world_timer: u32,
@@ -572,14 +689,16 @@ fn parse_tile_extra(cur: &mut Cursor, kind: u8, fg_item_id: u16) -> Result<TileT
             // Lock
             let settings = cur.u8()?;
             let owner_uid = cur.u32()?;
-            let access_count = cur.u32()?;
+            let mut access_count = cur.u32()?;
             let mut bpm: i32 = 100;
             let mut access_uids = Vec::with_capacity(access_count as usize);
             for _ in 0..access_count {
                 let id = cur.i32()?;
                 if id < 0 { bpm = id; }
-                else { access_uids.push(id); }
+                else { access_uids.push(id as u32); }
             }
+            access_count = access_uids.len() as u32;
+
             let minimum_level = cur.u32()?;
             let world_timer = cur.u32()?;
 
