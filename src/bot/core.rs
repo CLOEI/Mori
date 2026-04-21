@@ -1,4 +1,4 @@
-use crate::astar::AStar;
+use crate::astar::{self, find_path};
 use crate::bot_state::{
     BotCommand, BotDelays, BotState, BotStatus, CmdReceiver, InvSlot, PlayerInfo, TileInfo,
     WorldObjectInfo,
@@ -15,9 +15,9 @@ use crate::player::{LocalPlayer, Player, parse_pipe_map};
 use crate::server_data::{LoginInfo, get_server_data_proxied};
 use crate::socks5::Socks5UdpSocket;
 use crate::protocol::variant::VariantList;
-use crate::world::{NpcAction, NpcType, TileType, World, WorldNpc, WorldObject};
+use crate::world::{NpcAction, NpcType, TileFlags, TileType, World, WorldNpc, WorldObject, WorldTilePermission};
 use rusty_enet as enet;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
@@ -175,8 +175,6 @@ pub struct Bot {
     collect_interval: u64,
     /// Skip objects with no reachable A* path during auto-collect.
     pub collect_path_check: bool,
-    /// A* pathfinder, re-used across find_path calls.
-    astar: AStar,
     /// While `Some`, we are routing to this tile; `OnSetPos` triggers replanning from server position.
     pathfind_target: Option<(u32, u32)>,
     /// Set during pathfinding when the server sends `OnSetPos` so we abandon the current segment and replan.
@@ -308,7 +306,6 @@ impl Bot {
             collect_timer: std::time::Instant::now(),
             collect_interval: 500,
             collect_path_check: true,
-            astar: AStar::new(),
             pathfind_target: None,
             pathfind_recalc: false,
             delays: BotDelays::default(),
@@ -473,7 +470,6 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
             collect_timer: std::time::Instant::now(),
             collect_interval: 500,
             collect_path_check: true,
-            astar: AStar::new(),
             pathfind_target: None,
             pathfind_recalc: false,
             delays: BotDelays::default(),
@@ -2013,7 +2009,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         self.log_console(format!("[Bot] SendLock tile=({x},{y}) item={fg}"));
     }
 
-    pub fn walk(&mut self, tile_x: i32, tile_y: i32) {
+    pub fn walk(&mut self, tile_x: u32, tile_y: u32) {
         let target_x = tile_x as f32 * 32.0;
         let target_y = tile_y as f32 * 32.0;
 
@@ -2177,9 +2173,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         let r_px = radius_tiles as f32 * 32.0;
         const MAX_PER_TICK: usize = 32; // cap packets per call
 
-        let nearby: Vec<(u32, f32, f32, u16)> = {
+        let nearby: HashMap<(u32, u32), Vec<(f32, f32, u32, u16)>> = {
             let objects = &self.world.as_ref().unwrap().objects;
-            let mut v: Vec<(f32, u32, f32, f32, u16)> = objects
+            let mut ret: HashMap<(u32, u32), Vec<(f32, f32, u32, u16)>> = HashMap::with_capacity(32);
+            objects
                 .iter()
                 .filter_map(|obj| {
                     if self.collect_blacklist.contains(&obj.item_id) {
@@ -2196,80 +2193,62 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     if dx.abs() > r_px || dy.abs() > r_px {
                         return None;
                     }
-                    let ring = dx.abs().max(dy.abs());
-                    Some((ring, obj.uid, obj.x, obj.y, obj.item_id))
+                    Some((obj.uid, obj.x, obj.y, obj.item_id))
                 })
-                .collect();
-            v.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-            v.into_iter()
-                .map(|(_, uid, x, y, id)| (uid, x, y, id))
-                .collect()
+                // group nearby object together
+                .for_each(|obj| {
+                    let x = (obj.1 / 32.0).round() as u32;
+                    let y = (obj.2 / 32.0).round() as u32;
+                    if let Some(v) = ret.get_mut(&(x, y)) {
+                        v.push((obj.1, obj.2, obj.0, obj.3));
+                    }
+                    else {
+                        ret.insert((x, y), vec![(obj.1, obj.2, obj.0, obj.3)]);
+                    }
+                });
+            ret
         };
 
         if nearby.is_empty() {
             return 0;
         }
 
-        {
-            let world = self.world.as_ref().unwrap();
-            let width = world.tile_map.width;
-            let height = world.tile_map.height;
-            let tiles: Vec<(u16, u8)> = world
-                .tile_map
-                .tiles
-                .iter()
-                .map(|t| {
-                    let ct = match &t.tile_type {
-                        TileType::Lock { .. } => 3,
-                        TileType::Door { .. } => 0,
-                        _ => self
-                            .items_dat
-                            .find_by_id(t.fg_item_id as u32)
-                            .map(|i| i.collision_type)
-                            .unwrap_or(if t.fg_item_id == 0 { 0 } else { 1 }),
-                    };
-                    (t.fg_item_id, ct)
-                })
-                .collect();
-            let _ = world;
-            self.astar.update_from_tiles(width, height, &tiles);
-        }
-
-        let from_x = (pos_x / 32.0) as u32;
-        let from_y = (pos_y / 32.0) as u32;
-        let has_access = self.has_access();
-
         let mut sent = 0;
-        for (uid, x, y, item_id) in nearby.iter().take(MAX_PER_TICK) {
-            let tile_x = (*x / 32.0) as u32;
-            let tile_y = (*y / 32.0) as u32;
+        for ((x, y), objs) in nearby.iter() {
             // Skip if there's no reachable path to the object's tile
             if self.collect_path_check
-                && self.astar.find_path(from_x, from_y, tile_x, tile_y, has_access).is_none()
+                && self.compute_path(*x, *y)
+                    .map_or(true, |path| path.len() > radius_tiles as usize)
             {
                 continue;
             }
 
-            let can_collect = if *item_id == 112 {
-                // Gems always have room
-                true
-            } else if let Some(existing) = self.inventory.items.get(item_id) {
-                existing.amount < 200
-            } else {
-                inv_count < inv_size
-            };
+            if sent > MAX_PER_TICK { break; }
 
-            if can_collect {
-                let pkt = GameUpdatePacket {
-                    packet_type: GamePacketType::ItemActivateObjectRequest,
-                    vector_x: *x,
-                    vector_y: *y,
-                    value: *uid,
-                    ..Default::default()
+            // fx, fy = the object actual coordinate
+            for (fx, fy, uid, item_id) in objs {
+                if sent > MAX_PER_TICK { break; }
+                let can_collect = if *item_id == 112 {
+                    // Gems always have room
+                    true
+                } else if let Some(existing) = self.inventory.items.get(item_id) {
+                    existing.amount < 200
+                } else {
+                    inv_count < inv_size
                 };
 
-                self.send_game_packet(&pkt, true);
-                sent += 1;
+                if can_collect {
+                    let pkt = GameUpdatePacket {
+                        packet_type: GamePacketType::ItemActivateObjectRequest,
+                        vector_x: *fx,
+                        vector_y: *fy,
+                        value: *uid,
+                        ..Default::default()
+                    };
+
+                    self.send_game_packet(&pkt, true);
+                    sent += 1;
+                }
             }
         }
 
@@ -2304,53 +2283,17 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         self.pathfind_recalc = false;
 
         while self.pathfind_target.is_some() {
+            if self.world.is_none() {
+                self.pathfind_target = None;
+                return;
+            }
+
             let (goal_x, goal_y) = match self.pathfind_target {
                 Some(g) => g,
                 None => break,
             };
 
-            let world = match &self.world {
-                Some(w) => w,
-                None => {
-                    self.pathfind_target = None;
-                    return;
-                }
-            };
-
-            let width = world.tile_map.width;
-            let height = world.tile_map.height;
-
-            // Build (fg_item_id, collision_type) pairs for the grid
-            let tiles: Vec<(u16, u8)> = world
-                .tile_map
-                .tiles
-                .iter()
-                .map(|t| {
-                    let ct = match &t.tile_type {
-                        TileType::Door { .. } => 0, // doors are always passable
-                        _ => self
-                            .items_dat
-                            .find_by_id(t.fg_item_id as u32)
-                            .map(|i| i.collision_type)
-                            .unwrap_or(if t.fg_item_id == 0 { 0 } else { 1 }),
-                    };
-                    (t.fg_item_id, ct)
-                })
-                .collect();
-
-            self.astar.update_from_tiles(width, height, &tiles);
-
-            let from_x = (self.pos_x / 32.0) as u32;
-            let from_y = (self.pos_y / 32.0) as u32;
-            let has_access = self.has_access();
-
-            if from_x == goal_x && from_y == goal_y {
-                self.pathfind_target = None;
-                break;
-            }
-
-            let path = self.astar.find_path(from_x, from_y, goal_x, goal_y, has_access);
-
+            let path = self.compute_path(goal_x, goal_y);
             let Some(nodes) = path else {
                 self.pathfind_target = None;
                 break;
@@ -2359,19 +2302,22 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             self.pathfind_recalc = false;
 
             for node in nodes {
-                let nx = node.x as u32;
-                let ny = node.y as u32;
+                let nx = node.0 as u32;
+                let ny = node.1 as u32;
                 let cx = (self.pos_x / 32.0) as u32;
                 let cy = (self.pos_y / 32.0) as u32;
                 if nx == cx && ny == cy {
                     continue;
                 }
 
-                self.walk(node.x as i32, node.y as i32);
-
-                if self.pathfind_recalc {
+                // TODO: Optimize this.
+                //  I think the impact is tolerable
+                if self.compute_path(nx, ny).is_none() {
+                    self.pathfind_recalc = true;
                     break;
                 }
+
+                self.walk(nx, ny);
             }
 
             if self.pathfind_recalc {
@@ -2486,7 +2432,8 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Ack
             }
             Req::Walk { tile_x, tile_y } => {
-                self.walk(tile_x, tile_y);
+                if tile_x < 0 || tile_y < 0 { return Rep::Ack; }
+                self.walk(tile_x as u32, tile_y as u32);
                 Rep::Ack
             }
             Req::SetDirection { facing_left } => {
@@ -2502,28 +2449,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Ack
             }
             Req::Collect { range, interval_ms } => {
-                let count = if let Some(w) = &self.world {
-                    let r2 = (range * 32.0).powi(2);
-                    let uids: Vec<u32> = w
-                        .objects
-                        .iter()
-                        .filter(|o| {
-                            let dx = self.pos_x - o.x;
-                            let dy = self.pos_y - o.y;
-                            dx * dx + dy * dy <= r2
-                        })
-                        .map(|o| o.uid)
-                        .collect();
-                    let n = uids.len();
-                    for uid in uids {
-                        self.collect_object_at(uid, range);
-                        self.sleep_ms(interval_ms);
-                    }
-                    n
-                } else {
-                    0
-                };
-                Rep::CollectCount(count)
+                Rep::CollectCount(self.collect())
             }
             Req::SetMac { mac } => {
                 self.mac = mac.clone();
@@ -2559,7 +2485,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 username: self.username.clone(),
                 mac: self.mac.clone(),
             }),
-            Req::GetPath { x, y } => Rep::Path(self.compute_path(x, y)),
+            Req::GetPath { x, y } => Rep::Path(self.compute_path(x, y).unwrap_or_default()),
             Req::IsInWorld { name } => Rep::Bool(match (&self.world, name) {
                 (Some(w), Some(n)) => w.tile_map.world_name.to_uppercase() == n.to_uppercase(),
                 (Some(_), None) => true,
@@ -2678,9 +2604,10 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
     fn handle_command(&mut self, cmd: BotCommand) {
         match cmd {
             BotCommand::Move { x, y } => {
-                let cx = (self.pos_x / 32.0) as i32;
-                let cy = (self.pos_y / 32.0) as i32;
-                self.walk(cx + x, cy + y);
+                let cx = ((self.pos_x / 32.0).round() as i32) + x;
+                let cy = ((self.pos_y / 32.0).round() as i32) + y;
+                if cx < 0 || cy < 0 { return; }
+                self.walk((cx + x) as u32, (cy + y) as u32);
             }
             BotCommand::WalkTo { x, y } => {
                 self.find_path(x, y);
@@ -2913,46 +2840,20 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
     }
 
     /// Returns path nodes as (x, y) tile pairs without walking.
-    pub fn compute_path(&mut self, to_x: u32, to_y: u32) -> Vec<(u32, u32)> {
+    pub fn compute_path(&mut self, to_x: u32, to_y: u32) -> Option<Vec<(u32, u32)>> {
         let world = match &self.world {
             Some(w) => w,
-            None => return vec![],
+            None => return None,
         };
-        let width = world.tile_map.width;
-        let height = world.tile_map.height;
-
-        let tiles: Vec<(u16, u8)> = world
-            .tile_map
-            .tiles
-            .iter()
-            .map(|t| {
-                let ct = match &t.tile_type {
-                    TileType::Lock { .. } => 3,
-                    TileType::Door { .. } => 0,
-                    _ => self
-                        .items_dat
-                        .find_by_id(t.fg_item_id as u32)
-                        .map(|i| i.collision_type)
-                        .unwrap_or(if t.fg_item_id == 0 { 0 } else { 1 }),
-                };
-                (t.fg_item_id, ct)
-            })
-            .collect();
 
         let _ = world; // end the borrow before mutating astar
 
-        self.astar.update_from_tiles(width, height, &tiles);
-
         let from_x = (self.pos_x / 32.0) as u32;
         let from_y = (self.pos_y / 32.0) as u32;
-        let has_access = self.has_access();
 
-        self.astar
-            .find_path(from_x, from_y, to_x, to_y, has_access)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|n| (n.x, n.y))
-            .collect()
+        astar::find_path(from_x, from_y, to_x, to_y, |x: u32, y: u32, direction: (i32, i32)| -> bool {
+            self.is_tile_passable(x, y, direction)
+        })
     }
 
     // ── NPC packet ────────────────────────────────────────────────────────────
@@ -3009,6 +2910,47 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 world.remove_npc(id);
             }
             _ => {}
+        }
+    }
+
+    fn is_tile_passable(&self, x: u32, y: u32, direction: (i32, i32)) -> bool {
+        let Some(world) = &self.world else { return false; };
+        let idx = (y * world.tile_map.width + x) as usize;
+
+        let Some(tile) = world.tile_map.tiles.get(idx) else { return false; };
+        // if air, just let it pass
+        if tile.fg_item_id == 0 { return true; }
+
+        let Some(item_info) = self.items_dat.find_by_id(tile.fg_item_id as u32) else { return false; };
+        let user_id = self.local.user_id;
+
+        return match tile.tile_type {
+            TileType::VipEntrance { owner_uid, ref access_uids, .. } => {
+                user_id == owner_uid || access_uids.contains(&user_id)
+            },
+            TileType::StormyCloud { is_solid, .. } => { is_solid == 0 },
+            TileType::FriendsEntrance { owner_user_id, ref allowed_friends_userid } => {
+                user_id == owner_user_id || allowed_friends_userid.contains(&user_id)
+            },
+            TileType::Basic | _ => {
+                // Check collision type
+                match item_info.collision_type {
+                    0 => { true },
+                    2 => { direction != ((0, 1)) }, // platform. Forbid going down
+                    3 | 10 | 11 => {
+                        world.tile_map.get_tile_permission(x, y, user_id) != WorldTilePermission::NONE ||
+                        tile.flags.contains(TileFlags::IS_OPEN_TO_PUBLIC)
+                    }
+                    4 => { tile.flags.contains(TileFlags::IS_ON) }
+                    5 => { // Onw way
+                        if tile.flags.contains(TileFlags::FLIPPED_X) { direction != (1, 0) }
+                        else { direction != (-1, 0) } // forbid from right to left
+                    }
+                    7 => { direction != (0, -1) } // forbid going up
+                    9 => { !tile.flags.contains(TileFlags::IS_ON) }
+                    _ => { false }
+                }
+            }
         }
     }
 }
