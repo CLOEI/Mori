@@ -1,16 +1,6 @@
 use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap, HashSet},
+    cmp::Ordering, collections::{BinaryHeap, HashMap}, vec
 };
-
-pub struct AStar {
-    pub width: u32,
-    pub height: u32,
-    pub grid: Vec<u8>,
-    pub path_cache: HashMap<(u32, u32, u32, u32, bool), Option<Vec<(u32, u32)>>>,
-    pub cache_hits: u32,
-    pub cache_misses: u32,
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PathNode {
@@ -19,353 +9,134 @@ pub struct PathNode {
     pub h: u32,
     pub x: u32,
     pub y: u32,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Node {
-    pub g: u32,
-    pub h: u32,
-    pub f: u32,
-    pub x: u32,
-    pub y: u32,
-    pub collision_type: u8,
+    pub parent: Option<(u32, u32)>,
 }
 
 impl PathNode {
-    pub fn new(x: u32, y: u32, g: u32, h: u32) -> Self {
-        Self { f: g + h, g, h, x, y }
+    pub fn new(x: u32, y: u32, g: u32, h: u32, parent: Option<(u32, u32)>) -> Self {
+        Self { f: g + h, g, h, x, y, parent }
     }
 }
 
-impl Node {
-    pub fn new(x: u32, y: u32, collision_type: u8) -> Node {
-        Node { g: 0, h: 0, f: 0, x, y, collision_type }
-    }
+// ── OpenEntry (stored in BinaryHeap) ────────────────────────────────────────
+// Only holds what's needed for sorting — costs + position as key.
+// BinaryHeap is a max-heap, so we reverse the ordering to get min-heap behavior.
+
+#[derive(Eq, PartialEq)]
+struct OpenEntry {
+    f: u32,
+    h: u32,
+    pos: (u32, u32),
 }
 
-impl Ord for PathNode {
+impl Ord for OpenEntry {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.f.cmp(&self.f).then_with(|| other.h.cmp(&self.h))
+        other.f.cmp(&self.f).then(other.h.cmp(&self.h))
     }
 }
 
-impl PartialOrd for PathNode {
+impl PartialOrd for OpenEntry {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Node {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other.f.cmp(&self.f).then_with(|| other.h.cmp(&self.h))
-    }
-}
+pub fn find_path<F>(
+    ox: u32,
+    oy: u32,
+    tx: u32,
+    ty: u32,
+    is_passable_cb: F
+)
+-> Option<Vec<(/*x*/ u32,/*y*/ u32)>>
+// direction: (-1. 1) = (Left, Down). for (0,0), just ignore direction check.
+// NOTE: this callback must implement bound check, because this function is not
+//       dimension aware
+where F: Fn(/*x*/ u32, /*y*/ u32, /*direction*/ (i32, i32)) -> bool
+{
+    if (ox, oy) == (tx, ty) { return Some(vec!()); }
+    if !is_passable_cb(ox, oy, (0, 0)) || !is_passable_cb(tx, ty, (0, 0)) { return None }
 
-impl PartialOrd for Node {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+    let mut open_list: BinaryHeap<OpenEntry> = BinaryHeap::new();
+    let mut nodes: HashMap<(u32, u32), PathNode> = HashMap::new();
+    let mut closed: std::collections::HashSet<(u32, u32)> = std::collections::HashSet::new();
 
-impl AStar {
-    pub fn new() -> AStar {
-        AStar {
-            width: 0,
-            height: 0,
-            grid: Vec::new(),
-            path_cache: HashMap::new(),
-            cache_hits: 0,
-            cache_misses: 0,
-        }
-    }
+    let goal = (tx, ty);
+    let start_h = calculate_cost(ox, oy, tx, ty);
+    let start_node = PathNode::new(ox, oy, 0, start_h, None);
 
-    pub fn reset(&mut self) {
-        self.width = 0;
-        self.height = 0;
-        self.grid.clear();
-        if self.path_cache.len() > 1000 {
-            self.path_cache.clear();
-        }
-    }
+    open_list.push(OpenEntry { f: start_node.f, h: start_h, pos: (ox, oy) });
+    nodes.insert((ox, oy), start_node);
 
-    pub fn update_from_collision_data(&mut self, width: u32, height: u32, collision_data: &[u8]) {
-        if self.width != width || self.height != height {
-            self.reset();
-            self.width = width;
-            self.height = height;
-            self.grid.reserve_exact(collision_data.len());
-        } else {
-            self.path_cache.clear();
+    while let Some(entry) = open_list.pop() {
+        let pos = entry.pos;
+
+        if pos == goal {
+            return Some(reconstruct_path(&nodes, goal));
         }
 
-        self.grid.clear();
-        self.grid.extend_from_slice(collision_data);
-    }
-
-    pub fn update_from_tiles(&mut self, width: u32, height: u32, tiles: &[(u16, u8)]) {
-        if self.width != width || self.height != height {
-            self.reset();
-            self.width = width;
-            self.height = height;
-            self.grid.reserve_exact(tiles.len());
-        } else {
-            self.path_cache.clear();
+        // Skip if already processed (stale entry in heap)
+        if closed.contains(&pos) {
+            continue;
         }
+        closed.insert(pos);
 
-        self.grid.clear();
-        for &(_, collision_type) in tiles {
-            self.grid.push(collision_type);
-        }
-    }
+        let current_g = nodes[&pos].g;
 
-    pub fn find_path(
-        &mut self,
-        from_x: u32,
-        from_y: u32,
-        to_x: u32,
-        to_y: u32,
-        has_access: bool,
-    ) -> Option<Vec<Node>> {
-        let cache_key = (from_x, from_y, to_x, to_y, has_access);
-        if let Some(cached_path) = self.path_cache.get(&cache_key) {
-            self.cache_hits += 1;
-            return cached_path.as_ref().map(|path| {
-                path.iter()
-                    .map(|&(x, y)| {
-                        let index = (y * self.width + x) as usize;
-                        let collision_type = self.grid.get(index).copied().unwrap_or(0);
-                        Node::new(x, y, collision_type)
-                    })
-                    .collect()
-            });
-        }
-
-        self.cache_misses += 1;
-
-        if from_x >= self.width
-            || from_y >= self.height
-            || to_x >= self.width
-            || to_y >= self.height
-        {
-            self.path_cache.insert(cache_key, None);
-            return None;
-        }
-
-        let start_index = (from_y * self.width + from_x) as usize;
-        let end_index = (to_y * self.width + to_x) as usize;
-
-        if self.is_blocked(start_index, has_access) || self.is_blocked(end_index, has_access) {
-            self.path_cache.insert(cache_key, None);
-            return None;
-        }
-
-        if from_x == to_x && from_y == to_y {
-            let result = vec![(from_x, from_y)];
-            self.path_cache.insert(cache_key, Some(result.clone()));
-            return Some(
-                result
-                    .into_iter()
-                    .map(|(x, y)| {
-                        let collision_type = self.grid[start_index];
-                        Node::new(x, y, collision_type)
-                    })
-                    .collect(),
-            );
-        }
-
-        let mut open_list = BinaryHeap::new();
-        let mut came_from = HashMap::with_capacity(256);
-        let mut g_scores = HashMap::with_capacity(256);
-        let mut closed_set = HashSet::with_capacity(256);
-
-        let start_h = self.calculate_h(from_x, from_y, to_x, to_y);
-        open_list.push(PathNode::new(from_x, from_y, 0, start_h));
-        g_scores.insert((from_x, from_y), 0u32);
-
-        while let Some(current) = open_list.pop() {
-            let current_pos = (current.x, current.y);
-
-            if current.x == to_x && current.y == to_y {
-                let path =
-                    self.reconstruct_optimized_path(&came_from, current_pos, (from_x, from_y));
-                self.path_cache.insert(cache_key, Some(path.clone()));
-                return Some(
-                    path.into_iter()
-                        .map(|(x, y)| {
-                            let index = (y * self.width + x) as usize;
-                            let collision_type = self.grid.get(index).copied().unwrap_or(0);
-                            Node::new(x, y, collision_type)
-                        })
-                        .collect(),
-                );
-            }
-
-            if closed_set.contains(&current_pos) {
-                continue;
-            }
-            closed_set.insert(current_pos);
-
-            self.process_neighbors(
-                current,
-                to_x,
-                to_y,
-                &mut open_list,
-                &mut came_from,
-                &mut g_scores,
-                &closed_set,
-                has_access,
-            );
-        }
-
-        self.path_cache.insert(cache_key, None);
-        None
-    }
-
-    #[inline]
-    fn movement_cost(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> u32 {
-        let dx = from_x.abs_diff(to_x);
-        let dy = from_y.abs_diff(to_y);
-        if dx == 1 && dy == 1 { 14 } else { 10 }
-    }
-
-    #[inline]
-    fn calculate_h(&self, from_x: u32, from_y: u32, to_x: u32, to_y: u32) -> u32 {
-        let dx = from_x.abs_diff(to_x);
-        let dy = from_y.abs_diff(to_y);
-        14 * dx.min(dy) + 10 * dx.abs_diff(dy)
-    }
-
-    #[inline]
-    fn is_blocked(&self, index: usize, has_access: bool) -> bool {
-        self.grid.get(index).map_or(true, |&ct| {
-            if ct == 1 || ct == 6 {
-                true
-            } else if ct == 3 {
-                !has_access
-            } else {
-                false
-            }
-        })
-    }
-
-    fn process_neighbors(
-        &self,
-        current: PathNode,
-        target_x: u32,
-        target_y: u32,
-        open_list: &mut BinaryHeap<PathNode>,
-        came_from: &mut HashMap<(u32, u32), (u32, u32)>,
-        g_scores: &mut HashMap<(u32, u32), u32>,
-        closed_set: &HashSet<(u32, u32)>,
-        has_access: bool,
-    ) {
-        const DIRECTIONS: [(i32, i32); 8] = [
+        const DIRECTIONS: [(i32, i32); 4] = [
             (-1, 0), (1, 0), (0, -1), (0, 1),
-            (-1, -1), (-1, 1), (1, -1), (1, 1),
         ];
 
-        for &(dx, dy) in &DIRECTIONS {
-            let new_x = current.x as i32 + dx;
-            let new_y = current.y as i32 + dy;
+        for (dx, dy) in DIRECTIONS {
+            let nx = pos.0 as i32 + dx;
+            let ny = pos.1 as i32 + dy;
 
-            if new_x < 0 || new_y < 0 || new_x >= self.width as i32 || new_y >= self.height as i32 {
+            if nx < 0 || ny < 0 {
                 continue;
             }
 
-            let new_x = new_x as u32;
-            let new_y = new_y as u32;
-            let new_pos = (new_x, new_y);
+            let nx = nx as u32;
+            let ny = ny as u32;
 
-            if closed_set.contains(&new_pos) {
+            if !is_passable_cb(nx, ny, (dx, dy)) || closed.contains(&(nx, ny)) {
                 continue;
             }
 
-            let index = (new_y * self.width + new_x) as usize;
-            if self.is_blocked(index, has_access) {
-                continue;
-            }
+            let new_g = current_g + 1; // move cost is 1
+            let new_h = calculate_cost(nx, ny, tx, ty);
+            let new_f = new_g + new_h;
+            let new_node = PathNode::new(nx, ny, new_g, new_h, Some(pos));
 
-            // For diagonal moves, both adjacent orthogonal tiles must be passable
-            if dx != 0 && dy != 0 {
-                let adj1_x = (current.x as i32 + dx) as usize;
-                let adj1_y = current.y as usize;
-                let adj2_x = current.x as usize;
-                let adj2_y = (current.y as i32 + dy) as usize;
+            // Only insert/update if we found a cheaper path
+            let should_update = nodes.get(&(nx, ny))
+                .map_or(true, |existing| (new_node.f < existing.f) || (new_node.f == existing.f && new_node.h < existing.h));
 
-                let adj1_index = adj1_y * self.width as usize + adj1_x;
-                let adj2_index = adj2_y * self.width as usize + adj2_x;
-
-                if self.is_blocked(adj1_index, has_access)
-                    || self.is_blocked(adj2_index, has_access)
-                {
-                    continue;
-                }
-            }
-
-            let tentative_g = current.g + self.movement_cost(current.x, current.y, new_x, new_y);
-
-            if let Some(&existing_g) = g_scores.get(&new_pos) {
-                if tentative_g >= existing_g {
-                    continue;
-                }
-            }
-
-            g_scores.insert(new_pos, tentative_g);
-            came_from.insert(new_pos, (current.x, current.y));
-
-            let h = self.calculate_h(new_x, new_y, target_x, target_y);
-            open_list.push(PathNode::new(new_x, new_y, tentative_g, h));
-        }
-    }
-
-    fn reconstruct_optimized_path(
-        &self,
-        came_from: &HashMap<(u32, u32), (u32, u32)>,
-        current: (u32, u32),
-        start: (u32, u32),
-    ) -> Vec<(u32, u32)> {
-        let mut path = Vec::new();
-        let mut current = current;
-
-        while current != start {
-            path.push(current);
-            current = match came_from.get(&current) {
-                Some(&prev) => prev,
-                None => break,
-            };
-        }
-
-        path.push(start);
-        path.reverse();
-        path
-    }
-
-    pub fn clear_cache(&mut self) {
-        self.path_cache.clear();
-        self.cache_hits = 0;
-        self.cache_misses = 0;
-    }
-
-    pub fn cache_stats(&self) -> (u32, u32, f32) {
-        let total = self.cache_hits + self.cache_misses;
-        let hit_rate = if total > 0 {
-            self.cache_hits as f32 / total as f32 * 100.0
-        } else {
-            0.0
-        };
-        (self.cache_hits, self.cache_misses, hit_rate)
-    }
-
-    pub fn update_single_tile(&mut self, x: u32, y: u32, collision_type: u8) {
-        if x < self.width && y < self.height {
-            let index = (y * self.width + x) as usize;
-            if index < self.grid.len() {
-                self.grid[index] = collision_type;
-                self.path_cache.retain(|&(fx, fy, tx, ty, _), _| {
-                    !((fx <= x + 1 && fx + 1 >= x && fy <= y + 1 && fy + 1 >= y)
-                        || (tx <= x + 1 && tx + 1 >= x && ty <= y + 1 && ty + 1 >= y))
-                });
+            if should_update {
+                nodes.insert((nx, ny), new_node);
+                open_list.push(OpenEntry { f: new_f, h: new_h, pos: (nx, ny) });
             }
         }
     }
+
+    None // no path found
+}
+
+fn reconstruct_path(nodes: &HashMap<(u32, u32), PathNode>, goal: (u32, u32)) -> Vec<(u32, u32)> {
+    let mut path = Vec::new();
+    let mut current = goal;
+
+    loop {
+        path.push(current);
+        match nodes[&current].parent {
+            Some(parent) => current = parent,
+            None => break,
+        }
+    }
+
+    path.reverse();
+    path
+}
+
+fn calculate_cost(ox: u32, oy: u32, tx: u32, ty: u32) -> u32 {
+    ox.abs_diff(tx) + oy.abs_diff(ty)
 }
