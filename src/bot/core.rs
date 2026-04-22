@@ -1103,6 +1103,9 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                                 GamePacketType::ItemChangeObject => {
                                     self.on_item_change_object(&pkt)
                                 }
+                                GamePacketType::TileApplyDamage => {
+                                    self.on_tile_apply_damage(&pkt)
+                                }
                                 GamePacketType::SendLock => self.on_send_lock(&pkt),
                                 GamePacketType::Npc => self.on_npc_packet(&pkt),
                                 _ => self.log_console(format!("[Bot] {pkt}")),
@@ -2007,6 +2010,41 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
             bg,
         });
         self.log_console(format!("[Bot] SendLock tile=({x},{y}) item={fg}"));
+    }
+
+    fn on_tile_apply_damage(&mut self, pkt: &GameUpdatePacket) {
+        if self.world.is_none() {
+            return;
+        }
+        let world = match self.world.as_mut() {
+            Some(w) => Arc::make_mut(w),
+            None => return,
+        };
+        let tile_map = &mut world.tile_map;
+        let idx = (pkt.int_y as u32) * tile_map.width + (pkt.int_x as u32);
+
+        let Some(tile) = tile_map.tiles.get_mut(idx as usize) else {
+            return;
+        };
+
+        // TODO: find better way than this ugly thing
+        const TOGGLEABLE_ITEM_BY_PUNCH: [u32; 7] = [1226, 6172, 6398, 8348, 8350, 8806, 8808];
+        if TOGGLEABLE_ITEM_BY_PUNCH.contains(&(tile.fg_item_id as u32)) {
+            tile.flags.toggle(TileFlags::IS_ON);
+        }
+
+        let Some(item_info) = self.items_dat.find_by_id(tile.fg_item_id as u32) else {
+            return;
+        };
+
+
+        match item_info.action_type {
+            31 => { // switcheroo
+                tile.flags.toggle(TileFlags::IS_ON);
+            }
+            _ => {}
+        }
+
     }
 
     pub fn walk(&mut self, tile_x: u32, tile_y: u32) {
