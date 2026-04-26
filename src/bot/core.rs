@@ -740,7 +740,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 && self.collect_timer.elapsed() >= std::time::Duration::from_millis(self.collect_interval)
             {
                 self.collect_timer = std::time::Instant::now();
-                self.collect();
+                self.collect(None, None);
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
@@ -2191,7 +2191,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         self.auto_collect = enabled;
     }
 
-    pub fn collect(&mut self) -> usize {
+    pub fn collect(&mut self, radius: Option<u8>, delay: Option<u64>) -> usize {
         // Must be in a world
         if self.world.is_none() {
             return 0;
@@ -2207,9 +2207,11 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
         let pos_x = self.pos_x;
         let pos_y = self.pos_y;
 
-        let radius_tiles = self.collect_radius_tiles.clamp(1, 5);
+        let radius_tiles = radius.unwrap_or(self.collect_radius_tiles.clamp(1, 5));
         let r_px = radius_tiles as f32 * 32.0;
         const MAX_PER_TICK: usize = 32; // cap packets per call
+
+        let delay = delay.unwrap_or(self.collect_interval);
 
         let nearby: HashMap<(u32, u32), Vec<(f32, f32, u32, u16)>> = {
             let objects = &self.world.as_ref().unwrap().objects;
@@ -2285,6 +2287,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                     };
 
                     self.send_game_packet(&pkt, true);
+                    self.sleep_ms(delay);
                     sent += 1;
                 }
             }
@@ -2487,7 +2490,7 @@ rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nz
                 Rep::Ack
             }
             Req::Collect { range, interval_ms } => {
-                Rep::CollectCount(self.collect())
+                Rep::CollectCount(self.collect(Some(range as u8), Some(interval_ms)))
             }
             Req::SetMac { mac } => {
                 self.mac = mac.clone();
