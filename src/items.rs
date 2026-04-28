@@ -49,6 +49,8 @@ pub struct ItemInfo {
     pub punch_option:        String,
     // v22+
     pub description:         String,
+    pub hit_sound_fx: String,
+    pub hit_sound_fx_hash: u32,
 }
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
@@ -206,6 +208,10 @@ fn parse_item(cur: &mut Cursor, version: u16) -> Result<ItemInfo> {
     }
     if version >= 24 {
         cur.skip(1)?;
+    }
+    if version >= 25 {
+        it.hit_sound_fx = cur.plain_string()?;
+        it.hit_sound_fx_hash = cur.u32()?;
     }
 
     Ok(it)
