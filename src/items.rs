@@ -213,6 +213,9 @@ fn parse_item(cur: &mut Cursor, version: u16) -> Result<ItemInfo> {
         it.hit_sound_fx = cur.plain_string()?;
         it.hit_sound_fx_hash = cur.u32()?;
     }
+    if version >= 26 {
+        cur.skip(1)?;
+    }
 
     Ok(it)
 }
