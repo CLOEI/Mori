@@ -73,6 +73,17 @@ pub fn bgra_to_rgb(color: u32) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
 }
 
+// ── ProtonSDK hash helper ─────────────────────────────────────────────────────
+
+/// Computes the ProtonSDK hash for a byte slice (used for items.dat verification and fhash).
+pub fn proton_sdk_hash(chunk: &[u8]) -> i32 {
+    let mut hash: u32 = 0x55555555;
+    for &b in chunk {
+        hash = (hash >> 27).wrapping_add(hash << 5).wrapping_add(b as u32);
+    }
+    hash as i32
+}
+
 // ── Top-level container ───────────────────────────────────────────────────────
 
 pub struct ItemsDat {
@@ -104,17 +115,18 @@ impl ItemsDat {
         self.items.iter().find(|i| i.name.to_lowercase() == lower)
     }
 
-    /// Load from `items.dat` on disk; returns an empty database on failure.
+    /// Load from `.cache/items.dat` on disk; returns an empty database on failure.
     pub fn load() -> Self {
-        match std::fs::read("items.dat").and_then(|d| {
+        let path = crate::setup::items_dat_path();
+        match std::fs::read(&path).and_then(|d| {
             Self::parse(&d).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
         }) {
             Ok(db) => {
-                println!("[Items] Loaded {} items", db.items.len());
+                println!("[Items] Loaded {} items from {}", db.items.len(), path.display());
                 db
             }
             Err(e) => {
-                println!("[Items] Failed to load items.dat: {e} — pathfinding will be inaccurate");
+                println!("[Items] Failed to load {}: {e} — pathfinding will be inaccurate", path.display());
                 Self {
                     version: 0,
                     items: Vec::new(),
@@ -239,7 +251,11 @@ mod tests {
 
     #[test]
     fn parse_items_dat() {
-        let data = std::fs::read("items.dat").expect("items.dat not found in project root");
+        let path = crate::setup::items_dat_path();
+        if !path.exists() {
+            crate::setup::init();
+        }
+        let data = std::fs::read(&path).expect(".cache/items.dat not found");
         let db = ItemsDat::parse(&data).expect("parse failed");
 
         println!("version    : {}", db.version);
@@ -262,5 +278,16 @@ mod tests {
 
         assert!(!db.items.is_empty());
         assert!(db.items.last().unwrap().name != "");
+    }
+
+    #[test]
+    fn test_proton_sdk_hash() {
+        let path = crate::setup::items_dat_path();
+        if !path.exists() {
+            crate::setup::init();
+        }
+        let data = std::fs::read(&path).expect(".cache/items.dat not found");
+        let hash = proton_sdk_hash(&data);
+        assert_ne!(hash, 0);
     }
 }

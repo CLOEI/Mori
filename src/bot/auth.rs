@@ -1,4 +1,4 @@
-use crate::constants::{GAME_VER, PROTOCOL};
+use crate::constants::{get_game_version, get_protocol};
 use crate::dashboard::get_dashboard_proxied;
 use crate::login::{LoginError, get_legacy_token_proxied};
 use crate::server_data::{LoginInfo, get_server_data_proxied};
@@ -22,8 +22,8 @@ pub(super) fn fetch_credentials(
     let proxy_url = proxy_url.as_deref();
 
     let login_info = LoginInfo {
-        protocol: PROTOCOL,
-        game_version: GAME_VER.into(),
+        protocol: get_protocol(),
+        game_version: get_game_version(),
     };
 
     let mut alternate = false;

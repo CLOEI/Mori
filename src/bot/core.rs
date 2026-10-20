@@ -3,7 +3,7 @@ use crate::bot_state::{
     BotCommand, BotDelays, BotState, BotStatus, CmdReceiver, InvSlot, PlayerInfo, TileInfo,
     WorldObjectInfo,
 };
-use crate::constants::{FHASH, GAME_VER, PROTOCOL};
+use crate::constants::{get_fhash, get_game_version, get_protocol};
 use crate::cursor::Cursor;
 use crate::protocol::crypto::{compute_klv, generate_rid, hash_string, random_hex, random_mac};
 use crate::events::{WsEvent, WsInvItem, WsObject, WsTile, WsTx};
@@ -369,8 +369,8 @@ impl Bot {
         let proxy_url = proxy.as_ref().map(|p| p.to_url());
         let proxy_url_ref = proxy_url.as_deref();
         let login_info = LoginInfo {
-            protocol: PROTOCOL,
-            game_version: GAME_VER.into(),
+            protocol: get_protocol(),
+            game_version: get_game_version(),
         };
 
         let log_state = Arc::clone(&state);
@@ -410,11 +410,14 @@ impl Bot {
             }
         };
 
-        let klv = compute_klv(GAME_VER, &PROTOCOL.to_string(), &rid, hash);
+        let game_ver = get_game_version();
+        let protocol = get_protocol();
+        let fhash = get_fhash();
+        let klv = compute_klv(&game_ver, &protocol.to_string(), &rid, hash);
         let login_data = format!(
-            "tankIDName|\ntankIDPass|\nrequestedName|\nf|1\nprotocol|{PROTOCOL}\n\
-game_version|{GAME_VER}\nfz|22243512\ncbits|1024\nplayer_age|20\nGDPR|2\nFCMToken|\n\
-category|_-5100\ntotalPlaytime|0\nklv|{klv}\nhash2|{hash2}\nmeta|{}\nfhash|{FHASH}\n\
+            "tankIDName|\ntankIDPass|\nrequestedName|\nf|1\nprotocol|{protocol}\n\
+game_version|{game_ver}\nfz|22243512\ncbits|1024\nplayer_age|20\nGDPR|2\nFCMToken|\n\
+category|_-5100\ntotalPlaytime|0\nklv|{klv}\nhash2|{hash2}\nmeta|{}\nfhash|{fhash}\n\
 rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}\nwk|{wk}\nzf|31631978\nlmode|1\n",
             server_data.meta,
         );
@@ -506,8 +509,8 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
         self.refresh_token();
 
         let login_info = LoginInfo {
-            protocol: PROTOCOL,
-            game_version: GAME_VER.into(),
+            protocol: get_protocol(),
+            game_version: get_game_version(),
         };
         let proxy_url = self.proxy.as_ref().map(|p| p.to_url());
         let mut alternate = false;
@@ -586,20 +589,21 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
 
     fn build_login_packet(&self) -> String {
         format!(
-            "protocol|{PROTOCOL}\nltoken|{}\nplatformID|2\n",
+            "protocol|{}\nltoken|{}\nplatformID|2\n", get_protocol(),
             self.ltoken
         )
     }
 
     fn build_redirect_packet(&self, r: &RedirectData) -> String {
-        let klv = compute_klv(GAME_VER, &PROTOCOL.to_string(), &self.rid, self.hash);
+        let game_ver = get_game_version();
+        let klv = compute_klv(&game_ver, &get_protocol().to_string(), &self.rid, self.hash);
         let mut data = String::new();
         data.push_str(&format!("tankIDName|{}\n", r.tank_id_name));
         data.push_str("tankIDPass|\n");
         data.push_str("requestedName|\n");
         data.push_str("f|1\n");
         data.push_str("protocol|211\n");
-        data.push_str(&format!("game_version|{}\n", GAME_VER));
+        data.push_str(&format!("game_version|{}\n", game_ver));
         data.push_str("fz|47142936\n");
         data.push_str("cbits|1536\n");
         data.push_str("player_age|18\n");
@@ -610,7 +614,7 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
         data.push_str(&format!("klv|{klv}\n"));
         data.push_str(&format!("hash2|{}\n", self.hash2));
         data.push_str(&format!("meta|{}\n", self.meta));
-        data.push_str(&format!("fhash|{FHASH}\n"));
+        data.push_str(&format!("fhash|{}\n", get_fhash()));
         data.push_str(&format!("rid|{}\n", self.rid));
         data.push_str("platformID|0,1,1\n");
         data.push_str("deviceVersion|0\n");
@@ -633,11 +637,14 @@ rid|{rid}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{hash}\nmac|{mac}
     /// Builds the `clientData` string sent to the check-token endpoint.
     /// Uses the bot's stable per-session values (rid, mac, wk, hash, hash2).
     fn build_login_data(&self) -> String {
-        let klv = compute_klv(GAME_VER, &PROTOCOL.to_string(), &self.rid, self.hash);
+        let game_ver = get_game_version();
+        let protocol = get_protocol();
+        let fhash = get_fhash();
+        let klv = compute_klv(&game_ver, &protocol.to_string(), &self.rid, self.hash);
         format!(
-            "tankIDName|\ntankIDPass|\nrequestedName|\nf|1\nprotocol|{PROTOCOL}\n\
-game_version|{GAME_VER}\nfz|22243512\ncbits|1024\nplayer_age|20\nGDPR|2\nFCMToken|\n\
-category|_-5100\ntotalPlaytime|0\nklv|{klv}\nhash2|{}\nmeta|{}\nfhash|{FHASH}\n\
+            "tankIDName|\ntankIDPass|\nrequestedName|\nf|1\nprotocol|{protocol}\n\
+game_version|{game_ver}\nfz|22243512\ncbits|1024\nplayer_age|20\nGDPR|2\nFCMToken|\n\
+category|_-5100\ntotalPlaytime|0\nklv|{klv}\nhash2|{}\nmeta|{}\nfhash|{fhash}\n\
 rid|{}\nplatformID|0,1,1\ndeviceVersion|0\ncountry|jp\nhash|{}\nmac|{}\nwk|{}\nzf|31631978\nlmode|1\n",
             self.hash2, self.meta, self.rid, self.hash, self.mac, self.wk,
         )
