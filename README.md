@@ -68,7 +68,7 @@ Most Growtopia companion tools are Windows-only. Mori changes that. It's a cross
 | ✅ | Item database | Searchable item reference |
 | ✅ | Inventory | View bot inventory |
 | ✅ | Growscan | World block scanning |
-| 🔲 | Auto-update | Fetch latest version & items.dat automatically |
+| ✅ | Auto-update | Fetch latest version & items.dat automatically |
 
 ## Getting Started
 
