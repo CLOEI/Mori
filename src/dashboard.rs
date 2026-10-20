@@ -1,6 +1,6 @@
 use std::time::Duration;
 use scraper::{Html, Selector};
-use crate::constants::FHASH;
+use crate::constants::get_fhash;
 use crate::protocol::crypto::{compute_klv, generate_rid, hash_string};
 use crate::server_data::LoginInfo;
 use serde_json;
@@ -49,7 +49,7 @@ pub fn get_dashboard_proxied(
         ("totalPlaytime", "0"),
         ("klv",           &klv),
         ("meta",          meta),
-        ("fhash",         &FHASH.to_string()),
+        ("fhash",         &get_fhash().to_string()),
         ("rid",           &rid),
         ("platformID",    "2"),
         ("deviceVersion", "0"),
