@@ -122,11 +122,18 @@ impl ItemsDat {
             Self::parse(&d).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
         }) {
             Ok(db) => {
-                println!("[Items] Loaded {} items from {}", db.items.len(), path.display());
+                println!(
+                    "[Items] Loaded {} items from {}",
+                    db.items.len(),
+                    path.display()
+                );
                 db
             }
             Err(e) => {
-                println!("[Items] Failed to load {}: {e} — pathfinding will be inaccurate", path.display());
+                println!(
+                    "[Items] Failed to load {}: {e} — pathfinding will be inaccurate",
+                    path.display()
+                );
                 Self {
                     version: 0,
                     items: Vec::new(),
@@ -249,12 +256,20 @@ fn parse_item(cur: &mut Cursor, version: u16) -> Result<ItemInfo> {
 mod tests {
     use super::*;
 
+    fn ensure_items_dat() -> std::path::PathBuf {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        let path = crate::setup::items_dat_path();
+        INIT.call_once(|| {
+            if !path.exists() {
+                crate::setup::init();
+            }
+        });
+        path
+    }
+
     #[test]
     fn parse_items_dat() {
-        let path = crate::setup::items_dat_path();
-        if !path.exists() {
-            crate::setup::init();
-        }
+        let path = ensure_items_dat();
         let data = std::fs::read(&path).expect(".cache/items.dat not found");
         let db = ItemsDat::parse(&data).expect("parse failed");
 
@@ -282,10 +297,7 @@ mod tests {
 
     #[test]
     fn test_proton_sdk_hash() {
-        let path = crate::setup::items_dat_path();
-        if !path.exists() {
-            crate::setup::init();
-        }
+        let path = ensure_items_dat();
         let data = std::fs::read(&path).expect(".cache/items.dat not found");
         let hash = proton_sdk_hash(&data);
         assert_ne!(hash, 0);

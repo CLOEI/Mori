@@ -1,9 +1,9 @@
+use anyhow::{Result, bail};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{OnceLock, RwLock};
 use std::time::Duration;
-use anyhow::{bail, Result};
-use serde::{Deserialize, Serialize};
 
 use crate::constants::{DEFAULT_FHASH, DEFAULT_GAME_VER, DEFAULT_PROTOCOL};
 use crate::items::proton_sdk_hash;
@@ -185,6 +185,8 @@ pub fn init() {
     let _ = fs::create_dir_all(cache_dir());
 
     let mut current_config = load_cached_config().unwrap_or_default();
+    current_config.protocol = DEFAULT_PROTOCOL;
+    current_config.fhash = DEFAULT_FHASH;
     let agent = create_agent();
 
     // 1. Check latest game version
@@ -217,9 +219,7 @@ pub fn init() {
                     Ok(bytes) => {
                         let local_hash = proton_sdk_hash(&bytes);
                         if local_hash == meta.hash {
-                            println!(
-                                "[Setup] .cache/items.dat is up to date (hash: {local_hash})"
-                            );
+                            println!("[Setup] .cache/items.dat is up to date (hash: {local_hash})");
                             need_download = false;
                             current_config.items_hash = meta.hash;
                             current_config.items_content = meta.content.clone();
@@ -311,6 +311,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires network access"]
     fn test_fetch_latest_version() {
         let agent = create_agent();
         let res = fetch_latest_game_version(&agent);
@@ -321,6 +322,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires network access"]
     fn test_fetch_latest_items_meta() {
         let agent = create_agent();
         let res = fetch_latest_items_meta(&agent);
