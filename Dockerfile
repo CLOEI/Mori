@@ -63,7 +63,6 @@ WORKDIR /app
 
 COPY --from=builder /app/Mori ./Mori
 COPY --from=web-builder /app/dist ./dist
-COPY items.dat ./items.dat
 
 EXPOSE 3000
 
